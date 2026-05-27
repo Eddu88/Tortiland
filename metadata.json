@@ -1,0 +1,6 @@
+{
+  "name": "Tortiland",
+  "description": "An interactive retro-style arcade game where you control a cute 3D turtle protagonist, grow and remove lush animated hedge barriers, and gather delicious fruits while dodging clever foxes.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

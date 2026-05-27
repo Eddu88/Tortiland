@@ -1,0 +1,79 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+export type TileType = 0 | 1 | 2; // 0: EMPTY, 1: WALL, 2: ICE/GRASS
+
+export type EnemyType = 'patrol' | 'chaser' | 'ghost';
+
+export interface Position {
+  x: number;
+  y: number;
+}
+
+export interface GridPos {
+  col: number;
+  row: number;
+}
+
+export interface Player {
+  col: number;
+  row: number;
+  x: number;
+  y: number;
+  targetCol: number;
+  targetRow: number;
+  moving: boolean;
+  dir: Position; // direction vector (x: -1..1, y: -1..1)
+  speed: number;
+  animFrame: number;
+  animTimer: number;
+  invincible: number; // frames left
+  goldenBroccoliTimer: number; // frames left
+  powerCooldown: number; // frames left
+}
+
+export interface Enemy {
+  id: string;
+  type: EnemyType;
+  col: number;
+  row: number;
+  x: number;
+  y: number;
+  targetCol: number;
+  targetRow: number;
+  moving: boolean;
+  dir: Position;
+  speed: number;
+  chaseTimer: number;
+  animFrame: number;
+  animTimer: number;
+}
+
+export interface Fruit {
+  col: number;
+  row: number;
+  type: number; // 0: Wild Herb, 1: Broccoli, 2: Cabbage, 3: Apple, 4: Orange, 5: Golden Broccoli
+  anim: number; // offset animation factor
+}
+
+export interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  maxLife: number;
+  color: string;
+}
+
+export type GameState = 'menu' | 'playing' | 'paused' | 'dead' | 'gameover' | 'win';
+export type LevelPhase = 'apples' | 'oranges';
+
+export interface HighScore {
+  name: string;
+  score: number;
+  time: number;
+  date: string;
+}
