@@ -35,6 +35,13 @@
   animation: pulse-border 4s infinite ease-in-out;
 }
 
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+}
+
 body {
   background-color: #0d1117;
   color: #c9d1d9;

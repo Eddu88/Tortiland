@@ -60,30 +60,13 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-gradient-to-br from-[#0c1e0e] via-[#050b06] to-[#122414] text-[#e2f1e4] font-sans selection:bg-[#22c55e]/30 selection:text-[#a7f3d0]">
-
-      {/* simulated macOS/VS Code title bar wrapper with organic woodland trim */}
-      <header className="w-full max-w-5xl h-12 bg-[#0f2413] border-2 border-[#224d27] border-b-0 rounded-t-2xl flex items-center justify-between px-4 select-none shadow-lg">
-        <div className="flex items-center space-x-4">
-          <div className="flex space-x-1.5">
-            <div className="w-3 h-3 rounded-full bg-[#f43f5e] shadow-[0_0_3px_#f43f5e]"></div>
-            <div className="w-3 h-3 rounded-full bg-[#eab308] shadow-[0_0_3px_#eab308]"></div>
-            <div className="w-3 h-3 rounded-full bg-[#10b981] shadow-[0_0_3px_#10b981]"></div>
-          </div>
-          <div className="h-4 w-px bg-[#224d27] mx-2"></div>
-          <span className="text-xs font-semibold text-[#86efac]/60 font-mono">TurtleGarden / src / </span>
-          <span className="text-xs font-semibold text-[#86efac] font-mono">App.tsx</span>
-        </div>
-        <div className="flex items-center space-x-3 text-xs text-[#86efac]/70">
-          <span className="hover:text-white cursor-pointer select-none font-mono"> TORTILAND</span>
-        </div>
-      </header>
+    <div className="h-screen w-screen flex flex-col items-center justify-center p-3 md:p-4 bg-gradient-to-br from-[#0c1e0e] via-[#050b06] to-[#122414] text-[#e2f1e4] font-sans selection:bg-[#22c55e]/30 selection:text-[#a7f3d0] overflow-hidden">
 
       {/* Main Container Dashboard enclosing the entire app workspace */}
-      <div className="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center max-w-5xl w-full bg-[#112415] border-2 border-[#224d27] rounded-b-2xl p-5 shadow-2xl shadow-black/80">
+      <div className="flex flex-col lg:flex-row gap-5 items-center lg:items-stretch justify-center max-w-[95vw] w-full h-full max-h-[92vh] bg-[#112415] border-2 border-[#224d27] rounded-2xl p-4 md:p-5 shadow-2xl shadow-black/80 overflow-hidden">
 
         {/* Playfield Area Box */}
-        <div className="flex-1 flex flex-col items-center w-full">
+        <div className="flex-1 flex flex-col items-center w-full h-full min-h-0">
 
           {/* Top Stats HUD Bar matching custom wood panels */}
           <div className="w-full flex flex-wrap gap-4 items-center justify-between rounded-xl border-2 border-[#203f25] bg-[#09130a] p-4 mb-4 select-none shadow-[inset_0_2px_8px_rgba(0,0,0,0.8)]">
@@ -132,7 +115,7 @@ export default function App() {
           </div>
 
           {/* Interactive Play Canvas Section */}
-          <div className="relative w-full">
+          <div className="relative w-full flex-1 min-h-0 flex items-center justify-center">
             <GameCanvas
               gameState={gameState}
               setGameState={setGameState}
@@ -161,10 +144,10 @@ export default function App() {
                 {gameState === 'menu' && (
                   <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
                     <span className="px-3 py-1 rounded-md text-[9px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
-                      V2.0 JARDÍN EDICIÓN MÁGICA
+                      V2.0 TORTILAND
                     </span>
                     <h2 className="font-press-start text-base md:text-lg text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
-                      TORTUGA JARDÍN MÁGICO
+                      TORTILAND
                     </h2>
 
                     <p className="text-[#86efac]/70 text-xs leading-relaxed font-sans max-w-sm">
@@ -174,9 +157,9 @@ export default function App() {
                     <div className="rounded-xl bg-[#0f2413] border border-[#224d27] p-4 text-left w-full text-xs text-[#86efac]/80 flex flex-col gap-2 shadow-inner">
                       <div className="flex items-center gap-1.5 text-[#facc15] font-bold uppercase tracking-wider">
                         <Info size={13} fill="currentColor" className="text-[#132b18]" />
-                        CRÓNICA DEL BOSQUE
+                        CRÓNICA DEL JARDÍN
                       </div>
-                      <p>🎮 <span className="text-white font-semibold">WASD / Flechas:</span> Mueve a la tortuga por el laberinto.</p>
+                      <p>🎮 <span className="text-white font-semibold">Flechas:</span> Mueve a la tortuga por el laberinto.</p>
                       <p>🌱 <span className="text-[#4ade80] font-semibold">Espacio / F:</span> Siembra arbustos mágicos al instante.</p>
                       <p>🍂 <span className="text-[#f87171] font-semibold">Shift / C:</span> Poda y elimina el arbusto del frente.</p>
                       <p>🥦 Al quedar con <span className="text-[#facc15] font-semibold">1 sola vida</span>... ¡Búsca el <span className="text-[#facc15] font-semibold">Brócoli Dorado</span> para atravesar arbustos libremente!</p>
@@ -220,7 +203,7 @@ export default function App() {
                       🏆
                     </div>
                     <h2 className="font-press-start text-sm text-[#facc15] tracking-wider uppercase">
-                      ¡BOSQUE SALVADO!
+                      ¡JARDÍN SALVADO!
                     </h2>
                     <p className="text-[#86efac]/70 text-xs">
                       ¡Magnífico! Has recolectado todos los consumibles silvestres con agilidad.

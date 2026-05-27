@@ -76,7 +76,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
   }, [gameState]);
 
   return (
-    <div className="flex flex-col gap-5 w-full max-w-md lg:max-w-xs select-none">
+    <div className="flex flex-col justify-center gap-5 w-full max-w-md lg:max-w-xs select-none h-full">
       {/* Wooden Carved Control Console Pane */}
       <div className="flex flex-col gap-4 rounded-2xl border-4 border-[#5c3a21] bg-gradient-to-b from-[#2d1a10] to-[#1a0e05] p-4 shadow-xl shadow-black/60">
         <div className="flex items-center justify-between border-b border-[#5c3a21] pb-2.5">
@@ -85,7 +85,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <div className="w-2.5 h-2.5 rounded-full bg-[#eab308] shadow-[0_0_5px_#eab308]"></div>
             <div className="w-2.5 h-2.5 rounded-full bg-[#10b981] shadow-[0_0_5px_#10b981]"></div>
             <div className="h-3 w-px bg-[#5c3a21] mx-1.5"></div>
-            <span className="font-press-start text-[8px] tracking-widest text-[#fef08a]">CONSOLA JARDÍN</span>
+            <span className="font-press-start text-[8px] tracking-widest text-[#fef08a]">CONSOLA TORTILAND</span>
           </div>
           <button
             onClick={() => setSoundOn(!soundOn)}
@@ -105,7 +105,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           >
             <ArrowUp size={20} className="text-[#fde047]" />
           </button>
-          
+
           <div className="flex items-center gap-7">
             <button
               onTouchStart={() => triggerVirtualCommand('LEFT')}
@@ -143,7 +143,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             className="flex flex-col items-center justify-center gap-1 rounded-xl bg-[#14532d] hover:bg-[#166534] border-2 border-[#22c55e] px-3 py-2.5 text-[#dbfde3] active:scale-95 cursor-pointer transition-all shadow-md shadow-emerald-950/40"
           >
             <span className="font-press-start text-[8px] tracking-wider font-extrabold flex items-center gap-1">🌱 SEMBRAR</span>
-            <span className="text-[10px] text-[#dbfde3]/80 font-mono font-bold">Espacio</span>
+            <span className="text-[10px] text-[#dbfde3]/80 font-mono font-bold">Espacio / F</span>
           </button>
           <button
             onTouchStart={() => triggerVirtualCommand('BREAK')}
@@ -151,7 +151,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             className="flex flex-col items-center justify-center gap-1 rounded-xl bg-[#7f1d1d] hover:bg-[#991b1b] border-2 border-[#f87171] px-3 py-2.5 text-[#fee2e2] active:scale-95 cursor-pointer transition-all shadow-md shadow-rose-950/40"
           >
             <span className="font-press-start text-[8px] tracking-wider font-extrabold flex items-center gap-1">🍂 QUITAR</span>
-            <span className="text-[10px] text-[#fee2e2]/80 font-mono font-bold">Shift</span>
+            <span className="text-[10px] text-[#fee2e2]/80 font-mono font-bold">Shift / C</span>
           </button>
         </div>
       </div>
@@ -160,7 +160,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       <div className="flex flex-col gap-3 rounded-2xl border-4 border-[#5c3a21] bg-gradient-to-b from-[#2d1a10] to-[#1a0e05] p-4 shadow-xl">
         <h3 className="flex items-center gap-1.5 font-press-start text-[9px] text-[#facc15] tracking-widest font-extrabold uppercase">
           <Star className="text-[#facc15] animate-bounce" size={13} fill="currentColor" />
-          RÉCORDS DEL BOSQUE
+          RÉCORDS DEL JARDÍN
         </h3>
 
         {highScores.length === 0 ? (

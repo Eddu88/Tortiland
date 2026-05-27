@@ -109,7 +109,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetCol: 1, targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 2,
+    speed: 1.5,
     animFrame: 0, animTimer: 0,
     invincible: 0,
     goldenBroccoliTimer: 0,
@@ -276,7 +276,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       targetCol: 1, targetRow: 1,
       moving: false,
       dir: { x: 1, y: 0 },
-      speed: 2.2, // Slightly increased mobility for pleasant feel
+      speed: 1.5, // Calibrated speed for comfortable, delay-free tapping
       animFrame: 0, animTimer: 0,
       invincible: 60, // 1 sec protection on load
       goldenBroccoliTimer: 0,
@@ -300,7 +300,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         targetCol: 18, targetRow: 13,
         moving: false,
         dir: { x: 0, y: -1 },
-        speed: 1.0,
+        speed: 0.7,
         chaseTimer: 1,
         animFrame: 0, animTimer: 0,
       },
@@ -311,7 +311,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         targetCol: 18, targetRow: 1,
         moving: false,
         dir: { x: -1, y: 0 },
-        speed: 1.0,
+        speed: 0.7,
         chaseTimer: 1,
         animFrame: 0, animTimer: 0,
       },
@@ -322,7 +322,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         targetCol: 10, targetRow: 13,
         moving: false,
         dir: { x: -1, y: 0 },
-        speed: 1.3,
+        speed: 0.9,
         chaseTimer: 1,
         animFrame: 0, animTimer: 0,
       },
@@ -333,7 +333,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         targetCol: 1, targetRow: 13,
         moving: false,
         dir: { x: 0, y: -1 },
-        speed: 0.8,
+        speed: 0.6,
         chaseTimer: 1,
         animFrame: 0, animTimer: 0,
       },
@@ -398,7 +398,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
 
         const hasPlayer = (player.col === currentCc && player.row === currentCr) ||
-                          (player.targetCol === currentCc && player.targetRow === currentCr);
+          (player.targetCol === currentCc && player.targetRow === currentCr);
         const hasEnemy = enemiesRef.current.some(e => e.col === currentCc && e.row === currentCr);
 
         // Check blockage
@@ -640,7 +640,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (!player.moving) {
       // Pick current direction requested
       let dir = lastDirRef.current;
-      if (!dir) {
+      if (lastDirRef.current) {
+        // Clear simulated virtual direction so virtual buttons move exactly one tile
+        lastDirRef.current = null;
+      } else {
         if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) dir = { x: 0, y: -1 };
         else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) dir = { x: 0, y: 1 };
         else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) dir = { x: -1, y: 0 };
@@ -820,9 +823,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       for (let c = 0; c < COLS; c++) {
         if (prevMapRef.current[r][c] !== mapRef.current[r][c]) {
           if (mapRef.current[r][c] === T_ICE) {
-            spawnParticles(c, r, '#6cb33e'); // healthy grass green particles
+            spawnParticles(c, r, '#4caf50'); // vibrant leaf green grow particles
           } else if (prevMapRef.current[r][c] === T_ICE) {
-            spawnParticles(c, r, '#a3e222'); // dirt particles on breakage
+            // Explode in a satisfying combination of light and dark leaf particles!
+            spawnParticles(c, r, '#4caf50');
+            spawnParticles(c, r, '#2e7d32');
           }
         }
       }
@@ -841,84 +846,152 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         const t = mapRef.current[r][c];
 
         if (t === T_WALL) {
-          // 3D Bone-White Log Fence Block (#CAC6C7)
-          const faceTopHeight = TILE * 0.38;
-          const frontHeight = TILE - faceTopHeight;
+          // ==========================================
+          // 1. 2.5D BONE-WHITE GARDEN STONE WALLS (#CAC6C7)
+          // ==========================================
 
-          // 1. Draw Front Face (shaded body of 4 vertical logs)
-          ctx.fillStyle = '#A8A4A5'; // Shaded darker bone-white
-          ctx.fillRect(x, y + faceTopHeight, TILE, frontHeight);
+          // First draw standard ground dirt base underneath to eliminate ANY black holes!
+          ctx.fillStyle = '#C78757';
+          ctx.fillRect(x, y, TILE, TILE);
 
-          // Vertical division lines between the logs
-          ctx.strokeStyle = '#5a5758'; 
-          ctx.lineWidth = 1.2;
-          for (let i = 1; i < 4; i++) {
-            const lx = x + i * 10;
-            ctx.beginPath();
-            ctx.moveTo(lx, y + faceTopHeight);
-            ctx.lineTo(lx, y + TILE);
-            ctx.stroke();
-          }
+          // Draw subtle earth details under the block
+          ctx.fillStyle = 'rgba(145, 95, 55, 0.22)';
+          ctx.fillRect(x, y, 4, 4);
+          ctx.fillRect(x + TILE - 4, y, 4, 4);
+          ctx.fillRect(x, y + TILE - 4, 4, 4);
+          ctx.fillRect(x + TILE - 4, y + TILE - 4, 4, 4);
 
-          // Subtle dry wood grain texture lines
-          ctx.strokeStyle = '#858182';
-          ctx.lineWidth = 0.8;
+          // A. Soft Drop Shadow projected down-right onto dirt floor (40% opacity)
+          ctx.fillStyle = 'rgba(32, 19, 10, 0.40)';
+          ctx.fillRect(x + 5, y + 5, TILE, TILE);
+
+          // B. Draw 3D Stone Block occupying the full tile
+          const topH = 14; // 14 px sunlit flat top face
+          const frontH = TILE - topH; // 26 px shaded front face
+
+          // 1. Draw Top Face (sunlit flat stone bricks)
+          ctx.fillStyle = '#F5F1F2'; // Sunlit bone-white
+          ctx.fillRect(x, y, TILE, topH);
+
+          // Staggered vertical brick joints on top face
+          ctx.strokeStyle = '#CAC6C7';
+          ctx.lineWidth = 1.0;
           ctx.beginPath();
-          ctx.moveTo(x + 4, y + faceTopHeight + 3);
-          ctx.quadraticCurveTo(x + 6, y + faceTopHeight + 12, x + 3, y + TILE - 4);
-          ctx.moveTo(x + 14, y + faceTopHeight + 5);
-          ctx.quadraticCurveTo(x + 12, y + faceTopHeight + 15, x + 15, y + TILE - 2);
-          ctx.moveTo(x + 23, y + faceTopHeight + 2);
-          ctx.quadraticCurveTo(x + 25, y + faceTopHeight + 10, x + 24, y + TILE - 5);
-          ctx.moveTo(x + 34, y + faceTopHeight + 6);
-          ctx.quadraticCurveTo(x + 32, y + faceTopHeight + 14, x + 35, y + TILE - 3);
+          ctx.moveTo(x + 13, y); ctx.lineTo(x + 13, y + topH);
+          ctx.moveTo(x + 27, y); ctx.lineTo(x + 27, y + topH);
           ctx.stroke();
 
-          // 2. Draw Top Flat Face (tips of the cladded logs)
-          // Renders 4 individual circular log caps side by side
-          ctx.save();
-          ctx.strokeStyle = '#8c8889';
-          ctx.lineWidth = 0.8;
-          for (let i = 0; i < 4; i++) {
-            const lx = x + i * 10;
-            ctx.fillStyle = '#CAC6C7'; // Sunlit bone-white top
-            ctx.beginPath();
-            ctx.ellipse(lx + 5, y + faceTopHeight * 0.5, 4.8, faceTopHeight * 0.5, 0, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.stroke();
-
-            // Growth rings inside the log tops
-            ctx.strokeStyle = 'rgba(120, 115, 116, 0.4)';
-            ctx.beginPath();
-            ctx.ellipse(lx + 5, y + faceTopHeight * 0.5, 2.5, faceTopHeight * 0.25, 0, 0, Math.PI * 2);
-            ctx.stroke();
-          }
-          ctx.restore();
-
-          // Highlight bevel edge separating top and front faces
-          ctx.strokeStyle = '#E0DCDD';
-          ctx.lineWidth = 1.2;
+          // Horizontal brick dividing joint
           ctx.beginPath();
-          ctx.moveTo(x, y + faceTopHeight);
-          ctx.lineTo(x + TILE, y + faceTopHeight);
+          ctx.moveTo(x, y + 7); ctx.lineTo(x + TILE, y + 7);
           ctx.stroke();
 
-          // Overall block outline
-          ctx.strokeStyle = '#4a4849';
+          // 2. Draw Front Face (shaded vertical stone brick walls)
+          // Row 1 of front bricks
+          ctx.fillStyle = '#CAC6C7'; // Base shaded bone-white
+          ctx.fillRect(x, y + topH, TILE, 13);
+
+          // Row 2 of front bricks (darker bottom row shadow)
+          ctx.fillStyle = '#A5A1A2';
+          ctx.fillRect(x, y + topH + 13, TILE, 13);
+
+          // Vertical joints between front bricks (staggered pattern)
+          ctx.strokeStyle = '#5C5859';
+          ctx.lineWidth = 1.0;
+          ctx.beginPath();
+          // Row 1 joints
+          ctx.moveTo(x + 13, y + topH); ctx.lineTo(x + 13, y + topH + 13);
+          ctx.moveTo(x + 27, y + topH); ctx.lineTo(x + 27, y + topH + 13);
+          // Row 2 joint (centered staggered)
+          ctx.moveTo(x + 20, y + topH + 13); ctx.lineTo(x + 20, y + TILE);
+          ctx.stroke();
+
+          // Horizontal mortar joint dividing Row 1 and Row 2
+          ctx.beginPath();
+          ctx.moveTo(x, y + topH + 13); ctx.lineTo(x + TILE, y + topH + 13);
+          ctx.stroke();
+
+          // 3. Add realistic weathered stone cracks and chip highlights
+          ctx.strokeStyle = '#4A4647'; // dark crack color
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(x + 8, y + topH + 4);
+          ctx.lineTo(x + 11, y + topH + 8);
+          ctx.lineTo(x + 9, y + topH + 12);
+          ctx.stroke();
+
+          // Highlights on brick row edges to add carved relief
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(x + 1, y + topH + 1, TILE - 2, 0.8);
+          ctx.fillRect(x + 1, y + topH + 14, TILE - 2, 0.8);
+
+          // Micro-dot porosity texturing for stone organic feel
+          ctx.fillStyle = '#F5F1F2'; // light grains
+          ctx.fillRect(x + 6, y + topH + 8, 1, 1);
+          ctx.fillRect(x + 32, y + topH + 18, 1, 1);
+          ctx.fillStyle = '#7C7879'; // dark grains
+          ctx.fillRect(x + 18, y + topH + 5, 1, 1);
+          ctx.fillRect(x + 25, y + topH + 20, 1, 1);
+
+          // Bevel separator crisp highlight line separating top and front
+          ctx.strokeStyle = '#FFFFFF';
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x, y + topH);
+          ctx.lineTo(x + TILE, y + topH);
+          ctx.stroke();
+
+          // Solid dark outline for the whole brick block
+          ctx.strokeStyle = '#2B2728';
           ctx.lineWidth = 1.5;
           ctx.strokeRect(x, y, TILE, TILE);
-
         } else if (t === T_ICE) {
-          // Saturated Emerald Green destructible grass blocks (Grow scale animation retained)
+          // ==========================================
+          // 2. LUSH ORGANIC 2.5D CONNECTED SHRUB HEDGES (PASTO/HIERBA)
+          // ==========================================
+
           const key = `${r}_${c}`;
           const record = grassAgesRef.current[key];
           const ageMs = record ? Date.now() - record.createdAt : 1000;
-          const growProgress = Math.min(1, ageMs / 220); // Scale up over 220ms
 
-          if (growProgress < 0.95) {
-            ctx.fillStyle = '#065f46'; // dark emerald base
+          // Check adjacent tiles of the same type to support autotiling (Defined first to avoid ReferenceError!)
+          const isNeighborGrass = (nc: number, nr: number) => {
+            if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
+            return mapRef.current[nr][nc] === T_ICE;
+          };
+          const hasUp = isNeighborGrass(c, r - 1);
+          const hasDown = isNeighborGrass(c, r + 1);
+          const hasLeft = isNeighborGrass(c - 1, r);
+          const hasRight = isNeighborGrass(c + 1, r);
+
+          // FIX 1: Extender el dirt base 1px hacia vecinos del mismo tipo
+          // Esto elimina el gap negro de 1px entre tiles adyacentes
+          ctx.fillStyle = '#C78757';
+          const dL = hasLeft ? -1 : 0;
+          const dT = hasUp ? -1 : 0;
+          const dR = hasRight ? 1 : 0;
+          const dB = hasDown ? 1 : 0;
+          ctx.fillRect(x + dL, y + dT, TILE - dL + dR, TILE - dT + dB);
+
+          // Grow animation with bouncy elastic spring overshoot effect
+          let growProgress = 1.0;
+          if (ageMs < 250) {
+            const tNorm = ageMs / 250;
+            // Bouncy spring equation: f(t) = -((t-1)^2) * (t-1.25) + 1
+            growProgress = -Math.pow(tNorm - 1, 2) * (tNorm - 1.25) + 1;
+            growProgress = Math.max(0, Math.min(1.1, growProgress));
+          }
+
+          // Deterministic hash based on grid coordinate for layout variations
+          const hashVal = Math.abs(Math.sin(r * 12.9898 + c * 78.233)) * 43758.5453;
+          const variant = Math.floor(hashVal % 3);
+
+          // A. Organic base shadow projected onto the earth
+          if (!hasDown) {
+            ctx.fillStyle = 'rgba(32, 19, 10, 0.48)';
+            // Rounded shadow beneath the bottom of the shrub hedge
             ctx.beginPath();
-            ctx.arc(x + TILE / 2, y + TILE / 2, (TILE / 2) * (1 - growProgress + 0.3), 0, Math.PI * 2);
+            ctx.ellipse(x + TILE / 2, y + TILE + 2, TILE * 0.55, 4, 0, 0, Math.PI * 2);
             ctx.fill();
           }
 
@@ -927,86 +1000,175 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.scale(growProgress, growProgress);
           ctx.translate(-(x + TILE / 2), -(y + TILE / 2));
 
-          const topH = TILE * 0.38;
-          const frontH = TILE - topH;
+          // Set up colors based on variant to break monotony and add depth
+          // Variant 0: Emerald Green, Variant 1: Lime/Apple Green, Variant 2: Deep Forest Green
+          let colDark = '#143621'; // very dark shadow foliage
+          let colMid = '#1e5c26';  // forest green base
+          let colLight = '#4caf50'; // bright green highlights
+          let colWarm = '#81c784'; // sunlit neon tips
+          let colLeafGlint = '#a2e858'; // neon warm leaf glint
 
-          // 1. Front face (dense foliage with highly saturated emerald color)
-          ctx.fillStyle = '#047857'; // Saturated emerald green (700)
-          ctx.fillRect(x, y + topH, TILE, frontH);
-
-          // Highlights / shadows volume overlays
-          ctx.fillStyle = '#065f46'; // deep emerald shadow patch
-          ctx.beginPath();
-          ctx.arc(x + 8, y + topH + 8, 6.5, 0, Math.PI * 2);
-          ctx.arc(x + 20, y + topH + 12, 8.5, 0, Math.PI * 2);
-          ctx.arc(x + 32, y + topH + 8, 6.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#10b981'; // bright green highlights
-          ctx.beginPath();
-          ctx.arc(x + 12, y + topH + 6, 4.2, 0, Math.PI * 2);
-          ctx.arc(x + 28, y + topH + 5, 4.2, 0, Math.PI * 2);
-          ctx.fill();
-
-          // 2. Top face (extremely bright and saturated emerald neon crowns)
-          ctx.fillStyle = '#065f46'; // dark base
-          ctx.fillRect(x, y, TILE, topH);
-
-          ctx.fillStyle = '#10b981'; // Saturated emerald (500)
-          ctx.beginPath();
-          ctx.arc(x + 11, y + 6, 7.5, 0, Math.PI * 2);
-          ctx.arc(x + 28, y + 8, 6.5, 0, Math.PI * 2);
-          ctx.arc(x + 20, y + 12, 8, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.fillStyle = '#00ff9f'; // Saturated neon-mint tips
-          ctx.beginPath();
-          ctx.arc(x + 11, y + 6, 4.0, 0, Math.PI * 2);
-          ctx.arc(x + 28, y + 8, 3.2, 0, Math.PI * 2);
-          ctx.arc(x + 20, y + 11, 4.8, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Flowers
-          if ((r + c) % 4 === 0) {
-            ctx.fillStyle = '#f43f5e'; // Vibrant pink/red
-            ctx.beginPath();
-            ctx.arc(x + 15, y + 8, 3, 0, Math.PI * 2);
-            ctx.arc(x + 24, y + 10, 2.5, 0, Math.PI * 2);
-            ctx.fill();
-            ctx.fillStyle = '#fef08a'; // Yellow center
-            ctx.beginPath();
-            ctx.arc(x + 15, y + 8, 1, 0, Math.PI * 2);
-            ctx.arc(x + 24, y + 10, 0.8, 0, Math.PI * 2);
-            ctx.fill();
+          if (variant === 1) {
+            colDark = '#102e1c';
+            colMid = '#226b30';
+            colLight = '#66bb6a';
+            colWarm = '#98ee99';
+            colLeafGlint = '#c5f285';
+          } else if (variant === 2) {
+            colDark = '#0a230d';
+            colMid = '#164a1d';
+            colLight = '#2e7d32';
+            colWarm = '#66bb6a';
+            colLeafGlint = '#81c784';
           }
 
-          // Edge shine
-          ctx.strokeStyle = '#a7f3d0';
-          ctx.lineWidth = 1.2;
+          // Base fill con padding para no tocar los bordes exactos del tile
+          ctx.fillStyle = colDark;
+          // Connect seamless fills with neighbors (extended by 1px to prevent any subpixel anti-aliasing gaps!)
+          const padL = hasLeft ? -1 : 2;
+          const padR = hasRight ? -1 : 2;
+          const padT = hasUp ? -1 : 2;
+          const padB = hasDown ? -1 : 2;
+          ctx.fillRect(x + padL, y + padT, TILE - padL - padR, TILE - padT - padB);
+
+          // FIX 2 + FIX 3: Bordes autotile dibujados 1px hacia ADENTRO del tile
+          // con opacidad reducida para eliminar el efecto de marco duro
+          ctx.strokeStyle = 'rgba(5, 20, 8, 0.55)';
+          ctx.lineWidth = 1.0;
           ctx.beginPath();
-          ctx.moveTo(x, y + topH);
-          ctx.lineTo(x + TILE, y + topH);
+          if (!hasUp) {
+            ctx.moveTo(x + (hasLeft ? 0 : 3), y + 1);
+            ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + 1);
+          }
+          if (!hasDown) {
+            ctx.moveTo(x + (hasLeft ? 0 : 3), y + TILE - 1);
+            ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + TILE - 1);
+          }
+          if (!hasLeft) {
+            ctx.moveTo(x + 1, y + (hasUp ? 0 : 3));
+            ctx.lineTo(x + 1, y + TILE - (hasDown ? 0 : 3));
+          }
+          if (!hasRight) {
+            ctx.moveTo(x + TILE - 1, y + (hasUp ? 0 : 3));
+            ctx.lineTo(x + TILE - 1, y + TILE - (hasDown ? 0 : 3));
+          }
           ctx.stroke();
 
-          // Block outline
-          ctx.strokeStyle = '#022c22';
-          ctx.lineWidth = 1.5;
-          ctx.strokeRect(x, y, TILE, TILE);
+          // Helper to draw leaf circles that can jut out past the standard grid boundaries
+          const drawLeaf = (cx: number, cy: number, rSize: number, fillCol: string, outlineCol: string) => {
+            ctx.fillStyle = fillCol;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rSize, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Draw subtle bottom outline for leaf depth
+            ctx.strokeStyle = outlineCol;
+            ctx.lineWidth = 1.0;
+            ctx.beginPath();
+            ctx.arc(cx, cy, rSize, 0, Math.PI);
+            ctx.stroke();
+          };
+
+          // Draw interior branches (visible in small gaps)
+          ctx.strokeStyle = '#4a2e19'; // dark rustic wood brown
+          ctx.lineWidth = 1.6;
+          ctx.beginPath();
+          if (variant === 0) {
+            ctx.moveTo(x + 10, y + 25);
+            ctx.quadraticCurveTo(x + 18, y + 16, x + 25, y + 22);
+          } else if (variant === 1) {
+            ctx.moveTo(x + 30, y + 12);
+            ctx.quadraticCurveTo(x + 22, y + 20, x + 15, y + 15);
+          } else {
+            ctx.moveTo(x + 12, y + 12);
+            ctx.lineTo(x + 28, y + 28);
+          }
+          ctx.stroke();
+
+          // Draw dense organic leaf layers with shading (cenital lighting: top light, bottom dark)
+          // 1. Dark bottom foliage base layer
+          drawLeaf(x + 10, y + 28, 7.5, colDark, '#051408');
+          drawLeaf(x + TILE - 10, y + 28, 7.5, colDark, '#051408');
+          drawLeaf(x + 20, y + 30, 8.0, colDark, '#051408');
+
+          // 2. Middle green foliage layer
+          drawLeaf(x + 8, y + 20, 7.0, colMid, colDark);
+          drawLeaf(x + TILE - 8, y + 20, 7.0, colMid, colDark);
+          drawLeaf(x + 20, y + 22, 7.5, colMid, colDark);
+
+          // 3. Bright light foliage layer (closer to top)
+          drawLeaf(x + 10, y + 12, 6.5, colLight, colMid);
+          drawLeaf(x + TILE - 10, y + 12, 6.5, colLight, colMid);
+          drawLeaf(x + 20, y + 13, 7.0, colLight, colMid);
+
+          // 4. Hot direct sunlit top tips layer
+          drawLeaf(x + 12, y + 6, 5.0, colWarm, colLight);
+          drawLeaf(x + TILE - 12, y + 6, 5.0, colWarm, colLight);
+          drawLeaf(x + 20, y + 7, 5.5, colWarm, colLight);
+
+          // 5. Warm pixel yellow-green highlights (cenital glint)
+          drawLeaf(x + 14, y + 3, 3.5, colLeafGlint, colWarm);
+          drawLeaf(x + TILE - 14, y + 3, 3.5, colLeafGlint, colWarm);
+          drawLeaf(x + 20, y + 4, 4.0, colLeafGlint, colWarm);
+
+          // B. Leaves that BREAK the rigidity of the square (Jutting out of boundaries!)
+          if (!hasLeft) {
+            // Draw overlapping leaves sticking out left
+            drawLeaf(x - 2, y + 14, 4.5, colMid, colDark);
+            drawLeaf(x - 3, y + 22, 5.0, colDark, '#051408');
+            drawLeaf(x - 1, y + 8, 4.0, colLight, colMid);
+          }
+          if (!hasRight) {
+            // Draw overlapping leaves sticking out right
+            drawLeaf(x + TILE + 2, y + 14, 4.5, colMid, colDark);
+            drawLeaf(x + TILE + 3, y + 22, 5.0, colDark, '#051408');
+            drawLeaf(x + TILE + 1, y + 8, 4.0, colLight, colMid);
+          }
+          if (!hasUp) {
+            // Draw overlapping leaves sticking out top
+            drawLeaf(x + 12, y - 2, 4.5, colLeafGlint, colWarm);
+            drawLeaf(x + 28, y - 2, 4.2, colWarm, colLight);
+            drawLeaf(x + 20, y - 3, 5.0, colLeafGlint, colWarm);
+          }
+          if (!hasDown) {
+            // Draw leaves sticking out bottom
+            drawLeaf(x + 12, y + TILE - 1, 4.5, colDark, '#051408');
+            drawLeaf(x + 28, y + TILE - 1, 4.5, colDark, '#051408');
+          }
+
+          // C. Cute wild flowers (Variant 0: Pink/Yellow flower, Variant 1: Orange/White flower, Variant 2: deep foliage only)
+          if (variant === 0) {
+            const fx = x + 15, fy = y + 14;
+            ctx.fillStyle = '#ff3366'; // Gorgeous glowing pink
+            ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ffcc00'; // Yellow center
+            ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
+          } else if (variant === 1) {
+            const fx = x + TILE - 15, fy = y + 16;
+            ctx.fillStyle = '#ff6600'; // Hot vibrant orange
+            ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
+            ctx.fillStyle = '#ffffff'; // White center
+            ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
+          }
 
           ctx.restore();
 
         } else {
+          // ==========================================
+          // 3. SEAMLESS EARTHEN GARDEN GROUND (EMPTY)
+          // ==========================================
+
           // Organic Light Brown Earth (#C78757)
-          ctx.fillStyle = '#C78757'; // Base light brown organic dirt
+          ctx.fillStyle = '#C78757';
           ctx.fillRect(x, y, TILE, TILE);
 
-          // Soften the grid: draw very subtle grids plus dust clouds in corners
-          ctx.strokeStyle = 'rgba(160, 105, 65, 0.22)';
-          ctx.lineWidth = 1.0;
+          // Soften the grid: make it almost invisible, giving a seamless seamless ground
+          ctx.strokeStyle = 'rgba(150, 95, 55, 0.06)';
+          ctx.lineWidth = 0.8;
           ctx.strokeRect(x, y, TILE, TILE);
 
-          // Shadow/dirt corner accumulations to organically suggest cell borders
-          ctx.fillStyle = 'rgba(145, 95, 55, 0.35)';
+          // Shadow/dirt corner accumulations to organically suggest depth
+          ctx.fillStyle = 'rgba(145, 95, 55, 0.22)';
           ctx.fillRect(x, y, 4, 4);
           ctx.fillRect(x + TILE - 4, y, 4, 4);
           ctx.fillRect(x, y + TILE - 4, 4, 4);
@@ -1015,8 +1177,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           // Deterministic hash value for organic decorations
           const hashVal = Math.abs(Math.sin(r * 12.9898 + c * 78.233)) * 43758.5453;
 
-          // 1. Grains of sand / Porosity spots (light and dark micro-dots)
-          ctx.fillStyle = 'rgba(110, 65, 30, 0.45)'; // dark porous dots
+          // Sand grains / Porosity spots (light and dark micro-dots)
+          ctx.fillStyle = 'rgba(110, 65, 30, 0.35)'; // dark porous dots
           ctx.fillRect(x + 4 + (hashVal % 6), y + 6 + ((hashVal * 3) % 8), 1.2, 1.2);
           ctx.fillRect(x + 22 + (hashVal % 10), y + 14 + ((hashVal * 5) % 12), 1.0, 1.0);
           ctx.fillRect(x + 12 + (hashVal % 8), y + 26 + ((hashVal * 7) % 10), 1.2, 1.2);
@@ -1025,7 +1187,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.fillRect(x + 8 + (hashVal % 12), y + 18 + ((hashVal * 11) % 6), 1.0, 1.0);
           ctx.fillRect(x + 28 + (hashVal % 6), y + 22 + ((hashVal * 13) % 8), 1.2, 1.2);
 
-          // 2. Occasional gray Pebbles (10% of tiles)
+          // Occasional gray Pebbles (10% of tiles)
           if (hashVal % 10 < 1.0) {
             const px = x + 8 + (hashVal % 24);
             const py = y + 8 + ((hashVal * 7) % 24);
@@ -1042,7 +1204,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.stroke();
           }
 
-          // 3. Occasional dry Twigs (10% of tiles)
+          // Occasional dry Twigs (10% of tiles)
           if (hashVal % 10 > 9.0) {
             const tx = x + 10 + (hashVal % 20);
             const ty = y + 10 + ((hashVal * 13) % 20);
@@ -1056,15 +1218,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
             ctx.stroke();
           }
 
-          // 4. Heavy stepped-on footprint marks from the Bowser turtle (24% of tiles)
+          // Stepped-on mud footprint marks (24% of tiles)
           if (hashVal % 5 < 1.2) {
             const hx = x + 12 + (hashVal % 16);
             const hy = y + 12 + ((hashVal * 3) % 16);
-            ctx.fillStyle = 'rgba(142, 92, 52, 0.45)'; // Footprint mud depression
+            ctx.fillStyle = 'rgba(142, 92, 52, 0.35)'; // mud depression
             ctx.beginPath();
             ctx.ellipse(hx, hy, 4.5, 2.8, Math.PI / 4, 0, Math.PI * 2);
             ctx.fill();
-            // Tiny toe print dots
+            // Tiny toe prints
             ctx.beginPath();
             ctx.arc(hx - 2.5, hy - 2.5, 0.9, 0, Math.PI * 2);
             ctx.arc(hx + 2.5, hy - 2.5, 0.9, 0, Math.PI * 2);
@@ -1075,7 +1237,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
   };
 
-  // Helper draws a clean retro-modern garden turtle character with monocle, eyebrows and 3D textured shell
+  // Helper draws the cute Tortiland turtle character matching the provided pixel-art image
   const drawGardenTurtle = (
     ctx: CanvasRenderingContext2D,
     px: number, py: number,
@@ -1085,422 +1247,208 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     isGolden: boolean
   ) => {
     ctx.save();
-    
+
     // Scale factor: turtle is pleasantly robust, tall, and chunky
-    const s = TILE * 0.44; 
+    const s = TILE * 0.44;
     const bob = Math.sin(t * 0.008 + frame) * 1.5;
     const cy = py + bob;
 
     const playerIsMoving = playerRef.current.moving;
-    const wobbleAngle = playerIsMoving ? Math.sin(t * 0.015) * 0.06 : 0;
     const walkOffset = playerIsMoving ? Math.sin(t * 0.015) * 0.18 : 0;
 
-    // 1. Grounded oval shadow directly under the feet (doesn't bob)
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.48)';
+    // Grounded oval shadow directly under the feet (doesn't bob)
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(px, py + s * 0.58, s * 0.72, s * 0.24, 0, 0, Math.PI * 2);
+    ctx.ellipse(px, py + s * 0.58, s * 0.68, s * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
-    // Color palettes for Bowser-style turtle
-    const skinColor = isGolden ? '#fef08a' : '#facc15'; // yellow/light-green skin
-    const skinShadow = isGolden ? '#f59e0b' : '#ca8a04';
-    const skinOutline = isGolden ? '#78350f' : '#5c3e03';
+    // Color palettes for the cute Tortiland turtle
+    const skinColor = isGolden ? '#ffd43b' : '#8bc34a'; // cute green skin
+    const skinShadow = isGolden ? '#f59e0b' : '#689f38';
+    const skinOutline = isGolden ? '#5c3e03' : '#2b4f0b';
 
-    const shellBase = isGolden ? '#d97706' : '#15803d'; // Green shell base
-    const shellHighlight = isGolden ? '#fef08a' : '#4ade80'; 
-    const shellOutline = isGolden ? '#78350f' : '#022c22';
+    const shellBase = isGolden ? '#ff922b' : '#14b8a6'; // turquoise/teal shell
+    const shellOutline = isGolden ? '#b53f00' : '#0f766e';
+    const shellSpot = isGolden ? '#ffe8cc' : '#f0fdfa';
 
-    // Helper to draw robust upright walking legs
-    const drawUprightLeg = (lx: number, ly: number, legWalkOffset: number) => {
+    const bellyColor = isGolden ? '#fff3bf' : '#ece5c8'; // cream/tan belly
+    const bellyOutline = isGolden ? '#e67700' : '#4b3f2f';
+    const letterColor = isGolden ? '#d9480f' : '#2d6a4f'; // forest green 'T' or orange 'T'
+
+    const blushColor = '#fb7185'; // bright rosy blush cheeks
+    const mouthColor = isGolden ? '#5c3e03' : '#1f3807';
+
+    // If moving left, flip horizontally around turtle's center point
+    if (dir.x < 0) {
+      ctx.translate(px, 0);
+      ctx.scale(-1, 1);
+      ctx.translate(-px, 0);
+    }
+
+    // Helper to draw chubby legs
+    const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number) => {
       ctx.save();
-      // Apply offset for walking motion
-      ctx.translate(lx, ly + legWalkOffset * s * 0.5);
-      
-      // Robust thick leg body (vertical capsule)
+      ctx.translate(lx, ly + legWalkOffset * s * 0.3);
+
+      // Chubby round capsule leg
       ctx.fillStyle = skinColor;
       ctx.strokeStyle = skinOutline;
       ctx.lineWidth = 2.0;
       ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.16, s * 0.24, 0, 0, Math.PI * 2);
+
+      // Draw a rounded rectangle for leg
+      if (ctx.roundRect) {
+        ctx.roundRect(-s * 0.16, -s * 0.1, s * 0.32, s * 0.35, s * 0.12);
+      } else {
+        // Fallback for older canvas environments
+        const rx = -s * 0.16, ry = -s * 0.1, rw = s * 0.32, rh = s * 0.35, rad = s * 0.12;
+        ctx.moveTo(rx + rad, ry);
+        ctx.lineTo(rx + rw - rad, ry);
+        ctx.quadraticCurveTo(rx + rw, ry, rx + rw, ry + rad);
+        ctx.lineTo(rx + rw, ry + rh - rad);
+        ctx.quadraticCurveTo(rx + rw, ry + rh, rx + rw - rad, ry + rh);
+        ctx.lineTo(rx + rad, ry + rh);
+        ctx.quadraticCurveTo(rx, ry + rh, rx, ry + rh - rad);
+        ctx.lineTo(rx, ry + rad);
+        ctx.quadraticCurveTo(rx, ry, rx + rad, ry);
+      }
       ctx.fill();
       ctx.stroke();
 
-      // Scaly textures
+      // Shadow on back leg part
       ctx.fillStyle = skinShadow;
       ctx.beginPath();
-      ctx.arc(-s * 0.04, -s * 0.04, 1.8, 0, Math.PI * 2);
-      ctx.arc(s * 0.04, s * 0.04, 1.5, 0, Math.PI * 2);
+      ctx.ellipse(-s * 0.04, s * 0.12, s * 0.08, s * 0.08, 0, 0, Math.PI * 2);
       ctx.fill();
-
-      // Foot nails/claws facing down
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.arc(-s * 0.08, s * 0.22, 2.2, 0, Math.PI * 2);
-      ctx.arc(0, s * 0.24, 2.5, 0, Math.PI * 2);
-      ctx.arc(s * 0.08, s * 0.22, 2.2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
 
       ctx.restore();
     };
 
-    // Helper to draw green shell with thick borders and spikes on the back
-    const drawShell = () => {
-      ctx.save();
-      // Wobble rotation
-      ctx.translate(px, cy);
-      ctx.rotate(wobbleAngle);
-      ctx.translate(-px, -cy);
+    // Draw Tail (cute tiny green tail)
+    ctx.fillStyle = skinColor;
+    ctx.strokeStyle = skinOutline;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.moveTo(px - s * 0.65, cy + s * 0.28);
+    ctx.quadraticCurveTo(px - s * 0.88, cy + s * 0.36, px - s * 0.68, cy + s * 0.40);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
 
-      const shellX = px - dir.x * s * 0.15;
-      const shellY = cy - dir.y * s * 0.05;
+    // Draw shell behind body
+    ctx.fillStyle = shellBase;
+    ctx.strokeStyle = shellOutline;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(px - s * 0.32, cy + s * 0.06, s * 0.50, s * 0.55, Math.PI * 0.04, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
 
-      // 1. Draw thick cream-white border rim
-      ctx.fillStyle = '#f8fafc'; // Cream-white border
-      ctx.strokeStyle = shellOutline;
-      ctx.lineWidth = 2.4;
+    // Add white spots/circles on shell
+    ctx.fillStyle = shellSpot;
+    ctx.beginPath();
+    ctx.arc(px - s * 0.48, cy - s * 0.24, s * 0.11, 0, Math.PI * 2);
+    ctx.arc(px - s * 0.54, cy + s * 0.02, s * 0.13, 0, Math.PI * 2);
+    ctx.arc(px - s * 0.42, cy + s * 0.26, s * 0.10, 0, Math.PI * 2);
+    ctx.arc(px - s * 0.24, cy - s * 0.16, s * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Draw rear leg (left)
+    drawChubbyLeg(px - s * 0.20, cy + s * 0.40, walkOffset);
+
+    // Draw torso and cream/tan belly (plastron)
+    ctx.fillStyle = bellyColor;
+    ctx.strokeStyle = bellyOutline;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(px - s * 0.04, cy + s * 0.1, s * 0.41, s * 0.45, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw the green letter 'T' centered on the chest
+    const bx = px - s * 0.04;
+    const by = cy + s * 0.1;
+    ctx.fillStyle = letterColor;
+    // Horizontal bar
+    ctx.fillRect(bx - s * 0.14, by - s * 0.15, s * 0.28, s * 0.08);
+    // Vertical bar
+    ctx.fillRect(bx - s * 0.045, by - s * 0.15, s * 0.09, s * 0.26);
+
+    // Draw front leg (right)
+    drawChubbyLeg(px + s * 0.14, cy + s * 0.40, -walkOffset);
+
+    // Draw cute stubby left arm (slightly visible at back)
+    ctx.fillStyle = skinColor;
+    ctx.strokeStyle = skinOutline;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.ellipse(px - s * 0.40, cy + s * 0.08, s * 0.13, s * 0.20, Math.PI * 0.15, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw neck
+    ctx.fillStyle = skinColor;
+    ctx.strokeStyle = skinOutline;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.ellipse(px + s * 0.08, cy - s * 0.18, s * 0.15, s * 0.22, -Math.PI * 0.08, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw head (big rounded cute green head)
+    const hx = px + s * 0.12;
+    const hy = cy - s * 0.35;
+    ctx.fillStyle = skinColor;
+    ctx.strokeStyle = skinOutline;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.arc(hx, hy, s * 0.44, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Draw big shiny anime eyes
+    const drawCuteEye = (ex: number, ey: number) => {
+      ctx.fillStyle = '#000000';
       ctx.beginPath();
-      ctx.ellipse(shellX, shellY, s * 0.78, s * 0.72, 0, 0, Math.PI * 2);
+      ctx.arc(ex, ey, s * 0.09, 0, Math.PI * 2);
       ctx.fill();
-      ctx.stroke();
 
-      // 2. Inner green shell base
-      ctx.fillStyle = shellBase;
-      ctx.beginPath();
-      ctx.ellipse(shellX, shellY, s * 0.66, s * 0.60, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // 3. Geometric scutes lines
-      ctx.strokeStyle = shellOutline;
-      ctx.lineWidth = 1.6;
-      ctx.save();
-      ctx.translate(shellX, shellY);
-      const hexSize = s * 0.25;
-      ctx.beginPath();
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI) / 3;
-        const hx = Math.cos(angle) * hexSize;
-        const hy = Math.sin(angle) * hexSize;
-        if (i === 0) ctx.moveTo(hx, hy);
-        else ctx.lineTo(hx, hy);
-      }
-      ctx.closePath();
-      ctx.stroke();
-
-      // Radiating lines
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI) / 3;
-        ctx.beginPath();
-        ctx.moveTo(Math.cos(angle) * hexSize, Math.sin(angle) * hexSize);
-        ctx.lineTo(Math.cos(angle) * s * 0.66, Math.sin(angle) * s * 0.60);
-        ctx.stroke();
-      }
-
-      // 4. White spikes on the shell (like Bowser)
-      ctx.fillStyle = '#ffffff';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 0.8;
-      
-      // Central spike
-      ctx.beginPath();
-      ctx.arc(0, 0, 3.5, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Outer spikes
-      for (let i = 0; i < 6; i++) {
-        const angle = (i * Math.PI) / 3 + Math.PI / 6;
-        const sx = Math.cos(angle) * s * 0.44;
-        const sy = Math.sin(angle) * s * 0.40;
-        ctx.beginPath();
-        ctx.arc(sx, sy, 2.5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
-
-      ctx.restore();
-      ctx.restore();
-    };
-
-    // Helper to draw the torso and ribbed belly
-    const drawBelly = () => {
-      ctx.save();
-      
-      // Main body yellow mass
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 2.2;
-      ctx.beginPath();
-      ctx.ellipse(px, cy + s * 0.08, s * 0.52, s * 0.46, wobbleAngle, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Segmented ribbed belly (front shell chestplate, like Bowser)
-      if (dir.y >= 0 || dir.x !== 0) {
-        ctx.save();
-        ctx.translate(px, cy + s * 0.08);
-        ctx.rotate(wobbleAngle);
-
-        ctx.fillStyle = '#fef08a'; // Cream yellow belly plate
-        ctx.strokeStyle = '#ca8a04';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        ctx.ellipse(0, 0, s * 0.36, s * 0.36, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Belly rib lines
-        ctx.strokeStyle = '#ca8a04';
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        ctx.moveTo(-s * 0.30, -s * 0.18);
-        ctx.lineTo(s * 0.30, -s * 0.18);
-        ctx.moveTo(-s * 0.36, 0);
-        ctx.lineTo(s * 0.36, 0);
-        ctx.moveTo(-s * 0.30, s * 0.18);
-        ctx.lineTo(s * 0.30, s * 0.18);
-        ctx.stroke();
-
-        ctx.restore();
-      }
-
-      ctx.restore();
-    };
-
-    // Helper to draw robust muscular arms (build/break active actions)
-    const drawArms = () => {
-      const isCasting = playerRef.current.powerCooldown > 0;
-      
-      // Left Arm
-      ctx.save();
-      if (isCasting) {
-        // Casting action: punch/extend arms forward dramatically
-        ctx.translate(px - s * 0.38, cy + s * 0.08);
-        ctx.rotate(Math.atan2(dir.y, dir.x) - Math.PI * 0.2);
-      } else {
-        // Swinging naturally with walking cycle
-        ctx.translate(px - s * 0.44, cy + s * 0.08);
-        ctx.rotate(Math.PI * 0.6 + walkOffset * 0.28);
-      }
-      
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.24, s * 0.12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      
-      // Muscular wristband (black spiked band for Bowser feel)
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(s * 0.04, -s * 0.12, 2.5, s * 0.24);
-
-      // Claw hand
+      // Shiny reflection glint
       ctx.fillStyle = '#ffffff';
       ctx.beginPath();
-      ctx.arc(s * 0.18, -2, 2, 0, Math.PI * 2);
-      ctx.arc(s * 0.22, 0, 2.2, 0, Math.PI * 2);
-      ctx.arc(s * 0.18, 2, 2, 0, Math.PI * 2);
+      ctx.arc(ex - s * 0.03, ey - s * 0.03, s * 0.032, 0, Math.PI * 2);
       ctx.fill();
-      ctx.restore();
-
-      // Right Arm
-      ctx.save();
-      if (isCasting) {
-        ctx.translate(px + s * 0.38, cy + s * 0.08);
-        ctx.rotate(Math.atan2(dir.y, dir.x) + Math.PI * 0.2);
-      } else {
-        ctx.translate(px + s * 0.44, cy + s * 0.08);
-        ctx.rotate(-Math.PI * 0.6 - walkOffset * 0.28);
-      }
-      
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 2.0;
-      ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.24, s * 0.12, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Spiked wristband
-      ctx.fillStyle = '#1e293b';
-      ctx.fillRect(-s * 0.08, -s * 0.12, 2.5, s * 0.24);
-
-      // Claw hand
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(s * 0.18, -2, 2, 0, Math.PI * 2);
-      ctx.arc(s * 0.22, 0, 2.2, 0, Math.PI * 2);
-      ctx.arc(s * 0.18, 2, 2, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
     };
 
-    // Helper to draw head with determined expression, eyebrows and monocle
-    const drawHeadAndNeck = () => {
-      ctx.save();
+    drawCuteEye(hx - s * 0.08, hy - s * 0.02);
+    drawCuteEye(hx + s * 0.20, hy - s * 0.02);
 
-      const faceDirX = dir.x;
-      const faceDirY = dir.y;
+    // Draw blush cheeks
+    ctx.fillStyle = blushColor;
+    ctx.beginPath();
+    ctx.ellipse(hx - s * 0.18, hy + s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.ellipse(hx + s * 0.25, hy + s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+    ctx.fill();
 
-      // 1. Neck (robust, yellow/light green)
-      const neckStartX = px + faceDirX * s * 0.12;
-      const neckStartY = cy + faceDirY * s * 0.12;
-      const neckEndX = px + faceDirX * s * 0.40;
-      const neckEndY = cy + faceDirY * s * 0.40 - s * 0.12;
+    // Draw small cute smiling mouth (v-shaped smirk as in the image)
+    ctx.strokeStyle = mouthColor;
+    ctx.lineWidth = 2.2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.beginPath();
+    ctx.moveTo(hx + s * 0.02, hy + s * 0.08);
+    ctx.lineTo(hx + s * 0.06, hy + s * 0.13);
+    ctx.lineTo(hx + s * 0.10, hy + s * 0.08);
+    ctx.stroke();
 
-      const perpX = -faceDirY * s * 0.14;
-      const perpY = faceDirX * s * 0.14;
-
-      ctx.fillStyle = skinColor;
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(neckStartX - perpX, neckStartY - perpY);
-      ctx.lineTo(neckEndX - perpX, neckEndY - perpY);
-      ctx.lineTo(neckEndX + perpX, neckEndY + perpY);
-      ctx.lineTo(neckStartX + perpX, neckStartY + perpY);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // 2. Reptile Head
-      const hX = neckEndX;
-      const hY = neckEndY;
-      const headAngle = Math.atan2(faceDirY, faceDirX);
-
-      ctx.fillStyle = skinColor;
-      ctx.beginPath();
-      ctx.ellipse(hX, hY, s * 0.31, s * 0.25, headAngle, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-
-      // Determined slanted eyebrows (cejas rojas decididas, inclinadas hacia el centro)
-      const eyeOffsetDist = s * 0.11;
-      const eyeLX = hX - faceDirY * eyeOffsetDist + faceDirX * s * 0.04;
-      const eyeLY = hY + faceDirX * eyeOffsetDist + faceDirY * s * 0.04;
-      const eyeRX = hX + faceDirY * eyeOffsetDist + faceDirX * s * 0.04;
-      const eyeRY = hY - faceDirX * eyeOffsetDist + faceDirY * s * 0.04;
-
-      ctx.fillStyle = '#dc2626'; // cejas rojas
-      ctx.strokeStyle = '#991b1b';
-      ctx.lineWidth = 0.8;
-
-      // Left eyebrow slanted down-right
-      ctx.save();
-      ctx.translate(eyeLX, eyeLY - 3);
-      ctx.rotate(headAngle - 0.22);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.12, s * 0.038, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-
-      // Right eyebrow slanted down-left
-      ctx.save();
-      ctx.translate(eyeRX, eyeRY - 3);
-      ctx.rotate(headAngle + 0.22);
-      ctx.beginPath();
-      ctx.ellipse(0, 0, s * 0.12, s * 0.038, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.stroke();
-      ctx.restore();
-
-      // Draw Eye helper with monocle integration
-      const drawIndividualEye = (ex: number, ey: number, hasMonocle: boolean) => {
-        ctx.save();
-        // White eyeball
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = skinOutline;
-        ctx.lineWidth = 1.2;
-        ctx.beginPath();
-        ctx.arc(ex, ey, s * 0.085, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-
-        // Dark pupil
-        ctx.fillStyle = '#0f172a';
-        ctx.beginPath();
-        ctx.arc(ex + faceDirX * 1.5, ey + faceDirY * 0.8, s * 0.04, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Reflection glint
-        ctx.fillStyle = '#ffffff';
-        ctx.beginPath();
-        ctx.arc(ex + faceDirX * 2 - 0.3, ey + faceDirY * 0.8 - 0.3, 0.7, 0, Math.PI * 2);
-        ctx.fill();
-
-        if (hasMonocle) {
-          // Gold monocle rim
-          ctx.strokeStyle = '#eab308';
-          ctx.lineWidth = 1.8;
-          ctx.beginPath();
-          ctx.arc(ex, ey, s * 0.12, 0, Math.PI * 2);
-          ctx.stroke();
-
-          // Glass blue tint
-          ctx.fillStyle = 'rgba(14, 165, 233, 0.24)';
-          ctx.beginPath();
-          ctx.arc(ex, ey, s * 0.11, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Monocle sheen reflection
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-          ctx.lineWidth = 1.0;
-          ctx.beginPath();
-          ctx.moveTo(ex - s * 0.06, ey - s * 0.06);
-          ctx.lineTo(ex + s * 0.06, ey + s * 0.06);
-          ctx.stroke();
-
-          // Chain
-          ctx.strokeStyle = '#ca8a04';
-          ctx.lineWidth = 0.8;
-          ctx.beginPath();
-          ctx.moveTo(ex, ey + s * 0.12);
-          ctx.quadraticCurveTo(ex + faceDirY * s * 0.08, ey + s * 0.3, px + faceDirX * s * 0.22, cy + faceDirY * s * 0.15);
-          ctx.stroke();
-        }
-
-        ctx.restore();
-      };
-
-      drawIndividualEye(eyeLX, eyeLY, false);
-      drawIndividualEye(eyeRX, eyeRY, true);
-
-      // Snout and confident smirk mouth
-      ctx.strokeStyle = skinOutline;
-      ctx.lineWidth = 1.5;
-      ctx.lineCap = 'round';
-      ctx.beginPath();
-      const mouthX = hX + faceDirX * s * 0.13;
-      const mouthY = hY + faceDirY * s * 0.13 + s * 0.06;
-      ctx.arc(mouthX, mouthY, 2.2, 0, Math.PI * 0.8, false);
-      ctx.stroke();
-
-      ctx.restore();
-    };
-
-    // Draw upright walking legs first
-    drawUprightLeg(px - s * 0.22, cy + s * 0.44, walkOffset);
-    drawUprightLeg(px + s * 0.22, cy + s * 0.44, -walkOffset);
-
-    // Layering based on direction
-    const headBehindShell = dir.y < 0;
-
-    if (headBehindShell) {
-      drawHeadAndNeck();
-      drawBelly();
-      drawArms();
-      drawShell();
-    } else {
-      drawShell();
-      drawBelly();
-      drawArms();
-      drawHeadAndNeck();
-    }
+    // Draw chubby right arm (front arm, in foreground)
+    ctx.fillStyle = skinColor;
+    ctx.strokeStyle = skinOutline;
+    ctx.lineWidth = 2.0;
+    ctx.beginPath();
+    ctx.ellipse(px + s * 0.30, cy + s * 0.10, s * 0.15, s * 0.22, -Math.PI * 0.1, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
 
     ctx.restore();
   };
@@ -1552,7 +1500,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.translate(px, cy);
     const tailAngleOffset = Math.atan2(-dir.y, -dir.x);
     ctx.rotate(tailAngleOffset + tailSwing);
-    
+
     ctx.fillStyle = pCol;
     ctx.strokeStyle = sCol;
     ctx.lineWidth = 1.5;
@@ -1757,416 +1705,384 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.restore();
   };
 
-    const drawFruits = (ctx: CanvasRenderingContext2D, t: number) => {
-      fruitsRef.current.forEach(f => {
-        const px = f.col * TILE + TILE / 2;
-        const py = f.row * TILE + TILE / 2;
-        const bob = Math.sin(t * 0.003 + f.anim) * 3;
-        const yBob = py + bob;
+  const drawFruits = (ctx: CanvasRenderingContext2D, t: number) => {
+    fruitsRef.current.forEach(f => {
+      const px = f.col * TILE + TILE / 2;
+      const py = f.row * TILE + TILE / 2;
+      const bob = Math.sin(t * 0.003 + f.anim) * 3;
+      const yBob = py + bob;
 
-        const isCovered = mapRef.current[f.row][f.col] === T_ICE;
+      const isCovered = mapRef.current[f.row][f.col] === T_ICE;
 
-        ctx.save();
+      ctx.save();
 
-        if (!isCovered) {
-          // Grounded float relative floor shadow
-          const shadowScale = Math.max(0.3, 1.0 - Math.abs(bob) / 12);
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
-          ctx.beginPath();
-          ctx.ellipse(px, py + TILE * 0.35, 7.5 * shadowScale, 3 * shadowScale, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        if (isCovered) {
-          // Semi-visible translucent overlay representation when inside grass
-          ctx.globalAlpha = 0.5;
-          const pulse = 0.95 + Math.sin(t * 0.012 + f.anim) * 0.12;
-          const jiggleX = Math.cos(t * 0.025 + f.anim) * 1.5;
-
-          ctx.translate(px + jiggleX, yBob);
-          ctx.scale(pulse, pulse);
-          ctx.translate(-px, -yBob);
-        }
-
-        if (f.type === 3) {
-          // 🍎 Apple vector representation with 3D Sphere Radial Gradient
-          const appleGrad = ctx.createRadialGradient(px - 2, yBob - 2, 1, px, yBob + 1, 9);
-          appleGrad.addColorStop(0, '#fca5a5'); // glint light
-          appleGrad.addColorStop(0.2, '#ef4444'); // red body
-          appleGrad.addColorStop(1, '#7f1d1d'); // shadow red edge
-
-          ctx.fillStyle = appleGrad;
-          ctx.beginPath();
-          ctx.arc(px - 4, yBob + 1, 8.5, 0, Math.PI * 2);
-          ctx.arc(px + 4, yBob + 1, 8.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Dark outline
-          ctx.strokeStyle = '#7f1d1d';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.arc(px - 4, yBob + 1, 8.5, 0.3, Math.PI * 1.8);
-          ctx.arc(px + 4, yBob + 1, 8.5, -Math.PI * 0.8, Math.PI * 0.7);
-          ctx.stroke();
-
-          // Brown Stem
-          ctx.strokeStyle = '#78350f';
-          ctx.lineWidth = 2.5;
-          ctx.beginPath();
-          ctx.moveTo(px, yBob - 5);
-          ctx.quadraticCurveTo(px + 2, yBob - 10, px + 5, yBob - 12);
-          ctx.stroke();
-
-          // Cute green leaf
-          ctx.fillStyle = '#22c55e';
-          ctx.beginPath();
-          ctx.ellipse(px + 3, yBob - 9, 4, 2, -Math.PI / 4, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#166534';
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-
-          // High glint shine reflection
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
-          ctx.beginPath();
-          ctx.arc(px - 4, yBob - 3, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-
-        } else if (f.type === 4) {
-          // 🍊 Orange vector representation with 3D Gloss Gradient
-          const orangeGrad = ctx.createRadialGradient(px - 2, yBob - 3, 2, px, yBob + 1, 10);
-          orangeGrad.addColorStop(0, '#ffedd5'); // sweet shine
-          orangeGrad.addColorStop(0.3, '#f97316'); // orange core
-          orangeGrad.addColorStop(1, '#9a3412'); // shadow edge
-
-          ctx.fillStyle = orangeGrad;
-          ctx.beginPath();
-          ctx.arc(px, yBob + 1, 10, 0, Math.PI * 2);
-          ctx.fill();
-
-          ctx.strokeStyle = '#9a3412';
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          // Orange surface bumps texture points
-          ctx.fillStyle = '#ea580c';
-          ctx.fillRect(px - 3, yBob + 3, 1.5, 1.5);
-          ctx.fillRect(px + 4, yBob - 2, 1.5, 1.5);
-
-          // Small brown stump stem
-          ctx.fillStyle = '#78350f';
-          ctx.fillRect(px - 1, yBob - 9, 2, 2.5);
-
-          // Green leaf
-          ctx.fillStyle = '#16a34a';
-          ctx.beginPath();
-          ctx.ellipse(px - 3, yBob - 9.5, 4, 2.2, Math.PI / 5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.strokeStyle = '#14532d';
-          ctx.lineWidth = 0.8;
-          ctx.stroke();
-
-          // High glint shine reflection
-          ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
-          ctx.beginPath();
-          ctx.arc(px - 3.5, yBob - 3, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-
-        } else if (f.type === 5) {
-          // 🥦 Golden Broccoli (Power up)
-          // Golden stalk stem
-          ctx.fillStyle = '#fef08a'; // yellow-200
-          ctx.strokeStyle = '#ca8a04';
-          ctx.lineWidth = 1.5;
-          ctx.beginPath();
-          ctx.moveTo(px - 4, yBob + 9);
-          ctx.lineTo(px - 3, yBob + 1);
-          ctx.lineTo(px + 3, yBob + 1);
-          ctx.lineTo(px + 4, yBob + 9);
-          ctx.closePath();
-          ctx.fill();
-          ctx.stroke();
-
-          // Gold ramillete core layers
-          ctx.fillStyle = '#eab308'; // yellow-500
-          ctx.beginPath();
-          ctx.arc(px, yBob - 3, 7.5, 0, Math.PI * 2);
-          ctx.arc(px - 5, yBob - 1, 6.5, 0, Math.PI * 2);
-          ctx.arc(px + 5, yBob - 1, 6.5, 0, Math.PI * 2);
-          ctx.arc(px - 3, yBob - 6, 5.5, 0, Math.PI * 2);
-          ctx.arc(px + 3, yBob - 6, 5.5, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Golden details outlines
-          ctx.strokeStyle = '#ca8a04';
-          ctx.lineWidth = 1.2;
-          ctx.beginPath();
-          ctx.arc(px - 5, yBob - 1, 6.5, Math.PI * 0.7, Math.PI * 1.6);
-          ctx.stroke();
-
-          // Sparkling gold dots
-          ctx.fillStyle = '#ffffff';
-          ctx.fillRect(px - 2, yBob - 3, 1.5, 1.5);
-          ctx.fillRect(px + 2, yBob - 5, 1.5, 1.5);
-        }
-
-        // Star glint sparkles loop around uncovered active fruits
-        if (!isCovered) {
-          const sa = t * 0.05 + f.anim;
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
-          ctx.lineWidth = 1;
-          for (let i = 0; i < 4; i++) {
-            const angle = sa + i * Math.PI / 2;
-            const r1 = TILE * 0.32;
-            const r2 = TILE * 0.42;
-            ctx.beginPath();
-            ctx.moveTo(px + Math.cos(angle) * r1, py + bob + Math.sin(angle) * r1);
-            ctx.lineTo(px + Math.cos(angle) * r2, py + bob + Math.sin(angle) * r2);
-            ctx.stroke();
-          }
-        }
-
-        ctx.restore();
-      });
-    };
-
-    const drawIndicatorCell = (ctx: CanvasRenderingContext2D, col: number, row: number, isBreaking: boolean) => {
-      const fx = col * TILE + TILE / 2;
-      const fy = row * TILE + TILE / 2;
-
-      ctx.fillStyle = isBreaking ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)';
-      ctx.fillRect(col * TILE + 2, row * TILE + 2, TILE - 4, TILE - 4);
-
-      ctx.strokeStyle = isBreaking ? 'rgba(239, 68, 68, 0.85)' : 'rgba(34, 197, 94, 0.85)';
-      ctx.lineWidth = 2.5;
-      const cx = fx;
-      const cy = fy;
-      const r = 6;
-
-      if (isBreaking) {
-        // Red X
+      if (!isCovered) {
+        // Grounded float relative floor shadow
+        const shadowScale = Math.max(0.3, 1.0 - Math.abs(bob) / 12);
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
         ctx.beginPath();
-        ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
-        ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+        ctx.ellipse(px, py + TILE * 0.35, 7.5 * shadowScale, 3 * shadowScale, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      if (isCovered) {
+        // Semi-visible translucent overlay representation when inside grass
+        ctx.globalAlpha = 0.5;
+        const pulse = 0.95 + Math.sin(t * 0.012 + f.anim) * 0.12;
+        const jiggleX = Math.cos(t * 0.025 + f.anim) * 1.5;
+
+        ctx.translate(px + jiggleX, yBob);
+        ctx.scale(pulse, pulse);
+        ctx.translate(-px, -yBob);
+      }
+
+      if (f.type === 3) {
+        // 🍎 Apple vector representation with 3D Sphere Radial Gradient
+        const appleGrad = ctx.createRadialGradient(px - 2, yBob - 2, 1, px, yBob + 1, 9);
+        appleGrad.addColorStop(0, '#fca5a5'); // glint light
+        appleGrad.addColorStop(0.2, '#ef4444'); // red body
+        appleGrad.addColorStop(1, '#7f1d1d'); // shadow red edge
+
+        ctx.fillStyle = appleGrad;
+        ctx.beginPath();
+        ctx.arc(px - 4, yBob + 1, 8.5, 0, Math.PI * 2);
+        ctx.arc(px + 4, yBob + 1, 8.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Dark outline
+        ctx.strokeStyle = '#7f1d1d';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(px - 4, yBob + 1, 8.5, 0.3, Math.PI * 1.8);
+        ctx.arc(px + 4, yBob + 1, 8.5, -Math.PI * 0.8, Math.PI * 0.7);
         ctx.stroke();
+
+        // Brown Stem
+        ctx.strokeStyle = '#78350f';
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(px, yBob - 5);
+        ctx.quadraticCurveTo(px + 2, yBob - 10, px + 5, yBob - 12);
+        ctx.stroke();
+
+        // Cute green leaf
+        ctx.fillStyle = '#22c55e';
+        ctx.beginPath();
+        ctx.ellipse(px + 3, yBob - 9, 4, 2, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#166534';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // High glint shine reflection
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.beginPath();
+        ctx.arc(px - 4, yBob - 3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (f.type === 4) {
+        // 🍊 Orange vector representation with 3D Gloss Gradient
+        const orangeGrad = ctx.createRadialGradient(px - 2, yBob - 3, 2, px, yBob + 1, 10);
+        orangeGrad.addColorStop(0, '#ffedd5'); // sweet shine
+        orangeGrad.addColorStop(0.3, '#f97316'); // orange core
+        orangeGrad.addColorStop(1, '#9a3412'); // shadow edge
+
+        ctx.fillStyle = orangeGrad;
+        ctx.beginPath();
+        ctx.arc(px, yBob + 1, 10, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#9a3412';
+        ctx.lineWidth = 1.5;
+        ctx.stroke();
+
+        // Orange surface bumps texture points
+        ctx.fillStyle = '#ea580c';
+        ctx.fillRect(px - 3, yBob + 3, 1.5, 1.5);
+        ctx.fillRect(px + 4, yBob - 2, 1.5, 1.5);
+
+        // Small brown stump stem
+        ctx.fillStyle = '#78350f';
+        ctx.fillRect(px - 1, yBob - 9, 2, 2.5);
+
+        // Green leaf
+        ctx.fillStyle = '#16a34a';
+        ctx.beginPath();
+        ctx.ellipse(px - 3, yBob - 9.5, 4, 2.2, Math.PI / 5, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#14532d';
+        ctx.lineWidth = 0.8;
+        ctx.stroke();
+
+        // High glint shine reflection
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        ctx.beginPath();
+        ctx.arc(px - 3.5, yBob - 3, 2.5, 0, Math.PI * 2);
+        ctx.fill();
+
+      } else if (f.type === 5) {
+        // 🥦 Golden Broccoli (Power up)
+        // Golden stalk stem
+        ctx.fillStyle = '#fef08a'; // yellow-200
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(px - 4, yBob + 9);
+        ctx.lineTo(px - 3, yBob + 1);
+        ctx.lineTo(px + 3, yBob + 1);
+        ctx.lineTo(px + 4, yBob + 9);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Gold ramillete core layers
+        ctx.fillStyle = '#eab308'; // yellow-500
+        ctx.beginPath();
+        ctx.arc(px, yBob - 3, 7.5, 0, Math.PI * 2);
+        ctx.arc(px - 5, yBob - 1, 6.5, 0, Math.PI * 2);
+        ctx.arc(px + 5, yBob - 1, 6.5, 0, Math.PI * 2);
+        ctx.arc(px - 3, yBob - 6, 5.5, 0, Math.PI * 2);
+        ctx.arc(px + 3, yBob - 6, 5.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Golden details outlines
+        ctx.strokeStyle = '#ca8a04';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(px - 5, yBob - 1, 6.5, Math.PI * 0.7, Math.PI * 1.6);
+        ctx.stroke();
+
+        // Sparkling gold dots
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(px - 2, yBob - 3, 1.5, 1.5);
+        ctx.fillRect(px + 2, yBob - 5, 1.5, 1.5);
+      }
+
+      ctx.restore();
+    });
+  };
+
+  const drawIndicatorCell = (ctx: CanvasRenderingContext2D, col: number, row: number, isBreaking: boolean) => {
+    const fx = col * TILE + TILE / 2;
+    const fy = row * TILE + TILE / 2;
+
+    ctx.fillStyle = isBreaking ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)';
+    ctx.fillRect(col * TILE + 2, row * TILE + 2, TILE - 4, TILE - 4);
+
+    ctx.strokeStyle = isBreaking ? 'rgba(239, 68, 68, 0.85)' : 'rgba(34, 197, 94, 0.85)';
+    ctx.lineWidth = 2.5;
+    const cx = fx;
+    const cy = fy;
+    const r = 6;
+
+    if (isBreaking) {
+      // Red X
+      ctx.beginPath();
+      ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
+      ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
+      ctx.stroke();
+    } else {
+      // Green Plus sign
+      ctx.beginPath();
+      ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
+      ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
+      ctx.stroke();
+    }
+  };
+
+  const drawPlayerIndicators = (ctx: CanvasRenderingContext2D) => {
+    const player = playerRef.current;
+    const dir = player.dir;
+    const powerCount = Math.min(4, Math.max(1, Math.floor(score / 2) + 1));
+
+    // 1. Red preview marker overlays for breaking
+    let currentCc = player.col + dir.x;
+    let currentCr = player.row + dir.y;
+    for (let i = 0; i < powerCount; i++) {
+      if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
+      if (isWall(currentCc, currentCr)) break;
+
+      if (isIce(currentCc, currentCr)) {
+        drawIndicatorCell(ctx, currentCc, currentCr, true);
       } else {
-        // Green Plus sign
-        ctx.beginPath();
-        ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
-        ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
-        ctx.stroke();
+        break; // Stop immediately upon blank gap or other
       }
-    };
+      currentCc += dir.x;
+      currentCr += dir.y;
+    }
 
-    const drawPlayerIndicators = (ctx: CanvasRenderingContext2D) => {
-      const player = playerRef.current;
-      const dir = player.dir;
-      const powerCount = Math.min(4, Math.max(1, Math.floor(score / 2) + 1));
+    // 2. Green preview marker overlays for building-planting block sequence
+    currentCc = player.col + dir.x;
+    currentCr = player.row + dir.y;
+    for (let i = 0; i < powerCount; i++) {
+      if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
 
-      // 1. Red preview marker overlays for breaking
-      let currentCc = player.col + dir.x;
-      let currentCr = player.row + dir.y;
-      for (let i = 0; i < powerCount; i++) {
-        if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
-        if (isWall(currentCc, currentCr)) break;
+      const hasPlayer = player.col === currentCc && player.row === currentCr;
+      const hasEnemy = enemiesRef.current.some(e => e.col === currentCc && e.row === currentCr);
 
-        if (isIce(currentCc, currentCr)) {
-          drawIndicatorCell(ctx, currentCc, currentCr, true);
-        } else {
-          break; // Stop immediately upon blank gap or other
-        }
-        currentCc += dir.x;
-        currentCr += dir.y;
+      if (isIce(currentCc, currentCr) || isWall(currentCc, currentCr) || hasPlayer || hasEnemy) {
+        break;
       }
 
-      // 2. Green preview marker overlays for building-planting block sequence
-      currentCc = player.col + dir.x;
-      currentCr = player.row + dir.y;
-      for (let i = 0; i < powerCount; i++) {
-        if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
-
-        const hasPlayer = player.col === currentCc && player.row === currentCr;
-        const hasEnemy = enemiesRef.current.some(e => e.col === currentCc && e.row === currentCr);
-
-        if (isIce(currentCc, currentCr) || isWall(currentCc, currentCr) || hasPlayer || hasEnemy) {
-          break;
-        }
-
-        if (isEmpty(currentCc, currentCr)) {
-          drawIndicatorCell(ctx, currentCc, currentCr, false);
-        }
-        currentCc += dir.x;
-        currentCr += dir.y;
+      if (isEmpty(currentCc, currentCr)) {
+        drawIndicatorCell(ctx, currentCc, currentCr, false);
       }
-    };
+      currentCc += dir.x;
+      currentCr += dir.y;
+    }
+  };
 
-    const drawPlayerMain = (ctx: CanvasRenderingContext2D, t: number) => {
-      const player = playerRef.current;
-      const px = player.x;
-      const py = player.y;
+  const drawPlayerMain = (ctx: CanvasRenderingContext2D, t: number) => {
+    const player = playerRef.current;
+    const px = player.x;
+    const py = player.y;
 
-      // Invincibility protection flashing sequence
-      const alpha = player.invincible > 0
-        ? (Math.floor(player.invincible / 6) % 2 === 0 ? 0.25 : 1.0)
-        : 1.0;
+    // Invincibility protection flashing sequence
+    const alpha = player.invincible > 0
+      ? (Math.floor(player.invincible / 6) % 2 === 0 ? 0.25 : 1.0)
+      : 1.0;
 
+    ctx.globalAlpha = alpha;
+
+    const isGolden = player.goldenBroccoliTimer > 0;
+
+    if (isGolden) {
+      // Pulsating golden shielding rings around our cute Bowser turtle
+      ctx.save();
+      ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
+      ctx.lineWidth = 3.5;
+      ctx.shadowBlur = 15;
+      ctx.shadowColor = '#eab308';
+      ctx.beginPath();
+      ctx.arc(px, py, TILE * 0.65 + Math.sin(t * 0.012) * 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Draw our cute Bowser character!
+    drawGardenTurtle(ctx, px, py, player.dir, player.animFrame, t, isGolden);
+
+    if (gameState === 'playing') {
+      drawPlayerIndicators(ctx);
+    }
+
+    ctx.globalAlpha = 1.0;
+  };
+
+  const drawEnemies = (ctx: CanvasRenderingContext2D, t: number) => {
+    enemiesRef.current.forEach(e => {
+      if (e.type === 'ghost') {
+        // Semi transparent spectral render for the ghost fox
+        ctx.globalAlpha = 0.55;
+      } else {
+        ctx.globalAlpha = 1.0;
+      }
+
+      // Draw our custom beautiful fox enemy in place!
+      drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, t);
+      ctx.globalAlpha = 1.0;
+    });
+  };
+
+  const renderParticlesAndFlush = (ctx: CanvasRenderingContext2D) => {
+    const parts = particlesRef.current;
+    for (let i = parts.length - 1; i >= 0; i--) {
+      const p = parts[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.12; // downward gravity pull
+      p.life--;
+
+      if (p.life <= 0) {
+        parts.splice(i, 1);
+        continue;
+      }
+
+      const alpha = p.life / p.maxLife;
       ctx.globalAlpha = alpha;
 
-      const isGolden = player.goldenBroccoliTimer > 0;
-
-      if (isGolden) {
-        // Pulsating golden shielding rings around our cute Bowser turtle
+      // Draw custom leaf shape for green leaf particles
+      if (p.color === '#4caf50' || p.color === '#2e7d32') {
         ctx.save();
-        ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
-        ctx.lineWidth = 3.5;
-        ctx.shadowBlur = 15;
-        ctx.shadowColor = '#eab308';
+        ctx.translate(p.x, p.y);
+        ctx.rotate(p.life * 0.12); // satisfying organic rotation
+        ctx.fillStyle = p.color;
         ctx.beginPath();
-        ctx.arc(px, py, TILE * 0.65 + Math.sin(t * 0.012) * 4, 0, Math.PI * 2);
+        // Leaf shape ellipse
+        ctx.ellipse(0, 0, 4.5, 2.0, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.strokeStyle = '#051408';
+        ctx.lineWidth = 0.5;
         ctx.stroke();
         ctx.restore();
-      }
-
-      // Draw our cute Bowser character!
-      drawGardenTurtle(ctx, px, py, player.dir, player.animFrame, t, isGolden);
-
-      if (gameState === 'playing') {
-        drawPlayerIndicators(ctx);
-      }
-
-      ctx.globalAlpha = 1.0;
-    };
-
-    const drawEnemies = (ctx: CanvasRenderingContext2D, t: number) => {
-      enemiesRef.current.forEach(e => {
-        if (e.type === 'ghost') {
-          // Semi transparent spectral render for the ghost fox
-          ctx.globalAlpha = 0.55;
-        } else {
-          ctx.globalAlpha = 1.0;
-        }
-
-        // Draw our custom beautiful fox enemy in place!
-        drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, t);
-        ctx.globalAlpha = 1.0;
-
-        // Overlay status indicator badge with high-contrast glowing design
-        ctx.save();
-        ctx.font = 'bold 14px monospace';
-        ctx.fillStyle = '#ffffff';
-        ctx.strokeStyle = '#0d1117';
-        ctx.lineWidth = 2.5;
-
-        const label = e.type === 'patrol' ? '👁' : e.type === 'chaser' ? '🎯' : '👻';
-        ctx.strokeText(label, e.x - 6, e.y - TILE * 0.55);
-        ctx.fillText(label, e.x - 6, e.y - TILE * 0.55);
-        ctx.restore();
-      });
-    };
-
-    const renderParticlesAndFlush = (ctx: CanvasRenderingContext2D) => {
-      const parts = particlesRef.current;
-      for (let i = parts.length - 1; i >= 0; i--) {
-        const p = parts[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        p.vy += 0.12; // downward gravity pull
-        p.life--;
-
-        if (p.life <= 0) {
-          parts.splice(i, 1);
-          continue;
-        }
-
-        const alpha = p.life / p.maxLife;
-        ctx.globalAlpha = alpha;
+      } else {
+        // Standard retro square particle
         ctx.fillStyle = p.color;
         ctx.fillRect(p.x - 2.5, p.y - 2.5, 5, 5);
       }
-      ctx.globalAlpha = 1.0;
+    }
+    ctx.globalAlpha = 1.0;
+  };
+
+  // Frame Request Gameloop Execution
+  useEffect(() => {
+    let isSubscribed = true;
+
+    const renderLoop = (timestamp: number) => {
+      if (!isSubscribed) return;
+
+      const canvas = canvasRef.current;
+      if (!canvas) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        requestAnimationFrame(renderLoop);
+        return;
+      }
+
+      // Clear layout
+      ctx.clearRect(0, 0, W, H);
+
+      if (gameState === 'playing') {
+        updatePlayer();
+        enemiesRef.current.forEach(e => updateEnemy(e));
+        checkCollisions();
+        detectMapChanges();
+      }
+
+      // Render game layers
+      drawMap(ctx);
+      renderParticlesAndFlush(ctx);
+      drawFruits(ctx, timestamp);
+
+      if (['playing', 'dead', 'win', 'paused'].includes(gameState)) {
+        drawPlayerMain(ctx, timestamp);
+        drawEnemies(ctx, timestamp);
+      }
+
+      requestAnimationFrame(renderLoop);
     };
 
-    // Frame Request Gameloop Execution
-    useEffect(() => {
-      let isSubscribed = true;
+    const animId = requestAnimationFrame(renderLoop);
+    return () => {
+      isSubscribed = false;
+      cancelAnimationFrame(animId);
+    };
+  }, [gameState, score, levelPhase, lives]);
 
-      const renderLoop = (timestamp: number) => {
-        if (!isSubscribed) return;
-
-        const canvas = canvasRef.current;
-        if (!canvas) {
-          requestAnimationFrame(renderLoop);
-          return;
-        }
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          requestAnimationFrame(renderLoop);
-          return;
-        }
-
-        // Clear layout
-        ctx.clearRect(0, 0, W, H);
-
-        if (gameState === 'playing') {
-          updatePlayer();
-          enemiesRef.current.forEach(e => updateEnemy(e));
-          checkCollisions();
-          detectMapChanges();
-        }
-
-        // Render game layers
-        drawMap(ctx);
-        renderParticlesAndFlush(ctx);
-        drawFruits(ctx, timestamp);
-
-        if (['playing', 'dead', 'win', 'paused'].includes(gameState)) {
-          drawPlayerMain(ctx, timestamp);
-          drawEnemies(ctx, timestamp);
-        }
-
-        requestAnimationFrame(renderLoop);
-      };
-
-      const animId = requestAnimationFrame(renderLoop);
-      return () => {
-        isSubscribed = false;
-        cancelAnimationFrame(animId);
-      };
-    }, [gameState, score, levelPhase, lives]);
-
-    return (
-      <div className="relative overflow-hidden rounded-2xl border-4 border-[#5c3a21] bg-gradient-to-b from-[#1a0e05] to-[#2d1a10] p-1.5 shadow-2xl shadow-black/80">
-        <canvas
-          ref={canvasRef}
-          width={W}
-          height={H}
-          className="block h-auto w-full max-w-full rounded-lg bg-[#160d07] object-contain touch-none"
-        />
-
-        {/* Action instruction labels within footer of canvas */}
-        {gameState === 'playing' && (
-          <div className="absolute bottom-2.5 left-2.5 right-2.5 flex justify-between items-center rounded-xl bg-gradient-to-r from-[#4b301a] via-[#2f1c0e] to-[#4b301a] border-2 border-[#814e20] px-3.5 py-2 text-xs text-[#fef08a] shadow-[inset_0_2px_8px_rgba(0,0,0,0.85),0_4px_10px_rgba(0,0,0,0.6)] backdrop-blur-md xs:text-[10px] md:text-xs">
-            <span className="flex items-center gap-1.5">
-              <span className="rounded-lg bg-[#5c3a21] border border-[#a1622e] px-2 py-1 text-[11px] font-mono font-bold text-[#fef3c7] shadow-sm flex items-center gap-1">
-                🌱 Espacio / F
-              </span>
-              <span className="font-sans font-bold text-[#fef08a]/90">Crear Pasto</span>
-            </span>
-            <span className="flex items-center gap-1.5">
-              <span className="rounded-lg bg-[#5c3a21] border border-[#a1622e] px-2 py-1 text-[11px] font-mono font-bold text-[#fef3c7] shadow-sm flex items-center gap-1">
-                🍂 Shift / C
-              </span>
-              <span className="font-sans font-bold text-[#fef08a]/90">Quitar</span>
-            </span>
-            {playerRef.current.goldenBroccoliTimer > 0 && (
-              <span className="animate-pulse font-sans font-extrabold text-[#facc15] flex items-center gap-1">
-                🥦 Atravesar Pasto Activo!
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-    );
-  };
+  return (
+    <div className="relative overflow-hidden rounded-2xl border-4 border-[#5c3a21] bg-gradient-to-b from-[#1a0e05] to-[#2d1a10] p-1.5 shadow-2xl shadow-black/80 w-full h-full max-h-full flex items-center justify-center">
+      <canvas
+        ref={canvasRef}
+        width={W}
+        height={H}
+        className="block w-full h-full max-w-full max-h-full rounded-lg bg-[#160d07] object-contain touch-none"
+      />
+    </div>
+  );
+};
 export default GameCanvas;
