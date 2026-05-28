@@ -99,8 +99,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
         {/* DPAD Controller Design in Carved Wood styling */}
         <div className="flex flex-col items-center gap-1.5 my-1">
           <button
-            onTouchStart={() => triggerVirtualCommand('UP')}
-            onMouseDown={() => triggerVirtualCommand('UP')}
+            onTouchStart={() => triggerVirtualCommand('UP_START')}
+            onMouseDown={() => triggerVirtualCommand('UP_START')}
+            onTouchEnd={() => triggerVirtualCommand('UP_END')}
+            onMouseUp={() => triggerVirtualCommand('UP_END')}
+            onMouseLeave={() => triggerVirtualCommand('UP_END')}
+            onTouchCancel={() => triggerVirtualCommand('UP_END')}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
           >
             <ArrowUp size={20} className="text-[#fde047]" />
@@ -108,8 +112,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
 
           <div className="flex items-center gap-7">
             <button
-              onTouchStart={() => triggerVirtualCommand('LEFT')}
-              onMouseDown={() => triggerVirtualCommand('LEFT')}
+              onTouchStart={() => triggerVirtualCommand('LEFT_START')}
+              onMouseDown={() => triggerVirtualCommand('LEFT_START')}
+              onTouchEnd={() => triggerVirtualCommand('LEFT_END')}
+              onMouseUp={() => triggerVirtualCommand('LEFT_END')}
+              onMouseLeave={() => triggerVirtualCommand('LEFT_END')}
+              onTouchCancel={() => triggerVirtualCommand('LEFT_END')}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
             >
               <ArrowLeft size={20} className="text-[#fde047]" />
@@ -118,8 +126,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
               <div className="h-2 w-2 rounded-full bg-[#a1622e]" />
             </div>
             <button
-              onTouchStart={() => triggerVirtualCommand('RIGHT')}
-              onMouseDown={() => triggerVirtualCommand('RIGHT')}
+              onTouchStart={() => triggerVirtualCommand('RIGHT_START')}
+              onMouseDown={() => triggerVirtualCommand('RIGHT_START')}
+              onTouchEnd={() => triggerVirtualCommand('RIGHT_END')}
+              onMouseUp={() => triggerVirtualCommand('RIGHT_END')}
+              onMouseLeave={() => triggerVirtualCommand('RIGHT_END')}
+              onTouchCancel={() => triggerVirtualCommand('RIGHT_END')}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
             >
               <ArrowRight size={20} className="text-[#fde047]" />
@@ -127,8 +139,12 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </div>
 
           <button
-            onTouchStart={() => triggerVirtualCommand('DOWN')}
-            onMouseDown={() => triggerVirtualCommand('DOWN')}
+            onTouchStart={() => triggerVirtualCommand('DOWN_START')}
+            onMouseDown={() => triggerVirtualCommand('DOWN_START')}
+            onTouchEnd={() => triggerVirtualCommand('DOWN_END')}
+            onMouseUp={() => triggerVirtualCommand('DOWN_END')}
+            onMouseLeave={() => triggerVirtualCommand('DOWN_END')}
+            onTouchCancel={() => triggerVirtualCommand('DOWN_END')}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
           >
             <ArrowDown size={20} className="text-[#fde047]" />

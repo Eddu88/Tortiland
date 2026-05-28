@@ -13,7 +13,7 @@ export default function App() {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [score, setScore] = useState<number>(0);
   const [lives, setLives] = useState<number>(3);
-  const [levelPhase, setLevelPhase] = useState<LevelPhase>('apples');
+  const [levelPhase, setLevelPhase] = useState<LevelPhase>('tomatoes');
   const [gameTimeElapsed, setGameTimeElapsed] = useState<number>(0);
   const [fruitsLeft, setFruitsLeft] = useState<number>(5);
   const [goldenBroccoliTimer, setGoldenBroccoliTimer] = useState<number>(0);
@@ -24,7 +24,7 @@ export default function App() {
   const startNewGame = () => {
     setScore(0);
     setLives(3);
-    setLevelPhase('apples');
+    setLevelPhase('tomatoes');
     setGameTimeElapsed(0);
     setFruitsLeft(5);
     setGoldenBroccoliTimer(0);
@@ -42,8 +42,8 @@ export default function App() {
 
   // Render the fruit progress dynamically based on levelPhase (matches updateAppleProgress)
   const renderFruitProgressEmojis = () => {
-    const emoji = levelPhase === 'apples' ? '🍎' : '🍊';
-    const label = levelPhase === 'apples' ? 'Manzanas' : 'Naranjas';
+    const emoji = levelPhase === 'tomatoes' ? '🍅' : '🥕';
+    const label = levelPhase === 'tomatoes' ? 'Tomates' : 'Zanahorias';
 
     if (fruitsLeft === 0) {
       return (

@@ -54,7 +54,7 @@ export interface Enemy {
 export interface Fruit {
   col: number;
   row: number;
-  type: number; // 0: Wild Herb, 1: Broccoli, 2: Cabbage, 3: Apple, 4: Orange, 5: Golden Broccoli
+  type: number; // 0: Wild Herb, 1: Broccoli, 2: Cabbage, 3: Tomato, 4: Carrot, 5: Golden Broccoli
   anim: number; // offset animation factor
 }
 
@@ -69,7 +69,7 @@ export interface Particle {
 }
 
 export type GameState = 'menu' | 'playing' | 'paused' | 'dead' | 'gameover' | 'win';
-export type LevelPhase = 'apples' | 'oranges';
+export type LevelPhase = 'tomatoes' | 'carrots';
 
 export interface HighScore {
   name: string;

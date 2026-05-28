@@ -124,7 +124,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Keyboard state tracker
   const keysRef = useRef<{ [code: string]: boolean }>({});
+  const keysPressTimeRef = useRef<{ [code: string]: number }>({});
   const lastDirRef = useRef<Position | null>(null);
+  const turnBlockedRef = useRef<boolean>(false);
 
   // Sounds active state tracker (to sync with prop without closures stale)
   const soundOnRef = useRef<boolean>(soundOn);
@@ -230,7 +232,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       fruitsRef.current = fruitsRef.current.filter(f => f.type !== 5);
     }
     // Update local react state representation
-    const freshCount = fruitsRef.current.filter(f => f.type === (levelPhase === 'apples' ? 3 : 4)).length;
+    const freshCount = fruitsRef.current.filter(f => f.type === (levelPhase === 'tomatoes' ? 3 : 4)).length;
     setFruitsLeft(freshCount);
   };
 
@@ -283,9 +285,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       powerCooldown: 0,
     };
 
-    // Spawn core fruits (5 apples initially)
+    // Spawn core fruits (5 tomatoes initially)
     fruitsRef.current = [];
-    setLevelPhase('apples');
+    setLevelPhase('tomatoes');
     for (let i = 0; i < 5; i++) {
       spawnFruitInMap(3);
     }
@@ -434,17 +436,23 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // Lock diagonal movements
       if (!prev) {
-        const hasVKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] || keysRef.current['ArrowDown'] || keysRef.current['KeyS'];
-        const hasHKey = keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] || keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+        keysPressTimeRef.current[code] = Date.now();
+        let newDir: Position | null = null;
+        if (['ArrowUp', 'KeyW'].includes(code)) newDir = { x: 0, y: -1 };
+        else if (['ArrowDown', 'KeyS'].includes(code)) newDir = { x: 0, y: 1 };
+        else if (['ArrowLeft', 'KeyA'].includes(code)) newDir = { x: -1, y: 0 };
+        else if (['ArrowRight', 'KeyD'].includes(code)) newDir = { x: 1, y: 0 };
 
-        if (['ArrowUp', 'KeyW'].includes(code) && !hasVKey) {
-          lastDirRef.current = { x: 0, y: -1 };
-        } else if (['ArrowDown', 'KeyS'].includes(code) && !hasVKey) {
-          lastDirRef.current = { x: 0, y: 1 };
-        } else if (['ArrowLeft', 'KeyA'].includes(code) && !hasHKey) {
-          lastDirRef.current = { x: -1, y: 0 };
-        } else if (['ArrowRight', 'KeyD'].includes(code) && !hasHKey) {
-          lastDirRef.current = { x: 1, y: 0 };
+        if (newDir) {
+          const player = playerRef.current;
+          const isTurning = player.dir.x !== newDir.x || player.dir.y !== newDir.y;
+          if (isTurning) {
+            player.dir = newDir;
+            turnBlockedRef.current = true;
+          } else {
+            lastDirRef.current = newDir;
+            turnBlockedRef.current = false;
+          }
         }
       }
 
@@ -462,15 +470,18 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       keysRef.current[e.code] = false;
 
       // Recalculate last direction with actively pressed keys
-      lastDirRef.current = null;
-      if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) {
-        lastDirRef.current = { x: 0, y: -1 };
-      } else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) {
-        lastDirRef.current = { x: 0, y: 1 };
-      } else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) {
-        lastDirRef.current = { x: -1, y: 0 };
-      } else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) {
-        lastDirRef.current = { x: 1, y: 0 };
+      const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
+                             keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+                             keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+                             keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+      if (!hasMovementKey) {
+        turnBlockedRef.current = false;
+        lastDirRef.current = null;
+      } else {
+        if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) lastDirRef.current = { x: 0, y: -1 };
+        else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) lastDirRef.current = { x: 0, y: 1 };
+        else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) lastDirRef.current = { x: -1, y: 0 };
+        else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) lastDirRef.current = { x: 1, y: 0 };
       }
     };
 
@@ -487,15 +498,61 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   useEffect(() => {
     if (!virtualCommand || gameState !== 'playing') return;
 
-    if (['UP', 'DOWN', 'LEFT', 'RIGHT'].includes(virtualCommand)) {
-      const dirMap: { [k: string]: Position } = {
-        'UP': { x: 0, y: -1 },
-        'DOWN': { x: 0, y: 1 },
-        'LEFT': { x: -1, y: 0 },
-        'RIGHT': { x: 1, y: 0 }
+    if (virtualCommand.endsWith('_START')) {
+      const dirStr = virtualCommand.replace('_START', '');
+      const dirMap: { [k: string]: { code: string; dir: Position } } = {
+        'UP': { code: 'ArrowUp', dir: { x: 0, y: -1 } },
+        'DOWN': { code: 'ArrowDown', dir: { x: 0, y: 1 } },
+        'LEFT': { code: 'ArrowLeft', dir: { x: -1, y: 0 } },
+        'RIGHT': { code: 'ArrowRight', dir: { x: 1, y: 0 } }
       };
-      lastDirRef.current = dirMap[virtualCommand];
-      playerRef.current.dir = dirMap[virtualCommand];
+      const mapping = dirMap[dirStr];
+      if (mapping) {
+        const code = mapping.code;
+        const newDir = mapping.dir;
+        const player = playerRef.current;
+
+        const prev = keysRef.current[code];
+        keysRef.current[code] = true;
+
+        if (!prev) {
+          keysPressTimeRef.current[code] = Date.now();
+          const isTurning = player.dir.x !== newDir.x || player.dir.y !== newDir.y;
+          if (isTurning) {
+            player.dir = newDir;
+            turnBlockedRef.current = true;
+          } else {
+            lastDirRef.current = newDir;
+            turnBlockedRef.current = false;
+          }
+        }
+      }
+    } else if (virtualCommand.endsWith('_END')) {
+      const dirStr = virtualCommand.replace('_END', '');
+      const dirMap: { [k: string]: string } = {
+        'UP': 'ArrowUp',
+        'DOWN': 'ArrowDown',
+        'LEFT': 'ArrowLeft',
+        'RIGHT': 'ArrowRight'
+      };
+      const code = dirMap[dirStr];
+      if (code) {
+        keysRef.current[code] = false;
+
+        const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
+                               keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+                               keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+                               keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+        if (!hasMovementKey) {
+          turnBlockedRef.current = false;
+          lastDirRef.current = null;
+        } else {
+          if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) lastDirRef.current = { x: 0, y: -1 };
+          else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) lastDirRef.current = { x: 0, y: 1 };
+          else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) lastDirRef.current = { x: -1, y: 0 };
+          else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) lastDirRef.current = { x: 1, y: 0 };
+        }
+      }
     } else if (virtualCommand === 'BUILD') {
       useIcePower('create');
     } else if (virtualCommand === 'BREAK') {
@@ -529,15 +586,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       // Check state advancement
-      const targetFruitsCount = currentFruits.filter(f => f.type === (levelPhase === 'apples' ? 3 : 4)).length;
+      const targetFruitsCount = currentFruits.filter(f => f.type === (levelPhase === 'tomatoes' ? 3 : 4)).length;
       setFruitsLeft(targetFruitsCount);
 
       if (targetFruitsCount === 0) {
-        if (levelPhase === 'apples') {
-          // Switch to Oranges phase
-          setLevelPhase('oranges');
+        if (levelPhase === 'tomatoes') {
+          // Switch to Carrots phase
+          setLevelPhase('carrots');
           fruitsRef.current = fruitsRef.current.filter(f => f.type !== 5); // Flush active golden broccoli
-          // Spawn oranges
+          // Spawn carrots
           for (let i = 0; i < 5; i++) {
             spawnFruitInMap(4);
           }
@@ -637,29 +694,62 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     if (player.powerCooldown > 0) player.powerCooldown--;
 
-    if (!player.moving) {
-      // Pick current direction requested
-      let dir = lastDirRef.current;
-      if (lastDirRef.current) {
-        // Clear simulated virtual direction so virtual buttons move exactly one tile
-        lastDirRef.current = null;
-      } else {
-        if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) dir = { x: 0, y: -1 };
-        else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) dir = { x: 0, y: 1 };
-        else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) dir = { x: -1, y: 0 };
-        else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) dir = { x: 1, y: 0 };
+    if (turnBlockedRef.current) {
+      // Evaluate if user is holding down the key in player.dir for > 200ms
+      let isHoldingDir = false;
+      const now = Date.now();
+      if (player.dir.x === 0 && player.dir.y === -1) {
+        isHoldingDir = (keysRef.current['ArrowUp'] && (now - (keysPressTimeRef.current['ArrowUp'] || 0) > 200)) ||
+                       (keysRef.current['KeyW'] && (now - (keysPressTimeRef.current['KeyW'] || 0) > 200));
+      } else if (player.dir.x === 0 && player.dir.y === 1) {
+        isHoldingDir = (keysRef.current['ArrowDown'] && (now - (keysPressTimeRef.current['ArrowDown'] || 0) > 200)) ||
+                       (keysRef.current['KeyS'] && (now - (keysPressTimeRef.current['KeyS'] || 0) > 200));
+      } else if (player.dir.x === -1 && player.dir.y === 0) {
+        isHoldingDir = (keysRef.current['ArrowLeft'] && (now - (keysPressTimeRef.current['ArrowLeft'] || 0) > 200)) ||
+                       (keysRef.current['KeyA'] && (now - (keysPressTimeRef.current['KeyA'] || 0) > 200));
+      } else if (player.dir.x === 1 && player.dir.y === 0) {
+        isHoldingDir = (keysRef.current['ArrowRight'] && (now - (keysPressTimeRef.current['ArrowRight'] || 0) > 200)) ||
+                       (keysRef.current['KeyD'] && (now - (keysPressTimeRef.current['KeyD'] || 0) > 200));
       }
 
-      if (dir) {
-        player.dir = dir;
-        const nc = player.col + dir.x;
-        const nr = player.row + dir.y;
-        if (!isSolid(nc, nr, false, true)) {
-          player.targetCol = nc;
-          player.targetRow = nr;
-          player.moving = true;
+      if (isHoldingDir) {
+        turnBlockedRef.current = false;
+      }
+    }
+
+    if (!player.moving) {
+      if (!turnBlockedRef.current) {
+        // Pick current direction requested
+        let dir = lastDirRef.current;
+        if (lastDirRef.current) {
+          // Clear simulated virtual direction so virtual buttons move exactly one tile
+          lastDirRef.current = null;
+        } else {
+          if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) dir = { x: 0, y: -1 };
+          else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) dir = { x: 0, y: 1 };
+          else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) dir = { x: -1, y: 0 };
+          else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) dir = { x: 1, y: 0 };
+        }
+
+        if (dir) {
+          player.dir = dir;
+          const nc = player.col + dir.x;
+          const nr = player.row + dir.y;
+          if (!isSolid(nc, nr, false, true)) {
+            player.targetCol = nc;
+            player.targetRow = nr;
+            player.moving = true;
+          }
         }
       }
+    }
+
+    const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
+                           keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+                           keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+                           keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+    if (!hasMovementKey) {
+      turnBlockedRef.current = false;
     }
 
     // Move center coordinates smoothly toward targeted cell
@@ -1001,25 +1091,25 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           ctx.translate(-(x + TILE / 2), -(y + TILE / 2));
 
           // Set up colors based on variant to break monotony and add depth
-          // Variant 0: Emerald Green, Variant 1: Lime/Apple Green, Variant 2: Deep Forest Green
-          let colDark = '#143621'; // very dark shadow foliage
-          let colMid = '#1e5c26';  // forest green base
-          let colLight = '#4caf50'; // bright green highlights
-          let colWarm = '#81c784'; // sunlit neon tips
-          let colLeafGlint = '#a2e858'; // neon warm leaf glint
+          // Adjusted original palettes: lightened and softened to be more fresh lettuce-green.
+          let colDark = '#1c472d'; // softened original dark foliage
+          let colMid = '#2b7835';  // softened original forest base
+          let colLight = '#5ec263'; // softened original bright green highlights
+          let colWarm = '#94db97'; // softened original sunlit neon tips
+          let colLeafGlint = '#b4f07a'; // softened original neon warm leaf glint
 
           if (variant === 1) {
-            colDark = '#102e1c';
-            colMid = '#226b30';
-            colLight = '#66bb6a';
-            colWarm = '#98ee99';
-            colLeafGlint = '#c5f285';
+            colDark = '#1a3e26';
+            colMid = '#328543';
+            colLight = '#7ccc81';
+            colWarm = '#acf2ad';
+            colLeafGlint = '#daf7a6';
           } else if (variant === 2) {
-            colDark = '#0a230d';
-            colMid = '#164a1d';
-            colLight = '#2e7d32';
-            colWarm = '#66bb6a';
-            colLeafGlint = '#81c784';
+            colDark = '#133317';
+            colMid = '#24632b';
+            colLight = '#439c48';
+            colWarm = '#7cd181';
+            colLeafGlint = '#9be69e';
           }
 
           // Base fill con padding para no tocar los bordes exactos del tile
@@ -1726,9 +1816,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       if (isCovered) {
-        // Semi-visible translucent overlay representation when inside grass
-        ctx.globalAlpha = 0.5;
-        const pulse = 0.95 + Math.sin(t * 0.012 + f.anim) * 0.12;
+        // Semi-visible translucent overlay representation when inside grass (Balanced visibility!)
+        ctx.globalAlpha = 0.55;
+
+        // Draw a soft glowing warm aura behind the fruit to make it stand out beautifully inside the foliage
+        ctx.save();
+        const auraGrad = ctx.createRadialGradient(px, yBob, 2, px, yBob, 11);
+        auraGrad.addColorStop(0, 'rgba(255, 255, 255, 0.55)');
+        auraGrad.addColorStop(0.5, 'rgba(254, 240, 138, 0.32)'); // soft warm yellow glow
+        auraGrad.addColorStop(1, 'rgba(255, 255, 255, 0)');
+        ctx.fillStyle = auraGrad;
+        ctx.beginPath();
+        ctx.arc(px, yBob, 11, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
+
+        const pulse = 1.05 + Math.sin(t * 0.012 + f.anim) * 0.15;
         const jiggleX = Math.cos(t * 0.025 + f.anim) * 1.5;
 
         ctx.translate(px + jiggleX, yBob);
@@ -1737,88 +1840,119 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       }
 
       if (f.type === 3) {
-        // 🍎 Apple vector representation with 3D Sphere Radial Gradient
-        const appleGrad = ctx.createRadialGradient(px - 2, yBob - 2, 1, px, yBob + 1, 9);
-        appleGrad.addColorStop(0, '#fca5a5'); // glint light
-        appleGrad.addColorStop(0.2, '#ef4444'); // red body
-        appleGrad.addColorStop(1, '#7f1d1d'); // shadow red edge
+        // 🍅 Tomato vector representation with 3D Sphere Radial Gradient
+        const tomatoGrad = ctx.createRadialGradient(px - 2, yBob - 2, 1, px, yBob + 1, 9.5);
+        tomatoGrad.addColorStop(0, '#fecaca'); // glint light
+        tomatoGrad.addColorStop(0.3, '#ef4444'); // red body
+        tomatoGrad.addColorStop(1, '#991b1b'); // dark shadow red edge
 
-        ctx.fillStyle = appleGrad;
-        ctx.beginPath();
-        ctx.arc(px - 4, yBob + 1, 8.5, 0, Math.PI * 2);
-        ctx.arc(px + 4, yBob + 1, 8.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Dark outline
+        ctx.fillStyle = tomatoGrad;
         ctx.strokeStyle = '#7f1d1d';
         ctx.lineWidth = 1.5;
+
+        // Draw slightly flattened juicy tomato circle
         ctx.beginPath();
-        ctx.arc(px - 4, yBob + 1, 8.5, 0.3, Math.PI * 1.8);
-        ctx.arc(px + 4, yBob + 1, 8.5, -Math.PI * 0.8, Math.PI * 0.7);
+        ctx.ellipse(px, yBob + 1, 10, 8.5, 0, 0, Math.PI * 2);
+        ctx.fill();
         ctx.stroke();
 
-        // Brown Stem
-        ctx.strokeStyle = '#78350f';
-        ctx.lineWidth = 2.5;
-        ctx.beginPath();
-        ctx.moveTo(px, yBob - 5);
-        ctx.quadraticCurveTo(px + 2, yBob - 10, px + 5, yBob - 12);
-        ctx.stroke();
+        // Draw sepals (green star-like leaf crown on top)
+        ctx.fillStyle = '#22c55e';
+        ctx.strokeStyle = '#15803d';
+        ctx.lineWidth = 0.8;
 
-        // Cute green leaf
+        // Top stem
+        ctx.fillStyle = '#15803d';
+        ctx.fillRect(px - 1, yBob - 10, 2, 4);
+
+        // Sepal lobes
         ctx.fillStyle = '#22c55e';
         ctx.beginPath();
-        ctx.ellipse(px + 3, yBob - 9, 4, 2, -Math.PI / 4, 0, Math.PI * 2);
+        // Lobe 1 (left)
+        ctx.moveTo(px, yBob - 7);
+        ctx.quadraticCurveTo(px - 5, yBob - 8, px - 7, yBob - 5);
+        ctx.quadraticCurveTo(px - 3, yBob - 5, px, yBob - 7);
+        // Lobe 2 (right)
+        ctx.moveTo(px, yBob - 7);
+        ctx.quadraticCurveTo(px + 5, yBob - 8, px + 7, yBob - 5);
+        ctx.quadraticCurveTo(px + 3, yBob - 5, px, yBob - 7);
+        // Lobe 3 (center back)
+        ctx.moveTo(px, yBob - 7);
+        ctx.quadraticCurveTo(px, yBob - 11, px - 3, yBob - 10);
+        ctx.quadraticCurveTo(px, yBob - 9, px, yBob - 7);
+        // Lobe 4 (front left)
+        ctx.moveTo(px, yBob - 7);
+        ctx.quadraticCurveTo(px - 3, yBob - 4, px - 4, yBob - 2);
+        ctx.quadraticCurveTo(px - 1, yBob - 5, px, yBob - 7);
+        // Lobe 5 (front right)
+        ctx.moveTo(px, yBob - 7);
+        ctx.quadraticCurveTo(px + 3, yBob - 4, px + 4, yBob - 2);
+        ctx.quadraticCurveTo(px + 1, yBob - 5, px, yBob - 7);
         ctx.fill();
-        ctx.strokeStyle = '#166534';
-        ctx.lineWidth = 0.8;
         ctx.stroke();
 
         // High glint shine reflection
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.55)';
         ctx.beginPath();
-        ctx.arc(px - 4, yBob - 3, 2.5, 0, Math.PI * 2);
+        ctx.ellipse(px - 3, yBob - 3, 2.5, 1.5, -Math.PI / 4, 0, Math.PI * 2);
         ctx.fill();
 
       } else if (f.type === 4) {
-        // 🍊 Orange vector representation with 3D Gloss Gradient
-        const orangeGrad = ctx.createRadialGradient(px - 2, yBob - 3, 2, px, yBob + 1, 10);
-        orangeGrad.addColorStop(0, '#ffedd5'); // sweet shine
-        orangeGrad.addColorStop(0.3, '#f97316'); // orange core
-        orangeGrad.addColorStop(1, '#9a3412'); // shadow edge
+        // 🥕 Carrot vector representation (2.5D premium angled vector)
+        ctx.save();
+        ctx.translate(px, yBob);
+        ctx.rotate(-Math.PI / 8); // nice playful tilt
 
-        ctx.fillStyle = orangeGrad;
-        ctx.beginPath();
-        ctx.arc(px, yBob + 1, 10, 0, Math.PI * 2);
-        ctx.fill();
+        // Carrot body (elongated tapered cone)
+        const carrotGrad = ctx.createLinearGradient(-4, -8, 4, 8);
+        carrotGrad.addColorStop(0, '#fdba74'); // highlight orange
+        carrotGrad.addColorStop(0.4, '#f97316'); // main orange
+        carrotGrad.addColorStop(1, '#c2410c'); // shadow rust orange
 
-        ctx.strokeStyle = '#9a3412';
+        ctx.fillStyle = carrotGrad;
+        ctx.strokeStyle = '#7c2d12';
         ctx.lineWidth = 1.5;
+        ctx.lineJoin = 'round';
+
+        ctx.beginPath();
+        ctx.moveTo(-6, -6);
+        ctx.quadraticCurveTo(0, -9, 6, -6); // rounded top
+        ctx.lineTo(1, 10); // taper down to point
+        ctx.quadraticCurveTo(0, 11, -1, 10); // tiny tip
+        ctx.closePath();
+        ctx.fill();
         ctx.stroke();
 
-        // Orange surface bumps texture points
-        ctx.fillStyle = '#ea580c';
-        ctx.fillRect(px - 3, yBob + 3, 1.5, 1.5);
-        ctx.fillRect(px + 4, yBob - 2, 1.5, 1.5);
-
-        // Small brown stump stem
-        ctx.fillStyle = '#78350f';
-        ctx.fillRect(px - 1, yBob - 9, 2, 2.5);
-
-        // Green leaf
-        ctx.fillStyle = '#16a34a';
+        // Horizontal texture ridges
+        ctx.strokeStyle = '#c2410c';
+        ctx.lineWidth = 1.0;
         ctx.beginPath();
-        ctx.ellipse(px - 3, yBob - 9.5, 4, 2.2, Math.PI / 5, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.strokeStyle = '#14532d';
+        ctx.moveTo(-4, -2); ctx.lineTo(1, -2);
+        ctx.moveTo(-2, 2); ctx.lineTo(3, 2);
+        ctx.moveTo(-1, 6); ctx.lineTo(1, 6);
+        ctx.stroke();
+
+        // Green leaf leafy tuft at top
+        ctx.fillStyle = '#22c55e';
+        ctx.strokeStyle = '#15803d';
         ctx.lineWidth = 0.8;
-        ctx.stroke();
 
-        // High glint shine reflection
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.4)';
+        // Leaf 1 (center)
         ctx.beginPath();
-        ctx.arc(px - 3.5, yBob - 3, 2.5, 0, Math.PI * 2);
-        ctx.fill();
+        ctx.ellipse(0, -11, 2.2, 4.5, 0, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        // Leaf 2 (left)
+        ctx.beginPath();
+        ctx.ellipse(-3.5, -9.5, 2, 4, -Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        // Leaf 3 (right)
+        ctx.beginPath();
+        ctx.ellipse(3.5, -9.5, 2, 4, Math.PI / 4, 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+
+        ctx.restore();
 
       } else if (f.type === 5) {
         // 🥦 Golden Broccoli (Power up)
