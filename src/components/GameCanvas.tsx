@@ -695,21 +695,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (player.powerCooldown > 0) player.powerCooldown--;
 
     if (turnBlockedRef.current) {
-      // Evaluate if user is holding down the key in player.dir for > 200ms
+      // Evaluate if user is holding down the key in player.dir for > 100ms
       let isHoldingDir = false;
       const now = Date.now();
       if (player.dir.x === 0 && player.dir.y === -1) {
-        isHoldingDir = (keysRef.current['ArrowUp'] && (now - (keysPressTimeRef.current['ArrowUp'] || 0) > 200)) ||
-                       (keysRef.current['KeyW'] && (now - (keysPressTimeRef.current['KeyW'] || 0) > 200));
+        isHoldingDir = (keysRef.current['ArrowUp'] && (now - (keysPressTimeRef.current['ArrowUp'] || 0) > 100)) ||
+                       (keysRef.current['KeyW'] && (now - (keysPressTimeRef.current['KeyW'] || 0) > 100));
       } else if (player.dir.x === 0 && player.dir.y === 1) {
-        isHoldingDir = (keysRef.current['ArrowDown'] && (now - (keysPressTimeRef.current['ArrowDown'] || 0) > 200)) ||
-                       (keysRef.current['KeyS'] && (now - (keysPressTimeRef.current['KeyS'] || 0) > 200));
+        isHoldingDir = (keysRef.current['ArrowDown'] && (now - (keysPressTimeRef.current['ArrowDown'] || 0) > 100)) ||
+                       (keysRef.current['KeyS'] && (now - (keysPressTimeRef.current['KeyS'] || 0) > 100));
       } else if (player.dir.x === -1 && player.dir.y === 0) {
-        isHoldingDir = (keysRef.current['ArrowLeft'] && (now - (keysPressTimeRef.current['ArrowLeft'] || 0) > 200)) ||
-                       (keysRef.current['KeyA'] && (now - (keysPressTimeRef.current['KeyA'] || 0) > 200));
+        isHoldingDir = (keysRef.current['ArrowLeft'] && (now - (keysPressTimeRef.current['ArrowLeft'] || 0) > 100)) ||
+                       (keysRef.current['KeyA'] && (now - (keysPressTimeRef.current['KeyA'] || 0) > 100));
       } else if (player.dir.x === 1 && player.dir.y === 0) {
-        isHoldingDir = (keysRef.current['ArrowRight'] && (now - (keysPressTimeRef.current['ArrowRight'] || 0) > 200)) ||
-                       (keysRef.current['KeyD'] && (now - (keysPressTimeRef.current['KeyD'] || 0) > 200));
+        isHoldingDir = (keysRef.current['ArrowRight'] && (now - (keysPressTimeRef.current['ArrowRight'] || 0) > 100)) ||
+                       (keysRef.current['KeyD'] && (now - (keysPressTimeRef.current['KeyD'] || 0) > 100));
       }
 
       if (isHoldingDir) {
