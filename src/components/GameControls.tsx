@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HighScore, LevelPhase } from '../types';
 import { formatTime } from './GameCanvas';
-import { Volume2, VolumeX, ArrowUp, ArrowDown, ArrowLeft, ArrowRight, Star } from 'lucide-react';
+import { Volume2, VolumeX, Star } from 'lucide-react';
 
 interface GameControlsProps {
   score: number;
@@ -107,7 +107,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             onTouchCancel={() => triggerVirtualCommand('UP_END')}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
           >
-            <ArrowUp size={20} className="text-[#fde047]" />
+            <span className="font-press-start text-[14px] font-bold text-[#fde047]">W</span>
           </button>
 
           <div className="flex items-center gap-7">
@@ -120,7 +120,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
               onTouchCancel={() => triggerVirtualCommand('LEFT_END')}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
             >
-              <ArrowLeft size={20} className="text-[#fde047]" />
+              <span className="font-press-start text-[14px] font-bold text-[#fde047]">A</span>
             </button>
             <div className="h-6 w-6 rounded-full bg-[#160d07] border-2 border-[#5c3a21] flex items-center justify-center shadow-inner">
               <div className="h-2 w-2 rounded-full bg-[#a1622e]" />
@@ -134,7 +134,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
               onTouchCancel={() => triggerVirtualCommand('RIGHT_END')}
               className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
             >
-              <ArrowRight size={20} className="text-[#fde047]" />
+              <span className="font-press-start text-[14px] font-bold text-[#fde047]">D</span>
             </button>
           </div>
 
@@ -147,7 +147,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             onTouchCancel={() => triggerVirtualCommand('DOWN_END')}
             className="flex h-11 w-11 items-center justify-center rounded-xl bg-[#4a2e19] hover:bg-[#5c3a21] active:bg-[#1a0e05] border-2 border-[#814e20] text-[#fef08a] active:scale-95 cursor-pointer shadow-md transition-all"
           >
-            <ArrowDown size={20} className="text-[#fde047]" />
+            <span className="font-press-start text-[14px] font-bold text-[#fde047]">S</span>
           </button>
         </div>
 
@@ -158,7 +158,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             onMouseDown={() => triggerVirtualCommand('ACTION')}
             className="w-full flex flex-col items-center justify-center gap-1.5 rounded-xl bg-[#854d0e] hover:bg-[#a16207] border-2 border-[#eab308] px-3 py-3 text-[#fef9c3] active:scale-95 cursor-pointer transition-all shadow-md shadow-amber-950/40"
           >
-            <span className="font-press-start text-[9px] tracking-wider font-extrabold flex items-center gap-1">⚡ ACCIÓN CONTEXTUAL</span>
+            <span className="font-press-start text-[9px] tracking-wider font-extrabold flex items-center gap-1">Siembra o poda el arbusto</span>
             <span className="text-[10px] text-[#fef9c3]/80 font-mono font-bold">Espacio / F</span>
           </button>
         </div>

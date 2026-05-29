@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Bad Ice-Cream Clone</title>
+  <title>Tortiland</title>
   <style>
     * {
       margin: 0;
@@ -117,8 +117,8 @@
   <div id="canvas-container">
     <canvas id="gameCanvas"></canvas>
     <div id="overlay">
-      <div id="overlayTitle">❄️ BAD ICE-CREAM ❄️</div>
-      <div id="overlayMsg" style="font-size:16px; color:#fff;">Recoge hierbas, brócolis, coles y frutas. Usa el pasto
+      <div id="overlayTitle">🐢 TORTILAND 🐢</div>
+      <div id="overlayMsg" style="font-size:16px; color:#fff;">Recoge hierbas, brócolis, coles y vegetales. Usa el pasto
         para protegerte.</div>
       <button id="overlayBtn">▶ JUGAR</button>
       <div id="hint">WASD / Flechas = Mover &nbsp;|&nbsp; Espacio = Pasto</div>
@@ -156,7 +156,7 @@
           }
         }
       }
-      // Paredes interiores (diseño fijo estilo Bad Ice-Cream)
+      // Paredes interiores (diseño fijo estilo Tortiland)
       const innerWalls = [
         [2, 2], [2, 3], [2, 4],
         [2, 7], [2, 8], [2, 9], [2, 10], [2, 11], [2, 12],
@@ -304,7 +304,7 @@
       return map[row][col] === T_EMPTY;
     }
 
-    // Devuelve posición vacía aleatoria (no sobre paredes, hielo, player, frutas)
+    // Devuelve posición vacía aleatoria (no sobre paredes, arbustos, player, vegetales)
     function randomEmptyCell() {
       let tries = 0;
       while (tries++ < 500) {
@@ -531,7 +531,7 @@
           updateUI();
         }
 
-        // Comprobar si se consumieron todas las frutas de la fase actual (ignorando brócolis dorados sobrantes)
+        // Comprobar si se consumieron todas los vegetales de la fase actual (ignorando brócolis dorados sobrantes)
         const targetFruitsCount = fruits.filter(f => f.type === (levelPhase === 'apples' ? 3 : 4)).length;
         if (targetFruitsCount === 0) {
           if (levelPhase === 'apples') {
@@ -696,7 +696,7 @@
             const finalTime = formatTime(gameTimeElapsed);
             showOverlay('💀 GAME OVER', `Coleccionables: ${score} | Puntos: ${score * 100} | Tiempo: ${finalTime}`, 'Reiniciar');
           } else {
-            // Reaparecer jugador y enemigos (mantener frutas e hielo)
+            // Reaparecer jugador y enemigos (mantener vegetales e arbustos)
             player.invincible = 120; // 2 segundos de invencibilidad
             respawnEntities();
             checkGoldenBroccoliSpawn();
@@ -1211,7 +1211,7 @@
       ctx.globalAlpha = 1.0;
     }
 
-    // Dibuja un personaje tipo Bad Ice-Cream (helado con cara)
+    // Dibuja un personaje tipo Tortiland (helado con cara)
     function drawIceCreamChar(px, py, dir, frame, bodyColor, topColor, t) {
       const s = TILE * 0.38;
       const bob = Math.sin(t * 0.008 + frame) * 1;
@@ -1351,7 +1351,7 @@
     function updateAppleProgress() {
       const progressEl = document.getElementById('applesDisplay');
       if (!progressEl || !fruits) return;
-      
+
       if (levelPhase === 'apples') {
         const applesRemaining = fruits.filter(f => f.type === 3).length;
         const applesEaten = Math.max(0, Math.min(5, 5 - applesRemaining));
@@ -1423,7 +1423,7 @@
           enemies.forEach(e => updateEnemy(e));
           checkPlayerEnemyCollision();
           detectMapChanges();
-          
+
           gameTimeElapsed += dt;
           document.getElementById('timerDisplay').textContent = formatTime(gameTimeElapsed);
         }

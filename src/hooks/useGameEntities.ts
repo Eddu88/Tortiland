@@ -245,7 +245,7 @@ export const useGameEntities = ({
     checkGoldenBroccoliSpawn(currentLives);
 
     // Load Enemies
-    enemiesRef.current = [
+    enemiesRef.current = [ // TODO: serpientes, cocodrilos
       {
         id: '1', type: 'patrol',
         col: 18, row: 13,

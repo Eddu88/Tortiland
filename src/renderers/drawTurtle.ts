@@ -21,7 +21,7 @@ export const drawGardenTurtle = (
 ) => {
   ctx.save();
 
-  // Scale factor: turtle is pleasantly robust, tall, and chunky.
+  // Scale factor: Torti is pleasantly robust, tall, and chunky.
   // Increased from 0.44 to 0.58 so Torti fills 70-80% of the tile block for higher visibility.
   let breakScale = 1.0;
   let breakOffsetX = 0;
@@ -34,7 +34,7 @@ export const drawGardenTurtle = (
   let isShocked = false;
   let isTuckedDeath = false;
 
-  // Shell transformations (independent of rest of turtle body)
+  // Shell transformations (independent of rest of Torti's body)
   let shellRotation = 0;
   let shellScaleX = 1.0;
   let shellScaleY = 1.0;
@@ -170,7 +170,7 @@ export const drawGardenTurtle = (
   ctx.ellipse(finalPx, py + s * 0.58, s * 0.68, s * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Color palettes for the cute Tortiland turtle
+  // Color palettes for the cute Torti
   const skinColor = isGolden ? '#ffd43b' : '#8bc34a'; // cute green skin
   const skinShadow = isGolden ? '#f59e0b' : '#689f38';
   const skinOutline = isGolden ? '#5c3e03' : '#2b4f0b';
@@ -227,7 +227,7 @@ export const drawGardenTurtle = (
     legScaleY = 0;
   }
 
-  // If moving left, flip horizontally around turtle's center point
+  // If moving left, flip horizontally around Torti's center point
   if (dir.x < 0) {
     ctx.translate(finalPx, 0);
     ctx.scale(-1, 1);

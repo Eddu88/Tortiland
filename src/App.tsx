@@ -7,7 +7,7 @@ import React, { useState } from 'react';
 import { GameCanvas, formatTime } from './components/GameCanvas';
 import { GameControls } from './components/GameControls';
 import { GameState, LevelPhase } from './types';
-import { Shield, Sparkles, Heart, Play, RotateCcw, HelpCircle, Gamepad2, Info } from 'lucide-react';
+import { Shield, Sparkles, Heart, Play, RotateCcw, HelpCircle, Gamepad2 } from 'lucide-react';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('menu');
@@ -144,24 +144,23 @@ export default function App() {
                 {gameState === 'menu' && (
                   <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
                     <span className="px-3 py-1 rounded-md text-[9px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
-                      V2.0 TORTILAND
+                      V4.0 TORTILAND
                     </span>
                     <h2 className="font-press-start text-base md:text-lg text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       TORTILAND
                     </h2>
 
                     <p className="text-[#86efac]/70 text-xs leading-relaxed font-sans max-w-sm">
-                      Maneja a nuestra carismática tortuga para sembrar y remover tupidas barreras de arbustos. ¡Come todas las frutas silvestres antes de que los zorros te atrapen!
+                      Maneja a nuestra carismática tortuga para sembrar y remover tupidas barreras de arbustos mágicos. ¡Come todas las verduras silvestres antes de que los zorros te atrapen!
                     </p>
 
                     <div className="rounded-xl bg-[#0f2413] border border-[#224d27] p-4 text-left w-full text-xs text-[#86efac]/80 flex flex-col gap-2 shadow-inner">
                       <div className="flex items-center gap-1.5 text-[#facc15] font-bold uppercase tracking-wider">
-                        <Info size={13} fill="currentColor" className="text-[#132b18]" />
-                        CRÓNICA DEL JARDÍN
+                        CRÓNICA DE UN JARDÍN MÁGICO
                       </div>
                       <p>🎮 <span className="text-white font-semibold">Flechas:</span> Mueve a la tortuga por el laberinto.</p>
-                      <p>⚡ <span className="text-[#facc15] font-semibold">Espacio / F:</span> Acción Contextual (Siembra en celda vacía o Poda/Quita el arbusto del frente).</p>
-                      <p>🥦 Al quedar con <span className="text-[#facc15] font-semibold">1 sola vida</span>... ¡Búsca el <span className="text-[#facc15] font-semibold">Brócoli Dorado</span> para atravesar arbustos libremente!</p>
+                      <p>⚡ <span className="text-[#facc15] font-semibold">Espacio / F:</span> Siembra en celda vacía o Poda(Quita) el arbusto mágico.</p>
+                      <p>🥦 Al quedar con <span className="text-[#facc15] font-semibold">1 sola vida</span>... ¡Busca el <span className="text-[#facc15] font-semibold">Brócoli Dorado</span> para atravesar arbustos libremente y crear más arbustos!</p>
                     </div>
 
                     <button

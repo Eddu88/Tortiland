@@ -20,11 +20,11 @@ export const drawFoxEnemy = (
   // Dynamic scale based on enemy type to differentiate mechanics and threat levels:
   let s = TILE * 0.42;
   if (type === 'patrol') {
-    s = TILE * 0.48; // Red patrol foxes stay medium but clearly visible (up from 0.42)
+    s = TILE * 0.48; // Red patrol lobos stay medium but clearly visible (up from 0.42)
   } else if (type === 'chaser') {
     s = TILE * 0.58; // Gray armored chaser rodent is huge, imposing, and terrifying!
   } else if (type === 'ghost') {
-    s = TILE * 0.52; // Ghost spectral fox is intermediate size
+    s = TILE * 0.52; // Ghost spectral lobo is intermediate size
   }
   
   const abc = Math.sin(t * 0.009 + frame) * 1.5;
@@ -36,8 +36,8 @@ export const drawFoxEnemy = (
   ctx.ellipse(px, py + s * 0.52, s * 0.76, s * 0.22, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Adjust palettes naturally per fox subtype
-  let pCol = '#f97316'; // Red Fox
+  // Adjust palettes naturally per lobo subtype
+  let pCol = '#f97316'; // Red Lobo
   let iCol = '#ffffff'; // White fluff chest
   let dCol = '#1e293b'; // Charcoal tail details
   let sCol = '#7c2d12'; // Borders
@@ -45,13 +45,13 @@ export const drawFoxEnemy = (
   const tailSwing = Math.cos(t * 0.012 + frame) * 0.26;
 
   if (type === 'chaser') {
-    pCol = '#64748b'; // Gray/Steel armored fox
+    pCol = '#64748b'; // Gray/Steel armored lobo
     iCol = '#f1f5f9';
     dCol = '#0f172a';
     sCol = '#334155';
     eCol = '#f43f5e'; // Red focused eyes
   } else if (type === 'ghost') {
-    pCol = '#bfdbfe'; // Whimsical ghost-blue spectral fox
+    pCol = '#bfdbfe'; // Whimsical ghost-blue spectral lobo
     iCol = '#f0fdf4';
     dCol = '#3b82f6';
     sCol = '#1d4ed8';
@@ -98,7 +98,7 @@ export const drawFoxEnemy = (
   ctx.arc(px + s * 0.3, cy + s * 0.58, s * 0.14, 0, Math.PI * 2);
   ctx.fill();
 
-  // 3. Fox fluffy circular torso body
+  // 3. Lobo fluffy circular torso body
   ctx.fillStyle = pCol;
   ctx.strokeStyle = sCol;
   ctx.lineWidth = 1.8;
@@ -135,7 +135,7 @@ export const drawFoxEnemy = (
     ctx.fill();
   }
 
-  // 4. Fox Fox triangular cute face
+  // 4. Lobo triangular face
   const fdX = px + dir.x * 2.5;
   const fdY = cy - s * 0.32;
 
@@ -179,7 +179,7 @@ export const drawFoxEnemy = (
   ctx.closePath();
   ctx.fill();
 
-  // Fox Triangular snout face base
+  // Lobo Triangular snout face base
   ctx.fillStyle = pCol;
   ctx.strokeStyle = sCol;
   ctx.lineWidth = 1.8;
@@ -228,7 +228,7 @@ export const drawFoxEnemy = (
     ctx.fill();
   }
 
-  // Gentle almond fox eyes
+  // Gentle almond lobo eyes
   const eyeOffX = dir.x * 2.2;
   const eyeY = fdY + s * 0.05 + dir.y * 1;
 
@@ -252,7 +252,7 @@ export const drawFoxEnemy = (
   ctx.arc(fdX + s * 0.16 + eyeOffX + dir.x * 1, eyeY + dir.y * 0.6, 1.2, 0, Math.PI * 2);
   ctx.fill();
 
-  // Nose tip of fox snout
+  // Nose tip of lobo snout
   ctx.fillStyle = '#0f172a';
   ctx.beginPath();
   ctx.arc(fdX, fdY + s * 0.46, 3, 0, Math.PI * 2);

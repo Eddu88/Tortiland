@@ -126,7 +126,7 @@ export const useGameLoop = ({
     const isGolden = player.goldenBroccoliTimer > 0;
 
     if (isGolden) {
-      // Pulsating golden shielding rings around our cute Bowser turtle
+      // Pulsating golden shielding rings around our cute Torti character
       ctx.save();
       ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
       ctx.lineWidth = 3.5;
@@ -138,7 +138,7 @@ export const useGameLoop = ({
       ctx.restore();
     }
 
-    // Draw our cute Bowser character!
+    // Draw our cute Torti character!
     drawGardenTurtle(
       ctx,
       px,
@@ -164,13 +164,13 @@ export const useGameLoop = ({
   const drawEnemies = (ctx: CanvasRenderingContext2D, t: number) => {
     enemiesRef.current.forEach(e => {
       if (e.type === 'ghost') {
-        // Semi transparent spectral render for the ghost fox
+        // Semi transparent spectral render for the ghost lobo
         ctx.globalAlpha = 0.55;
       } else {
         ctx.globalAlpha = 1.0;
       }
 
-      // Draw our custom beautiful fox enemy in place!
+      // Draw our custom beautiful lobo enemy in place!
       drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, t);
       ctx.globalAlpha = 1.0;
     });
