@@ -5,7 +5,8 @@
 
 import React, { useEffect, useRef } from 'react';
 import { GameState, LevelPhase, Player, Enemy, TileType, GridPos, Position } from '../types';
-import { COLS, ROWS, TILE, T_WALL, T_BUSH, T_EMPTY } from '../constants';
+import { COLS, ROWS, TILE } from '../constants';
+import { isWall, isBush, isEmpty } from '../utils/map';
 
 interface UsePlayerInputProps {
   gameState: GameState;
@@ -48,20 +49,6 @@ export const usePlayerInput = ({
     return Math.min(10, score + 1);
   };
 
-  const isWall = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
-    return mapRef.current[row]?.[col] === T_WALL;
-  };
-
-  const isBush = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_BUSH;
-  };
-
-  const isEmpty = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_EMPTY;
-  };
 
   const useBushPower = (action: 'create' | 'break') => {
     const player = playerRef.current;
@@ -75,7 +62,7 @@ export const usePlayerInput = ({
     const firstCr = player.row + dir.y;
 
     if (firstCc <= 0 || firstCc >= COLS - 1 || firstCr <= 0 || firstCr >= ROWS - 1) return;
-    if (isWall(firstCc, firstCr)) return;
+    if (isWall(firstCc, firstCr, mapRef.current)) return;
 
     let currentCc = firstCc;
     let currentCr = firstCr;
@@ -85,9 +72,9 @@ export const usePlayerInput = ({
       breakingTilesRef.current = [];
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
-        if (isWall(currentCc, currentCr)) break;
+        if (isWall(currentCc, currentCr, mapRef.current)) break;
 
-        if (isBush(currentCc, currentCr)) {
+        if (isBush(currentCc, currentCr, mapRef.current)) {
           // Check ready frame for individual tiles
           const readyFrame = tileReadyRef.current[currentCr]?.[currentCc] ?? 0;
           if (readyFrame <= frameCountRef.current) {
@@ -122,7 +109,7 @@ export const usePlayerInput = ({
         const isScheduled = scheduledPlantsRef.current.some(p => p.col === currentCc && p.row === currentCr);
 
         // Check blockage
-        if (isWall(currentCc, currentCr) || isBush(currentCc, currentCr) || hasPlayer || enemyAtCurrent || isScheduled) {
+        if (isWall(currentCc, currentCr, mapRef.current) || isBush(currentCc, currentCr, mapRef.current) || hasPlayer || enemyAtCurrent || isScheduled) {
           break;
         }
 
@@ -133,7 +120,7 @@ export const usePlayerInput = ({
           (e.targetCol === nextCc && e.targetRow === nextCr)
         );
 
-        if (isEmpty(currentCc, currentCr)) {
+        if (isEmpty(currentCc, currentCr, mapRef.current)) {
           plantingTilesRef.current.push({ col: currentCc, row: currentCr });
           actionExecuted = true;
         }
@@ -169,14 +156,14 @@ export const usePlayerInput = ({
     const targetRow = player.row + dir.y;
 
     if (targetCol <= 0 || targetCol >= COLS - 1 || targetRow <= 0 || targetRow >= ROWS - 1) return;
-    if (isWall(targetCol, targetRow)) return;
+    if (isWall(targetCol, targetRow, mapRef.current)) return;
 
-    if (isBush(targetCol, targetRow)) {
+    if (isBush(targetCol, targetRow, mapRef.current)) {
       const readyFrame = tileReadyRef.current[targetRow]?.[targetCol] ?? 0;
       if (readyFrame <= frameCountRef.current) {
         useBushPower('break');
       }
-    } else if (isEmpty(targetCol, targetRow)) {
+    } else if (isEmpty(targetCol, targetRow, mapRef.current)) {
       useBushPower('create');
     }
   };

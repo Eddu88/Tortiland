@@ -4,9 +4,10 @@
  */
 
 import React, { useState } from 'react';
-import { GameCanvas, formatTime } from './components/GameCanvas';
+import { GameCanvas } from './components/GameCanvas';
 import { GameControls } from './components/GameControls';
 import { GameState, LevelPhase } from './types';
+import { formatTime } from './utils/map';
 import { Shield, Sparkles, Heart, Play, RotateCcw, HelpCircle, Gamepad2 } from 'lucide-react';
 
 export default function App() {

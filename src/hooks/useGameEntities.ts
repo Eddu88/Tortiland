@@ -2,6 +2,14 @@ import React from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position } from '../types';
 import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, INNER_WALLS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
+import {
+  buildBaseMap,
+  isWall,
+  isBush,
+  isEmpty,
+  isSolid,
+  findRandomEmptyCell,
+} from '../utils/map';
 
 interface UseGameEntitiesProps {
   playerRef: React.MutableRefObject<Player>;
@@ -64,84 +72,9 @@ export const useGameEntities = ({
     return Math.min(10, score + 1);
   };
 
-  const isWall = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
-    return mapRef.current[row]?.[col] === T_WALL;
-  };
-
-  const isBush = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_BUSH;
-  };
-
-  const isSolid = (col: number, row: number, ghostMode = false, isPlayer = false) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
-    if (mapRef.current[row]?.[col] === T_WALL) return true;
-    if (mapRef.current[row]?.[col] === T_BUSH) {
-      if (ghostMode) return false;
-      if (isPlayer && playerRef.current.goldenBroccoliTimer > 0) return false;
-      return true;
-    }
-    if (mapRef.current[row]?.[col] === T_BURROW) {
-      if (isPlayer && awaitingBurrowRef.current) return false;
-      return true;
-    }
-    return false;
-  };
-
-  const isEmpty = (col: number, row: number) => {
-    if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_EMPTY;
-  };
-
-  const buildBaseMap = (): TileType[][] => {
-    const m: TileType[][] = [];
-    for (let r = 0; r < ROWS; r++) {
-      m.push([]);
-      for (let c = 0; c < COLS; c++) {
-        if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
-          m[r].push(T_WALL);
-        } else if (r >= 5 && r <= 8 && c >= 8 && c <= 11) {
-          m[r].push(T_WALL); // permanent Boss Burrow (4x4)
-        } else {
-          m[r].push(T_EMPTY);
-        }
-      }
-    }
-    INNER_WALLS.forEach(([r, c]) => {
-      const isBossBurrow = r >= 5 && r <= 8 && c >= 8 && c <= 11;
-      if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) {
-        m[r][c] = T_BUSH;
-        if (grassAgesRef.current) {
-          grassAgesRef.current[`${r}_${c}`] = { createdAt: Date.now() - 5000 };
-        }
-      }
-    });
-    return m;
-  };
-
-  const findRandomEmptyCell = (): { col: number; row: number } | null => {
-    let tries = 0;
-    while (tries++ < 500) {
-      const c = 1 + Math.floor(Math.random() * (COLS - 2));
-      const r = 1 + Math.floor(Math.random() * (ROWS - 2));
-      if (mapRef.current[r]?.[c] !== T_EMPTY) continue;
-
-      // Excluir casa de Torti (1x1 en 18, 13)
-      if (c === 18 && r === 13) continue;
-
-      // Excluir fortaleza del jefe (4x4)
-      if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
-
-      if (c === playerRef.current.col && r === playerRef.current.row) continue;
-      if (fruitsRef.current.some(f => f.col === c && f.row === r)) continue;
-      return { col: c, row: r };
-    }
-    return null;
-  };
 
   const spawnFruitInMap = (type: number) => {
-    const pos = findRandomEmptyCell();
+    const pos = findRandomEmptyCell(mapRef.current, playerRef.current.col, playerRef.current.row, fruitsRef.current);
     if (pos) {
       fruitsRef.current.push({
         col: pos.col,
@@ -225,7 +158,7 @@ export const useGameEntities = ({
   const initLevel = (currentLives: number) => {
     awaitingBurrowRef.current = false;
     grassAgesRef.current = {};
-    mapRef.current = buildBaseMap();
+    mapRef.current = buildBaseMap(grassAgesRef.current);
     tileReadyRef.current = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
     // Initialize Torti's House (T_BURROW) in cell col 18, row 13
@@ -402,7 +335,7 @@ export const useGameEntities = ({
 
         if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
         if (visited[nr][nc] !== null) continue;
-        if (isSolid(nc, nr, ghostMode)) continue;
+        if (isSolid(nc, nr, mapRef.current, ghostMode)) continue;
 
         visited[nr][nc] = { fromC: c, fromR: r };
         if (nc === goalC && nr === goalR) {
@@ -415,7 +348,7 @@ export const useGameEntities = ({
 
     if (!found) {
       // Greedy fallback path search
-      const fallback = DIRS.filter(d => !isSolid(e.col + d.x, e.row + d.y, ghostMode));
+      const fallback = DIRS.filter(d => !isSolid(e.col + d.x, e.row + d.y, mapRef.current, ghostMode));
       fallback.sort((a, b) => {
         const da = Math.abs((e.col + a.x) - goalC) + Math.abs((e.row + a.y) - goalR);
         const db = Math.abs((e.col + b.x) - goalC) + Math.abs((e.row + b.y) - goalR);
@@ -500,7 +433,7 @@ export const useGameEntities = ({
           const nc = player.col + dir.x;
           const nr = player.row + dir.y;
           const readyFrame = tileReadyRef.current[nr]?.[nc] ?? 0;
-          if (!isSolid(nc, nr, false, true) && readyFrame <= frameCountRef.current) {
+          if (!isSolid(nc, nr, mapRef.current, false, true, player.goldenBroccoliTimer > 0, awaitingBurrowRef.current) && readyFrame <= frameCountRef.current) {
             player.targetCol = nc;
             player.targetRow = nr;
             player.moving = true;
@@ -583,7 +516,7 @@ export const useGameEntities = ({
 
       const nc0 = e.col + newDir.x;
       const nr0 = e.row + newDir.y;
-      if (isSolid(nc0, nr0, ghost)) {
+      if (isSolid(nc0, nr0, mapRef.current, ghost)) {
         newDir = findChaseDirection(e, ghost);
         e.chaseTimer = 1;
       }
@@ -592,7 +525,7 @@ export const useGameEntities = ({
       const nc = e.col + newDir.x;
       const nr = e.row + newDir.y;
 
-      if (!isSolid(nc, nr, ghost)) {
+      if (!isSolid(nc, nr, mapRef.current, ghost)) {
         e.targetCol = nc;
         e.targetRow = nr;
         e.moving = true;

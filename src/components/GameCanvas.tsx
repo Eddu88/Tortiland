@@ -20,13 +20,14 @@ import { W, H, TILE } from '../constants';
 import { usePlayerInput } from '../hooks/usePlayerInput';
 import { useGameEntities } from '../hooks/useGameEntities';
 import { useGameLoop } from '../hooks/useGameLoop';
+import { formatTime } from '../utils/map';
 
-// Format seconds into elegant MM:SS
-export function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-}
+// Capa de Render drawing functions
+import { drawMap } from '../renderers/drawMap';
+import { drawFruits, drawPlayerIndicators } from '../renderers/drawFruits';
+import { drawGardenTurtle } from '../renderers/drawTurtle';
+import { drawFoxEnemy } from '../renderers/drawFox';
+import { drawParticles } from '../renderers/drawParticles';
 
 interface GameCanvasProps {
   gameState: GameState;
@@ -105,6 +106,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const scheduledPlantsRef = useRef<{ col: number; row: number; triggerAt: number }[]>([]);
   const tileReadyRef = useRef<number[][]>([]);
   const awaitingBurrowRef = useRef<boolean>(false);
+  const dyingBushesRef = useRef<{ col: number; row: number; alpha: number; variant: number }[]>([]);
 
   // Sounds active state tracker (to sync with prop without closures stale)
   const soundOnRef = useRef<boolean>(soundOn);
@@ -185,6 +187,98 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     awaitingBurrowRef,
   });
 
+  // Decoupled unified rendering callback function
+  const onRender = (ctx: CanvasRenderingContext2D, timestamp: number) => {
+    // Clear layout
+    ctx.clearRect(0, 0, W, H);
+
+    const player = playerRef.current;
+
+    // Screen shake calculation: 3-5 frames during breaking impact (ticks 48-40) and planting huddle (ticks 72-60)
+    const isBreakShake = player.breakingAnimTimer >= 40 && player.breakingAnimTimer <= 48;
+    const isPlantShake = player.plantingAnimTimer >= 60 && player.plantingAnimTimer <= 72;
+
+    ctx.save();
+    
+    if (isBreakShake) {
+      const shakeX = (Math.random() * 2 - 1) * 2.5;
+      const shakeY = (Math.random() * 2 - 1) * 2.5;
+      ctx.translate(shakeX, shakeY);
+    } else if (isPlantShake) {
+      const shakeX = (Math.random() * 2 - 1) * 1.5;
+      const shakeY = (Math.random() * 2 - 1) * 1.5;
+      ctx.translate(shakeX, shakeY);
+    }
+
+    const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
+
+    // Render game layers using pure functions from the Capa de Render
+    drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, player.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current);
+    drawParticles(ctx, particlesRef.current);
+    drawFruits(ctx, fruitsRef.current, mapRef.current, timestamp);
+
+    if (['playing', 'dead', 'win', 'paused'].includes(gameState)) {
+      // Draw player main
+      const px = player.x;
+      const py = player.y;
+
+      const alpha = player.invincible > 0
+        ? (Math.floor(player.invincible / 6) % 2 === 0 ? 0.25 : 1.0)
+        : 1.0;
+
+      ctx.globalAlpha = alpha;
+
+      const isGolden = player.goldenBroccoliTimer > 0;
+
+      if (isGolden) {
+        ctx.save();
+        ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
+        ctx.lineWidth = 3.5;
+        ctx.shadowBlur = 15;
+        ctx.shadowColor = '#eab308';
+        ctx.beginPath();
+        ctx.arc(px, py, TILE * 0.65 + Math.sin(timestamp * 0.012) * 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      drawGardenTurtle(
+        ctx,
+        px,
+        py,
+        player.dir,
+        player.animFrame,
+        timestamp,
+        isGolden,
+        player.moving,
+        player.plantingAnimTimer,
+        player.breakingAnimTimer,
+        player.deathAnimTimer
+      );
+
+      if (gameState === 'playing') {
+        const powerCount = getPowerCount();
+        drawPlayerIndicators(ctx, player, enemiesRef.current, mapRef.current, powerCount);
+      }
+
+      ctx.globalAlpha = 1.0;
+
+      // Draw enemies
+      enemiesRef.current.forEach(e => {
+        if (e.type === 'ghost') {
+          ctx.globalAlpha = 0.55;
+        } else {
+          ctx.globalAlpha = 1.0;
+        }
+
+        drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, timestamp);
+        ctx.globalAlpha = 1.0;
+      });
+    }
+
+    ctx.restore();
+  };
+
   // Initialize main canvas requestAnimationFrame loop hook
   useGameLoop({
     canvasRef,
@@ -202,6 +296,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     breakingTilesRef,
     plantingTilesRef,
     grassAgesRef,
+    dyingBushesRef,
     updatePlayer,
     updateEnemy,
     checkCollisions,
@@ -209,10 +304,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     checkGoldenBroccoliSpawn,
     spawnParticles,
     detectMapChanges,
-    getPowerCount,
     frameCountRef,
     scheduledPlantsRef,
     tileReadyRef,
+    onRender,
   });
 
   // Handle layout loading and reset trigger bounds

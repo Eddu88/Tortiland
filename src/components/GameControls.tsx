@@ -5,7 +5,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { GameState, HighScore, LevelPhase } from '../types';
-import { formatTime } from './GameCanvas';
+import { formatTime } from '../utils/map';
 import { Volume2, VolumeX, Star } from 'lucide-react';
 
 interface GameControlsProps {

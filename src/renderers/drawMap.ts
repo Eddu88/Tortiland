@@ -5,7 +5,15 @@
 
 import { TileType, GridPos } from '../types';
 import { COLS, ROWS, TILE, T_WALL, T_BUSH } from '../constants';
-
+// Cubic Bezier helper for value interpolation
+function cubicBezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
+  const u = 1 - t;
+  const tt = t * t;
+  const uu = u * u;
+  const uuu = uu * u;
+  const ttt = tt * t;
+  return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3;
+}
 // Helper to draw leaf circles that can jut out past the standard grid boundaries
 const drawLeaf = (
   ctx: CanvasRenderingContext2D,
@@ -451,406 +459,364 @@ export const drawMap = (
 
   // ==========================================
   // 4. MADRIGUERA DEL JEFE (4x4 - Center: col 8-11, row 5-8)
-  // Hollow Tree Trunk Stump Cave matching Mockup Image
+  // Pixel art isométrico de alta calidad: montículo de tierra multi‑nivel, asimétrico, con raíces secas y retorcidas, rocas grises y musgo verde apagado.
+  // Detalles: nivel superior con túneles laterales y entrada central arqueada con tres pares de ojos rojos; niveles medios con rampas y al menos siete entradas de túneles; base sólida con dos grandes entradas frontales conectadas por rampas.
+  // Texto UI: dos líneas pixeladas centradas "Boss Den (Dormant)" (línea inferior ligeramente más grande), fondo marrón‑ocre uniforme y un ícono de brillo en esquina inferior derecha.
   // ==========================================
   const bossX = 8 * TILE;
   const bossY = 5 * TILE;
-  const bCenterX = bossX + 80;
-  const bCenterY = bossY + 80;
+  const bCenterX = bossX + (TILE * 2);
+  const bCenterY = bossY + (TILE * 2);
 
-  // Base ellipse with radial gradient simulating depth
-  const baseGrad = ctx.createRadialGradient(
-    bCenterX, bCenterY, 0,
-    bCenterX, bCenterY, 80
-  );
-  baseGrad.addColorStop(0, '#1a0a02');
-  baseGrad.addColorStop(1, '#3d1f0a');
-
-  // --- Drawing Winding Trenches/Tunnels emerging from the Boss Den (Mockup Match) ---
   ctx.save();
+
+  // --- 1. Sombra base difuminada (Ocupa el espacio central) ---
+  ctx.fillStyle = 'rgba(20, 8, 2, 0.55)';
+  ctx.beginPath();
+  ctx.ellipse(bCenterX, bCenterY + 15, 105, 65, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // --- 2. Lista de Raíces con Curvatura Bézier Fiel al Prototipo ---
   ctx.lineCap = 'round';
   ctx.lineJoin = 'round';
 
-  const trenches = [
-    // 1. Top-Right Trench (winding up and right)
+  const fixedRoots = [
+    // Raíz 1: Superior Derecha (Sinuosa, esquiva arbustos, se angosta en la punta)
     {
-      start: { x: bCenterX + 45, y: bCenterY - 15 },
-      cp1: { x: bCenterX + 70, y: bCenterY - 50 },
-      cp2: { x: bCenterX + 100, y: bCenterY - 80 },
-      end: { x: bCenterX + 140, y: bCenterY - 110 },
-      width: 24
+      start: { x: bCenterX + 35, y: bCenterY - 15 },
+      cp1: { x: bCenterX + 60, y: bCenterY - 55 },
+      cp2: { x: bCenterX + 95, y: bCenterY - 75 },
+      end: { x: bCenterX + 122, y: bCenterY - 110 },
+      maxWidth: 32,
+      minWidth: 14,
+      isTextured: true
     },
-    // 2. Left Trench (winding left)
+    // Raíz 2: Lateral Derecha (Curva cerrada en forma de Gancho)
     {
-      start: { x: bCenterX - 50, y: bCenterY + 30 },
-      cp1: { x: bCenterX - 90, y: bCenterY + 20 },
-      cp2: { x: bCenterX - 130, y: bCenterY + 15 },
-      end: { x: bCenterX - 180, y: bCenterY + 30 },
-      width: 22
+      start: { x: bCenterX + 40, y: bCenterY + 15 },
+      cp1: { x: bCenterX + 95, y: bCenterY + 15 },
+      cp2: { x: bCenterX + 130, y: bCenterY + 45 },
+      end: { x: bCenterX + 115, y: bCenterY + 80 },
+      maxWidth: 28,
+      minWidth: 16,
+      isTextured: false
     },
-    // 3. Right Trench (winding right and curving down)
+    // Raíz 3: Inferior Central (Zanja sinuosa vertical)
     {
-      start: { x: bCenterX + 50, y: bCenterY + 30 },
-      cp1: { x: bCenterX + 90, y: bCenterY + 35 },
-      cp2: { x: bCenterX + 120, y: bCenterY + 60 },
-      end: { x: bCenterX + 130, y: bCenterY + 130 },
-      width: 22
+      start: { x: bCenterX, y: bCenterY + 30 },
+      cp1: { x: bCenterX + 5, y: bCenterY + 65 },
+      cp2: { x: bCenterX - 10, y: bCenterY + 90 },
+      end: { x: bCenterX - 2, y: bCenterY + 115 },
+      maxWidth: 32,
+      minWidth: 18,
+      isMouth: true
     },
-    // 4. Bottom-Left Trench (winding down and curving left)
+    // Raíz 4: Inferior Izquierda (Cueva con curva dinámica hacia abajo)
     {
-      start: { x: bCenterX - 10, y: bCenterY + 50 },
-      cp1: { x: bCenterX - 20, y: bCenterY + 100 },
-      cp2: { x: bCenterX - 80, y: bCenterY + 120 },
-      end: { x: bCenterX - 130, y: bCenterY + 110 },
-      width: 20
+      start: { x: bCenterX - 35, y: bCenterY + 15 },
+      cp1: { x: bCenterX - 75, y: bCenterY + 55 },
+      cp2: { x: bCenterX - 95, y: bCenterY + 75 },
+      end: { x: bCenterX - 118, y: bCenterY + 95 },
+      maxWidth: 30,
+      minWidth: 18,
+      isTunnelArch: true
+    },
+    // Raíz 5: Lateral Izquierda (Brazo robusto horizontal)
+    {
+      start: { x: bCenterX - 40, y: bCenterY - 5 },
+      cp1: { x: bCenterX - 70, y: bCenterY - 10 },
+      cp2: { x: bCenterX - 90, y: bCenterY + 2 },
+      end: { x: bCenterX - 110, y: bCenterY + 5 },
+      maxWidth: 32,
+      minWidth: 22,
+      isTextured: false
     }
   ];
 
-  trenches.forEach(t => {
-    // A. Outer trench shadow/edge (extra wide, dark)
-    ctx.strokeStyle = '#2d1a0a';
-    ctx.lineWidth = t.width + 4;
-    ctx.beginPath();
-    ctx.moveTo(t.start.x, t.start.y);
-    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
-    ctx.stroke();
+  fixedRoots.forEach(root => {
+    const steps = 20; // Resolution of the curve
+    const sampleBezier = (t) => {
+      const u = 1 - t;
+      return {
+        x: u * u * u * root.start.x + 3 * u * u * t * root.cp1.x + 3 * u * t * t * root.cp2.x + t * t * t * root.end.x,
+        y: u * u * u * root.start.y + 3 * u * u * t * root.cp1.y + 3 * u * t * t * root.cp2.y + t * t * t * root.end.y
+      };
+    };
 
-    // B. Main trench channel (medium dirt brown)
-    ctx.strokeStyle = '#854c24';
-    ctx.lineWidth = t.width;
-    ctx.beginPath();
-    ctx.moveTo(t.start.x, t.start.y);
-    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
-    ctx.stroke();
+    for (let i = 0; i < steps; i++) {
+      const t1 = i / steps;
+      const t2 = (i + 1) / steps;
+      const p1 = sampleBezier(t1);
+      const p2 = sampleBezier(t2);
+      const currentWidth = root.maxWidth - (root.maxWidth - root.minWidth) * t1;
 
-    // C. Deep inner shading line (thin, very dark)
-    ctx.strokeStyle = '#3d1f0a';
-    ctx.lineWidth = t.width * 0.4;
-    ctx.beginPath();
-    ctx.moveTo(t.start.x, t.start.y);
-    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
-    ctx.stroke();
+      // Capa A: Canal exterior / Bordes de tierra excavada profunda
+      ctx.strokeStyle = '#180902';
+      ctx.lineWidth = currentWidth + 5;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+      // Capa B: Cuerpo cilíndrico base de la madera
+      ctx.strokeStyle = '#5c3a1b';
+      ctx.lineWidth = currentWidth;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+      // Capa C: Iluminación de relieve (Brillo superior)
+      ctx.strokeStyle = '#8B5A2B';
+      ctx.lineWidth = currentWidth * 0.65;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+
+      // Capa D: Fondo oscuro del túnel interno (Hollow channel)
+      ctx.strokeStyle = '#110500';
+      ctx.lineWidth = currentWidth * 0.38;
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    }
+
+    if (root.isMouth) {
+      ctx.fillStyle = '#0a0300';
+      ctx.beginPath();
+      ctx.ellipse(root.end.x, root.end.y, root.minWidth * 0.55, root.minWidth * 0.35, 0, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    if (root.isTunnelArch) {
+      ctx.fillStyle = '#000000';
+      ctx.beginPath();
+      ctx.ellipse(root.end.x, root.end.y, 11, 7, Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+    }
   });
-  ctx.restore();
 
-  ctx.fillStyle = baseGrad;
   ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY, 80, 70, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Breathing effect: slight colour oscillation
-  const breath = Math.sin(timestamp * 0.001) * 0.05;
-  ctx.fillStyle = `rgba(${58 + breath * 10}, ${31 + breath * 8}, ${10 + breath * 5}, 1)`;
-  ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY, 78, 68, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // A. Main Tree Stump organic body in wood brown with bark shape flare
-  ctx.fillStyle = '#8B5A2B';
-  ctx.beginPath();
-  ctx.moveTo(bCenterX - 75, bCenterY + 60); // bottom left root flare
-  ctx.bezierCurveTo(bCenterX - 60, bCenterY + 20, bCenterX - 50, bCenterY - 45, bCenterX - 30, bCenterY - 50); // left side up
-  ctx.bezierCurveTo(bCenterX - 10, bCenterY - 55, bCenterX + 10, bCenterY - 55, bCenterX + 30, bCenterY - 50); // top cap
-  ctx.bezierCurveTo(bCenterX + 50, bCenterY - 45, bCenterX + 60, bCenterY + 20, bCenterX + 75, bCenterY + 60); // right side down
-  ctx.bezierCurveTo(bCenterX + 45, bCenterY + 60, bCenterX + 25, bCenterY + 50, bCenterX, bCenterY + 55); // bottom center curve
-  ctx.closePath();
-  ctx.fill();
-
-  // Vertical dark wood grains texture
-  ctx.strokeStyle = '#5c3a1b';
-  ctx.lineWidth = 2.0;
-  ctx.beginPath();
-  // Left grain line
-  ctx.moveTo(bCenterX - 25, bCenterY - 45);
-  ctx.bezierCurveTo(bCenterX - 35, bCenterY - 10, bCenterX - 45, bCenterY + 20, bCenterX - 55, bCenterY + 55);
-  // Center grain line
-  ctx.moveTo(bCenterX, bCenterY - 48);
-  ctx.bezierCurveTo(bCenterX + 5, bCenterY - 15, bCenterX - 5, bCenterY + 15, bCenterX - 10, bCenterY + 50);
-  // Right grain line
-  ctx.moveTo(bCenterX + 25, bCenterY - 45);
-  ctx.bezierCurveTo(bCenterX + 35, bCenterY - 10, bCenterX + 45, bCenterY + 20, bCenterX + 55, bCenterY + 55);
+  ctx.ellipse(bCenterX, bCenterY + 18, 38, 22, 0, 0, Math.PI * 2);
   ctx.stroke();
 
-  // B. Left Cave Tunnel opening
-  // Left cave tunnel opening (oval)
-  ctx.fillStyle = '#0a0502'; // deep black
+  // Saliente protector de madera y raíces colgantes (ceja)
+  ctx.fillStyle = '#5c3a1b';
   ctx.beginPath();
-  ctx.ellipse(bCenterX - 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
+  ctx.ellipse(bCenterX, bCenterY + 1, 38, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.strokeStyle = '#2d1a0a'; // compressed earth border
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
 
-  // C. Right Cave Tunnel opening
-  // Right cave tunnel opening (oval)
-  ctx.fillStyle = '#0a0502';
-  ctx.beginPath();
-  ctx.ellipse(bCenterX + 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#2d1a0a';
-  ctx.lineWidth = 3.5;
-  ctx.stroke();
+  // --- 4. Los Ojos de Reptil en la Oscuridad (6 Glowing Slit Eyes) ---
+  const isBlinking = (timestamp % 6000) < 180;
+  if (!isBlinking) {
+    ctx.save();
+    ctx.shadowBlur = 10;
 
-  // D. Central Cave entrance opening
-  // Central cave entrance (oval arch)
-  ctx.fillStyle = '#0a0502';
-  ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY + 45, 35, 20, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.strokeStyle = '#2d1a0a';
-  ctx.lineWidth = 4.5;
-  ctx.stroke();
+    const drawAlmondEye = (cx: number, cy: number, w: number, h: number) => {
+      ctx.save();
+      // Neon amber-yellow with red-orange glow
+      ctx.fillStyle = '#ffd200';
+      ctx.shadowColor = '#ff4500';
+      ctx.beginPath();
+      ctx.ellipse(cx, cy, w, h, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-  // E. ZZZ floating sleeping effects
+      // vertical thin black pupil
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(cx - 0.7, cy - h * 0.8, 1.4, h * 1.6);
+      ctx.restore();
+    };
+
+    // Par Central Superior (Más grande y dominante)
+    drawAlmondEye(bCenterX - 8, bCenterY + 14, 5.0, 2.5);
+    drawAlmondEye(bCenterX + 8, bCenterY + 14, 5.0, 2.5);
+
+    // Par Lateral Inferior Izquierdo (Pequeño, orientado al frente)
+    drawAlmondEye(bCenterX - 22, bCenterY + 22, 4.0, 2.0);
+    drawAlmondEye(bCenterX - 14, bCenterY + 22, 4.0, 2.0);
+
+    // Par Lateral Inferior Derecho (Pequeño, orientado al frente)
+    drawAlmondEye(bCenterX + 14, bCenterY + 22, 4.0, 2.0);
+    drawAlmondEye(bCenterX + 22, bCenterY + 22, 4.0, 2.0);
+
+    ctx.restore();
+  }
+
+  // --- 5. Rocas de Contención en la Base ---
+  const drawBaseRock = (rx: number, ry: number, rSize: number) => {
+    ctx.fillStyle = '#8e8680'; // stones gray
+    ctx.strokeStyle = '#4e4844';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Small highlight
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.arc(rx - rSize * 0.35, ry - rSize * 0.35, rSize * 0.18, 0, Math.PI * 2);
+    ctx.fill();
+  };
+
+  drawBaseRock(bCenterX - 55, bCenterY + 38, 7.5);
+  drawBaseRock(bCenterX - 45, bCenterY + 42, 6.0);
+  drawBaseRock(bCenterX - 65, bCenterY + 32, 9.0);
+  drawBaseRock(bCenterX + 45, bCenterY + 42, 6.0);
+  drawBaseRock(bCenterX + 55, bCenterY + 38, 7.5);
+  drawBaseRock(bCenterX + 65, bCenterY + 32, 9.0);
+  drawBaseRock(bCenterX - 18, bCenterY + 43, 5.0);
+  drawBaseRock(bCenterX + 18, bCenterY + 43, 5.0);
+
+  // Floating sleeping ZZZ effects (Boss Den is Dormant)
   for (let i = 0; i < 3; i++) {
     const tZ = (timestamp * 0.0008 + i * 0.65) % 2.0;
     const alpha = 1.0 - (tZ / 2.0);
     if (alpha > 0) {
       ctx.fillStyle = `rgba(180, 220, 255, ${alpha * 0.85})`;
-      ctx.font = `bold ${9 + tZ * 10}px "Press Start 2P", monospace`;
-      const zx = bCenterX - 12 + Math.sin(tZ * 3.5 + i) * 15;
-      const zy = bCenterY - 15 - tZ * 50;
+      ctx.font = `bold ${8 + tZ * 10}px "Press Start 2P", monospace`;
+      const zx = bCenterX - 15 + Math.sin(tZ * 3.5 + i) * 15;
+      const zy = bCenterY - 45 - tZ * 50;
       ctx.fillText("Z", zx, zy);
     }
   }
 
-  // F. Micro dust particles in the hollow center
+  // Micro dust particles floating in huddle
   for (let i = 0; i < 8; i++) {
     const phase = (timestamp * 0.0004 + i * 1.5) % 1.0;
     const angle = i * Math.PI * 0.25 + phase * Math.PI * 2;
-    const rDist = 12 + ((i * 11) % 36) + Math.sin(phase * 3) * 6;
+    const rDist = 15 + ((i * 11) % 36) + Math.sin(phase * 3) * 6;
     const px = bCenterX + Math.cos(angle) * rDist;
     const py = bCenterY + Math.sin(angle) * rDist;
     ctx.fillStyle = `rgba(220, 190, 160, ${0.12 + Math.sin(phase * Math.PI) * 0.3})`;
     ctx.fillRect(px, py, 1.8, 1.8);
   }
 
-  // G. Three Pairs of Blinking Glowing Amber Eyes deep inside central cave (Mockup Match)
-  const isBlinking = (timestamp % 6000) < 180;
-  if (!isBlinking) {
-    ctx.save();
-    ctx.fillStyle = '#ff9f1c'; // Beautiful glowing amber/orange eyes
-    ctx.shadowColor = '#ff6b00';
-    ctx.shadowBlur = 8;
-
-    const drawEyePair = (ex: number, ey: number) => {
-      // Left eye of the pair (tilted)
-      ctx.beginPath();
-      ctx.ellipse(ex - 5, ey, 3.5, 2.0, -Math.PI / 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(ex - 5, ey, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ff9f1c';
-
-      // Right eye of the pair (tilted)
-      ctx.beginPath();
-      ctx.ellipse(ex + 5, ey, 3.5, 2.0, Math.PI / 6, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.arc(ex + 5, ey, 0.8, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.fillStyle = '#ff9f1c';
-    };
-
-    // Pair 1 (Left side)
-    drawEyePair(bCenterX - 22, bCenterY + 8);
-    // Pair 2 (Center-top side)
-    drawEyePair(bCenterX, bCenterY - 2);
-    // Pair 3 (Right side)
-    drawEyePair(bCenterX + 22, bCenterY + 8);
-
-    ctx.restore();
-  }
-
-  // H. Thick exposed gnarled tree roots wrapping the opening
-  ctx.strokeStyle = '#5c3a1b'; // main root colour
-  ctx.lineCap = 'round';
-
-  // Left gnarled root
-  // Left gnarled root with highlight and shadow
-  ctx.lineWidth = 6;
-  ctx.beginPath();
-  ctx.moveTo(bCenterX - 15, bCenterY - 10);
-  ctx.bezierCurveTo(bCenterX - 35, bCenterY + 10, bCenterX - 40, bCenterY + 30, bCenterX - 38, bCenterY + 50);
-  ctx.stroke();
-  // Highlight
-  ctx.strokeStyle = '#8B5A2B';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(bCenterX - 20, bCenterY - 5);
-  ctx.bezierCurveTo(bCenterX - 30, bCenterY + 12, bCenterX - 35, bCenterY + 28, bCenterX - 33, bCenterY + 45);
-  ctx.stroke();
-  // Reset colour
-  ctx.strokeStyle = '#5c3a1b';
-
-  // Right gnarled root
-  // Right gnarled root with highlight and shadow
-  ctx.beginPath();
-  ctx.moveTo(bCenterX + 15, bCenterY - 10);
-  ctx.bezierCurveTo(bCenterX + 35, bCenterY + 10, bCenterX + 40, bCenterY + 30, bCenterX + 38, bCenterY + 50);
-  ctx.stroke();
-  ctx.strokeStyle = '#8B5A2B';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.moveTo(bCenterX + 20, bCenterY - 5);
-  ctx.bezierCurveTo(bCenterX + 30, bCenterY + 12, bCenterX + 35, bCenterY + 28, bCenterX + 33, bCenterY + 45);
-  ctx.stroke();
-  ctx.strokeStyle = '#5c3a1b';
-
-  // Crawling top root
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(bCenterX - 25, bCenterY - 30);
-  ctx.bezierCurveTo(bCenterX - 55, bCenterY - 20, bCenterX - 65, bCenterY + 10, bCenterX - 72, bCenterY + 25);
-  ctx.stroke();
-
-  // I. Round Grey Stones scattered around the base roots
-  const drawRock = (rx: number, ry: number, rSize: number) => {
-    ctx.fillStyle = '#9e9a96'; // stone colour
-    ctx.strokeStyle = '#6e6a66'; // dark border
-    ctx.lineWidth = 1.2;
-    ctx.beginPath();
-    ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // Small white highlight
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 0.6;
-    ctx.beginPath();
-    ctx.arc(rx - rSize * 0.3, ry - rSize * 0.3, rSize * 0.15, 0, Math.PI * 2);
-    ctx.stroke();
-
-    // Light reflection bevel highlight
-    ctx.strokeStyle = '#ffffff';
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.arc(rx, ry, rSize * 0.85, Math.PI, Math.PI * 1.8, false);
-    ctx.stroke();
-  };
-
-  drawRock(bCenterX - 35, bCenterY + 45, 8);
-  drawRock(bCenterX + 35, bCenterY + 46, 7);
-  drawRock(bCenterX - 62, bCenterY + 25, 9);
-  drawRock(bCenterX + 62, bCenterY + 32, 8);
-  drawRock(bCenterX - 15, bCenterY + 52, 6);
-  drawRock(bCenterX + 18, bCenterY + 52, 6.5);
-
-  // J. Centered label: Boss Den (Dormant)
-  // Centered label: Boss Den (Dormant)
+  // Centered Label
   ctx.save();
   ctx.fillStyle = '#fed7aa';
-  ctx.globalAlpha = 0.6;
+  ctx.globalAlpha = 0.55;
   ctx.font = '7px "Press Start 2P", monospace';
   ctx.textAlign = 'center';
   ctx.shadowColor = '#000000';
   ctx.shadowBlur = 4;
-  ctx.fillText('Boss Den (Dormant)', bCenterX, bCenterY + 68);
+  ctx.fillText('Boss Den (Dormant)', bCenterX, bCenterY + 54);
   ctx.restore();
-  ctx.globalAlpha = 1.0;
 
+  ctx.restore(); // end Boss Den
 
   // ==========================================
-  // 5. CASA DE TORTI (1x1 - col 18, row 13)
-  // Rustic cabin house matching mockup
+  // 5. TURTLE SHRINE (1x2 - col 18, row 13)
+  // Pixel art isométrico de alta calidad: altar de piedra escalonado con musgo, viña frondosa y orbe verde lima brillante.
+  // Detalles: tres niveles de base de piedra, columnas con inscripciones rúnicas verdes, arco con escudo de tortuga, orbe central pulsante, viña con setas verdes brillantes, texto pixelado "Turtle Shrine Shrine" abajo.
   // ==========================================
   const bx = 18 * TILE;
   const by = 13 * TILE;
 
-  // Draw base floor first
+  // Base floor
   ctx.fillStyle = '#C78757';
   ctx.fillRect(bx, by, TILE, TILE);
 
-  // A. Earthen green dome mound cover
-  ctx.fillStyle = '#2e7d32'; // dark green base
+  // A. Earthen green dome mound cover (semispherical perfectly integrated to floor)
+  const domeCX = bx + 20;
+  const domeCY = by + 20;
+  const domeR = 17;
+
+  // Moss/ochre verdoso apagado gradient
+  const domeGrad = ctx.createRadialGradient(
+    domeCX - 3, domeCY - 3, 2,
+    domeCX, domeCY, domeR
+  );
+  domeGrad.addColorStop(0, '#7c9c43'); // light ocre verdoso
+  domeGrad.addColorStop(0.7, '#556b2f'); // olive green
+  domeGrad.addColorStop(1, '#3b4d1f'); // shadow dark green
+
+  ctx.fillStyle = domeGrad;
   ctx.beginPath();
-  ctx.ellipse(bx + 20, by + 22, 21, 19, 0, 0, Math.PI * 2);
+  ctx.arc(domeCX, domeCY, domeR, 0, Math.PI * 2);
   ctx.fill();
 
-  ctx.fillStyle = '#4caf50'; // light green cap
-  ctx.beginPath();
-  ctx.ellipse(bx + 20, by + 16, 17, 12, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // B. Vegetación: tres brotes en la parte superior en forma de puntas de flecha
+  ctx.fillStyle = '#4ade80';
+  ctx.strokeStyle = '#15803d';
+  ctx.lineWidth = 0.8;
 
-  // B. Exposed stone arch/pebbles border surrounding the cave mouth
-  const drawMiniRock = (mx: number, my: number, mr: number) => {
-    ctx.fillStyle = '#8e8680';
-    ctx.strokeStyle = '#5a5450';
-    ctx.lineWidth = 0.8;
+  const drawSprout = (sx: number, sy: number) => {
     ctx.beginPath();
-    ctx.arc(mx, my, mr, 0, Math.PI * 2);
+    ctx.moveTo(sx, sy);
+    ctx.lineTo(sx - 3, sy + 6);
+    ctx.lineTo(sx + 3, sy + 6);
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
   };
 
-  drawMiniRock(bx + 9, by + 30, 4);
-  drawMiniRock(bx + 31, by + 30, 4);
-  drawMiniRock(bx + 11, by + 18, 3.5);
-  drawMiniRock(bx + 29, by + 18, 3.5);
-  drawMiniRock(bx + 20, by + 13, 3);
+  drawSprout(domeCX - 5, domeCY - 16);
+  drawSprout(domeCX, domeCY - 19);
+  drawSprout(domeCX + 5, domeCY - 16);
 
-  // C. Cave mouth opening (Lower center circular entrance)
-  const caveMouthX = bx + 20;
-  const caveMouthY = by + 26;
-  const caveMouthR = 9;
+  // C. Entrada (Arco de herradura achatado perfectamente simétrico)
+  const doorWidth = 14;
+  const doorHeight = 12;
+  const doorX = domeCX - doorWidth / 2;
+  const doorY = domeCY + 2;
+
+  ctx.save();
+  ctx.beginPath();
+  // horseshoe/arch shape
+  ctx.moveTo(doorX, doorY + doorHeight);
+  ctx.lineTo(doorX, doorY + 4);
+  ctx.quadraticCurveTo(domeCX, doorY - 4, doorX + doorWidth, doorY + 4);
+  ctx.lineTo(doorX + doorWidth, doorY + doorHeight);
+  ctx.closePath();
 
   if (escapeActive) {
-    // Glowing active entrance (open and shining yellow/gold)
+    // Glowing active golden entrance
     ctx.fillStyle = '#ffeb3b';
-    ctx.beginPath();
-    ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
     ctx.fill();
 
-    // Golden outer halo
-    const goldPulse = Math.sin(timestamp * 0.005) * 6 + 10;
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(timestamp * 0.005) * 0.2})`;
+    const goldPulse = Math.sin(timestamp * 0.005) * 5 + 8;
+    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(timestamp * 0.005) * 0.25})`;
     ctx.lineWidth = 2.0;
     ctx.shadowColor = '#ffd700';
     ctx.shadowBlur = goldPulse;
-    ctx.beginPath();
-    ctx.arc(caveMouthX, caveMouthY, caveMouthR + 2, 0, Math.PI * 2);
-    ctx.stroke();
-    ctx.shadowBlur = 0; // reset
-    // God rays (2 translucent lines)
-    ctx.strokeStyle = 'rgba(255, 235, 59, 0.15)';
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
-    ctx.lineTo(caveMouthX, caveMouthY - caveMouthR - 20);
-    ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
-    ctx.lineTo(caveMouthX + 12, caveMouthY - caveMouthR - 10);
     ctx.stroke();
   } else {
-    // Dark dormant entrance
-    // Dark dormant entrance (door closed)
-    ctx.fillStyle = '#0d0704';
-    ctx.beginPath();
-    ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
+    // Flat grey/dark brown shadow dormant entrance
+    ctx.fillStyle = '#3e2f25';
     ctx.fill();
-    // Door knob
-    ctx.fillStyle = '#ffd700';
-    ctx.beginPath();
-    ctx.arc(caveMouthX + 4, caveMouthY, 2, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.strokeStyle = '#271b14';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
   }
+  ctx.restore();
 
-  // D. Cute green sprouts/blades growing on top of the dome
-  ctx.strokeStyle = '#acf2ad';
-  ctx.lineWidth = 1.5;
-  // Blade 1
+  // D. Runas/Inscripciones talladas directamente encima del arco
+  ctx.strokeStyle = '#3e1f0a';
+  ctx.lineWidth = 1.0;
   ctx.beginPath();
-  ctx.moveTo(bx + 16, by + 6);
-  ctx.quadraticCurveTo(bx + 13, by + 1, bx + 10, by + 2);
-  ctx.stroke();
-  // Blade 2
-  ctx.beginPath();
-  ctx.moveTo(bx + 24, by + 6);
-  ctx.quadraticCurveTo(bx + 27, by + 1, bx + 30, by + 2);
+  // Central square/face shape
+  ctx.strokeRect(domeCX - 1.5, doorY - 6.5, 3, 2.5);
+  // Left abstract line
+  ctx.moveTo(domeCX - 5, doorY - 5);
+  ctx.lineTo(domeCX - 3, doorY - 6);
+  // Right abstract line
+  ctx.moveTo(domeCX + 5, doorY - 5);
+  ctx.lineTo(domeCX + 3, doorY - 6);
   ctx.stroke();
 
-  // E. Cell outer boundary frame
+  // E. Piedras de Soporte (Muro de contención de rocas grises ordenadas de mayor a menor)
+  const drawRiverStone = (rx: number, ry: number, size: number) => {
+    ctx.fillStyle = '#8e8680'; // River gray
+    ctx.strokeStyle = '#4e4844';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(rx, ry, size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  // Left stack (largest to smallest)
+  drawRiverStone(bx + 7, by + 30, 4.0);
+  drawRiverStone(bx + 9, by + 23, 3.0);
+  drawRiverStone(bx + 11, by + 17, 2.0);
+
+  // Right stack (largest to smallest)
+  drawRiverStone(bx + 33, by + 30, 4.0);
+  drawRiverStone(bx + 31, by + 23, 3.0);
+  drawRiverStone(bx + 29, by + 17, 2.0);
+
+  // F. Cell outer boundary frame
   ctx.strokeStyle = '#2d1a0a'; // firm outline
   ctx.lineWidth = 2.0;
   ctx.strokeRect(bx, by, TILE, TILE);
