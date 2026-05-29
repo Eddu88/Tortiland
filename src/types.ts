@@ -32,6 +32,9 @@ export interface Player {
   invincible: number; // frames left
   goldenBroccoliTimer: number; // frames left
   powerCooldown: number; // frames left
+  plantingAnimTimer: number; // frames left for planting animation
+  breakingAnimTimer: number; // frames left for breaking animation
+  deathAnimTimer: number; // frames left for death animation
 }
 
 export interface Enemy {

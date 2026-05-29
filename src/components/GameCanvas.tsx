@@ -114,6 +114,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     invincible: 0,
     goldenBroccoliTimer: 0,
     powerCooldown: 0,
+    plantingAnimTimer: 0,
+    breakingAnimTimer: 0,
+    deathAnimTimer: 0,
   });
 
   const enemiesRef = useRef<Enemy[]>([]);
@@ -121,6 +124,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const particlesRef = useRef<Particle[]>([]);
   const prevMapRef = useRef<TileType[][] | null>(null);
   const grassAgesRef = useRef<{ [key: string]: { createdAt: number } }>({});
+  const breakingTilesRef = useRef<{ col: number; row: number }[]>([]);
+  const plantingTilesRef = useRef<{ col: number; row: number }[]>([]);
 
   // Keyboard state tracker
   const keysRef = useRef<{ [code: string]: boolean }>({});
@@ -184,7 +189,6 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
     if (mapRef.current[row][col] === T_WALL) return true;
     if (mapRef.current[row][col] === T_ICE) {
-      if (ghostMode) return false;
       if (isPlayer && playerRef.current.goldenBroccoliTimer > 0) return false;
       return true;
     }
@@ -194,6 +198,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const isEmpty = (col: number, row: number) => {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
     return mapRef.current[row][col] === T_EMPTY;
+  };
+
+  const getPowerCount = () => {
+    const player = playerRef.current;
+    if (player.goldenBroccoliTimer > 0) {
+      return 10;
+    }
+    return Math.min(4, Math.max(1, Math.floor((score + 1) / 2) + 1));
   };
 
   const findRandomEmptyCell = (): { col: number; row: number } | null => {
@@ -236,17 +248,54 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     setFruitsLeft(freshCount);
   };
 
-  const spawnParticles = (col: number, row: number, color: string) => {
+  const spawnParticles = (col: number, row: number, color: string, dir?: Position, isDirt = false) => {
     const cx = col * TILE + TILE / 2;
     const cy = row * TILE + TILE / 2;
-    for (let i = 0; i < 12; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const spd = 1.2 + Math.random() * 3.5;
+
+    if (isDirt) {
+      // Spawn 4 brown dirt particles jumping from the ground
+      for (let i = 0; i < 4; i++) {
+        const vx = (Math.random() - 0.5) * 2.5;
+        const vy = -1.5 - Math.random() * 2.5; // pop upwards
+        particlesRef.current.push({
+          x: cx + (Math.random() - 0.5) * 12,
+          y: cy + TILE / 3, // start near bottom of the tile
+          vx,
+          vy,
+          life: 25,
+          maxLife: 25,
+          color,
+        });
+      }
+      return;
+    }
+
+    const count = dir ? 8 : 12; // 8 particles for focused cone, 12 for radial
+    for (let i = 0; i < count; i++) {
+      let vx = 0;
+      let vy = 0;
+
+      if (dir) {
+        // Focused cone velocity in direction of 'dir' with lateral spread
+        const perpX = -dir.y;
+        const perpY = dir.x;
+        const factor = (Math.random() - 0.5) * 5.0; // spread of ±2.5
+        
+        vx = dir.x * 4.5 + perpX * factor + (Math.random() - 0.5) * 1.0;
+        vy = dir.y * 4.5 + perpY * factor - (Math.random() * 1.5); // slight upward pop
+      } else {
+        // Original radial uniform
+        const angle = Math.random() * Math.PI * 2;
+        const spd = 1.2 + Math.random() * 3.5;
+        vx = Math.cos(angle) * spd;
+        vy = Math.sin(angle) * spd;
+      }
+
       particlesRef.current.push({
         x: cx,
         y: cy,
-        vx: Math.cos(angle) * spd,
-        vy: Math.sin(angle) * spd,
+        vx,
+        vy,
         life: 30,
         maxLife: 30,
         color,
@@ -283,6 +332,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       invincible: 60, // 1 sec protection on load
       goldenBroccoliTimer: 0,
       powerCooldown: 0,
+      plantingAnimTimer: 0,
+      breakingAnimTimer: 0,
+      deathAnimTimer: 0,
     };
 
     // Spawn core fruits (5 tomatoes initially)
@@ -364,8 +416,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     if (player.moving) return; // Prevent bugs mid-motion
 
     const dir = player.dir;
-    // Power scale limits: 1 to 4 cells dependent on active score limits
-    const powerCount = Math.min(4, Math.max(1, Math.floor(score / 2) + 1));
+    const powerCount = getPowerCount();
 
     const firstCc = player.col + dir.x;
     const firstCr = player.row + dir.y;
@@ -378,12 +429,13 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     let actionExecuted = false;
 
     if (action === 'break') {
+      breakingTilesRef.current = [];
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
         if (isWall(currentCc, currentCr)) break;
 
         if (isIce(currentCc, currentCr)) {
-          mapRef.current[currentCr][currentCc] = T_EMPTY;
+          breakingTilesRef.current.push({ col: currentCc, row: currentCr });
           actionExecuted = true;
         } else {
           break; // Stop immediately upon meeting space / gaps
@@ -392,36 +444,71 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        SoundEffects.playBreak();
-        player.powerCooldown = 30; // 0.5s cooldown
+        player.powerCooldown = 80; // 1.33s cooldown (scaled for 54 frames)
+        player.breakingAnimTimer = 54; // 54 frames of break animation
       }
     } else if (action === 'create') {
+      plantingTilesRef.current = [];
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
 
         const hasPlayer = (player.col === currentCc && player.row === currentCr) ||
           (player.targetCol === currentCc && player.targetRow === currentCr);
-        const hasEnemy = enemiesRef.current.some(e => e.col === currentCc && e.row === currentCr);
+        
+        const enemyAtCurrent = enemiesRef.current.some(e => 
+          (e.col === currentCc && e.row === currentCr) ||
+          (e.targetCol === currentCc && e.targetRow === currentCr)
+        );
 
         // Check blockage
-        if (isWall(currentCc, currentCr) || isIce(currentCc, currentCr) || hasPlayer || hasEnemy) {
+        if (isWall(currentCc, currentCr) || isIce(currentCc, currentCr) || hasPlayer || enemyAtCurrent) {
           break;
         }
 
+        const nextCc = currentCc + dir.x;
+        const nextCr = currentCr + dir.y;
+        const enemyAtNext = enemiesRef.current.some(e => 
+          (e.col === nextCc && e.row === nextCr) ||
+          (e.targetCol === nextCc && e.targetRow === nextCr)
+        );
+
         if (isEmpty(currentCc, currentCr)) {
-          mapRef.current[currentCr][currentCc] = T_ICE;
-          const key = `${currentCr}_${currentCc}`;
-          grassAgesRef.current[key] = { createdAt: Date.now() };
+          plantingTilesRef.current.push({ col: currentCc, row: currentCr });
           actionExecuted = true;
+        }
+
+        if (enemyAtNext) {
+          break;
         }
 
         currentCc += dir.x;
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        SoundEffects.playBuild();
-        player.powerCooldown = 35; // 0.6s cooldown
+        player.powerCooldown = 90; // 1.5s cooldown (scaled for 54 frames)
+        player.plantingAnimTimer = 54; // 54 ticks duration for planting animation
       }
+    }
+  };
+
+  // Unified context-aware action trigger (Space/F/Shift/C all call this)
+  const triggerAction = () => {
+    const player = playerRef.current;
+    if (player.powerCooldown > 0) return;
+    if (player.moving) return; // Prevent bugs mid-motion
+    if (player.deathAnimTimer > 0) return;
+
+    const dir = player.dir;
+    const targetCol = player.col + dir.x;
+    const targetRow = player.row + dir.y;
+
+    if (targetCol <= 0 || targetCol >= COLS - 1 || targetRow <= 0 || targetRow >= ROWS - 1) return;
+    if (isWall(targetCol, targetRow)) return;
+
+    if (isIce(targetCol, targetRow)) {
+      useIcePower('break');
+    } else if (isEmpty(targetCol, targetRow)) {
+      useIcePower('create');
     }
   };
 
@@ -456,13 +543,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         }
       }
 
-      // Action Keys: Space/Enter/KeyF for creation, Backspace/Shift/KeyE/KeyC for break
-      if (['Space', 'Enter', 'KeyF'].includes(code)) {
+      // Action Keys: Space performs context-aware actions
+      if (['Space'].includes(code)) {
         e.preventDefault();
-        useIcePower('create');
-      } else if (['ShiftLeft', 'ShiftRight', 'KeyE', 'KeyC', 'Backspace'].includes(code)) {
-        e.preventDefault();
-        useIcePower('break');
+        triggerAction();
       }
     };
 
@@ -553,10 +637,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) lastDirRef.current = { x: 1, y: 0 };
         }
       }
-    } else if (virtualCommand === 'BUILD') {
-      useIcePower('create');
-    } else if (virtualCommand === 'BREAK') {
-      useIcePower('break');
+    } else if (virtualCommand === 'BUILD' || virtualCommand === 'BREAK') {
+      triggerAction();
     }
 
     clearVirtualCommand();
@@ -693,6 +775,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     if (player.powerCooldown > 0) player.powerCooldown--;
+    if (player.plantingAnimTimer > 0) player.plantingAnimTimer--;
+    if (player.breakingAnimTimer > 0) player.breakingAnimTimer--;
 
     if (turnBlockedRef.current) {
       // Evaluate if user is holding down the key in player.dir for > 100ms
@@ -754,23 +838,29 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     // Move center coordinates smoothly toward targeted cell
     if (player.moving) {
-      const tx = player.targetCol * TILE + TILE / 2;
-      const ty = player.targetRow * TILE + TILE / 2;
-      const dx = tx - player.x;
-      const dy = ty - player.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist <= player.speed) {
-        player.x = tx;
-        player.y = ty;
-        player.col = player.targetCol;
-        player.row = player.targetRow;
+      if (mapRef.current[player.targetRow][player.targetCol] === T_ICE && !(player.goldenBroccoliTimer > 0)) {
         player.moving = false;
-
-        checkFruitPickup();
+        player.targetCol = player.col;
+        player.targetRow = player.row;
       } else {
-        player.x += (dx / dist) * player.speed;
-        player.y += (dy / dist) * player.speed;
+        const tx = player.targetCol * TILE + TILE / 2;
+        const ty = player.targetRow * TILE + TILE / 2;
+        const dx = tx - player.x;
+        const dy = ty - player.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist <= player.speed) {
+          player.x = tx;
+          player.y = ty;
+          player.col = player.targetCol;
+          player.row = player.targetRow;
+          player.moving = false;
+
+          checkFruitPickup();
+        } else {
+          player.x += (dx / dist) * player.speed;
+          player.y += (dy / dist) * player.speed;
+        }
       }
     }
 
@@ -821,21 +911,28 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     if (e.moving) {
-      const tx = e.targetCol * TILE + TILE / 2;
-      const ty = e.targetRow * TILE + TILE / 2;
-      const dx = tx - e.x;
-      const dy = ty - e.y;
-      const dist = Math.sqrt(dx * dx + dy * dy);
-
-      if (dist <= e.speed) {
-        e.x = tx;
-        e.y = ty;
-        e.col = e.targetCol;
-        e.row = e.targetRow;
+      if (mapRef.current[e.targetRow][e.targetCol] === T_ICE) {
         e.moving = false;
+        e.targetCol = e.col;
+        e.targetRow = e.row;
+        e.chaseTimer = 0; // force findChaseDirection on next tick
       } else {
-        e.x += (dx / dist) * e.speed;
-        e.y += (dy / dist) * e.speed;
+        const tx = e.targetCol * TILE + TILE / 2;
+        const ty = e.targetRow * TILE + TILE / 2;
+        const dx = tx - e.x;
+        const dy = ty - e.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist <= e.speed) {
+          e.x = tx;
+          e.y = ty;
+          e.col = e.targetCol;
+          e.row = e.targetRow;
+          e.moving = false;
+        } else {
+          e.x += (dx / dist) * e.speed;
+          e.y += (dy / dist) * e.speed;
+        }
       }
     }
 
@@ -848,28 +945,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   const checkCollisions = () => {
     const player = playerRef.current;
-    if (player.invincible > 0) return;
+    if (player.invincible > 0 || player.deathAnimTimer > 0) return;
 
     for (const e of enemiesRef.current) {
       const dx = player.x - e.x;
       const dy = player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      if (dist < TILE * 0.65) {
-        // Player touched by enemy
-        setLives((prev: number) => {
-          const updated = prev - 1;
-          if (updated <= 0) {
-            setGameState('gameover');
-            SoundEffects.playGameOver();
-          } else {
-            SoundEffects.playHurt();
-            player.invincible = 120; // 2 seconds protection
-            respawnEntities();
-            checkGoldenBroccoliSpawn(updated);
-          }
-          return updated;
-        });
+      if (dist < TILE * 0.72) {
+        // Trigger arcade death sequence!
+        SoundEffects.playHurt();
+        player.deathAnimTimer = 75; // 75 frames (1.25s) of cartoon shock, shell refuge, and fall-out
         return;
       }
     }
@@ -909,15 +995,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       prevMapRef.current = mapRef.current.map(r => [...r]);
       return;
     }
+    const player = playerRef.current;
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (prevMapRef.current[r][c] !== mapRef.current[r][c]) {
           if (mapRef.current[r][c] === T_ICE) {
-            spawnParticles(c, r, '#4caf50'); // vibrant leaf green grow particles
+            // Only spawn radial green particles for other map changes (e.g. initLevel)
+            if (player.plantingAnimTimer === 0) {
+              spawnParticles(c, r, '#4caf50'); // vibrant leaf green grow particles
+            }
           } else if (prevMapRef.current[r][c] === T_ICE) {
-            // Explode in a satisfying combination of light and dark leaf particles!
-            spawnParticles(c, r, '#4caf50');
-            spawnParticles(c, r, '#2e7d32');
+            // Only spawn radial green particles for non-player break changes
+            if (player.breakingAnimTimer === 0) {
+              spawnParticles(c, r, '#4caf50');
+              spawnParticles(c, r, '#2e7d32');
+            }
           }
         }
       }
@@ -931,7 +1023,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
-        const x = c * TILE;
+        let x = c * TILE;
         const y = r * TILE;
         const t = mapRef.current[r][c];
 
@@ -1039,6 +1131,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
           // ==========================================
           // 2. LUSH ORGANIC 2.5D CONNECTED SHRUB HEDGES (PASTO/HIERBA)
           // ==========================================
+
+          const isShaking = breakingTilesRef.current.some(tile => tile.col === c && tile.row === r) && playerRef.current.breakingAnimTimer >= 13;
+          if (isShaking) {
+            x += Math.sin(Date.now() * 0.09) * 3.5;
+          }
 
           const key = `${r}_${c}`;
           const record = grassAgesRef.current[key];
@@ -1334,14 +1431,153 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     dir: Position,
     frame: number,
     t: number,
-    isGolden: boolean
+    isGolden: boolean,
+    plantingAnimTimer: number = 0,
+    breakingAnimTimer: number = 0,
+    deathAnimTimer: number = 0
   ) => {
     ctx.save();
 
-    // Scale factor: turtle is pleasantly robust, tall, and chunky
-    const s = TILE * 0.44;
+    // Scale factor: turtle is pleasantly robust, tall, and chunky.
+    // Increased from 0.44 to 0.58 so Torti fills 70-80% of the tile block for higher visibility.
+    let breakScale = 1.0;
+    let breakOffsetX = 0;
+    let breakOffsetY = 0;
+    
+    // Death animation properties (shock, hide, roll falling and ghost parpadeo)
+    let deathJumpY = 0;
+    let deathAngle = 0;
+    let deathOpacity = 1.0;
+    let isShocked = false;
+    let isTuckedDeath = false;
+
+    // Shell transformations (independent of rest of turtle body)
+    let shellRotation = 0;
+    let shellScaleX = 1.0;
+    let shellScaleY = 1.0;
+
+    let limbsScale = 1.0;
+    let isNaked = false;
+    let localOffsetX = 0;
+    let localOffsetY = 0;
+
     const bob = Math.sin(t * 0.008 + frame) * 1.5;
-    const cy = py + bob;
+    let cy = py + bob;
+
+    if (deathAnimTimer > 0) {
+      if (deathAnimTimer >= 61) {
+        // Fase 1 (ticks 75-61, 15 frames): Shock / Surprise Jump!
+        isShocked = true;
+        // User math: t = (75 - deathAnimTimer) / 14, dy = -AlturaMaxima * sin(t * PI)
+        const tNorm = (75 - deathAnimTimer) / 14;
+        deathJumpY = -TILE * 0.9 * Math.sin(tNorm * Math.PI);
+      } else if (deathAnimTimer >= 46) {
+        // Fase 2 (ticks 60-46, 15 frames): Hide in shell & panic shake!
+        isTuckedDeath = true;
+        const shakeAngle = Math.sin(t * 0.25) * 0.09;
+        ctx.translate(px, cy);
+        ctx.rotate(shakeAngle);
+        ctx.translate(-px, -cy);
+      } else {
+        // Fase 3 (ticks 45-1, 45 frames): Shell falling, rolling and ghost fade out!
+        isTuckedDeath = true;
+        const progress = (45 - deathAnimTimer) / 44;
+        deathAngle = progress * Math.PI / 2 + progress * Math.PI * 2; // fall 90 deg + spin 360 deg
+        deathOpacity = Math.max(0, 1.0 - progress);
+        
+        ctx.translate(px, cy);
+        ctx.rotate(deathAngle);
+        ctx.translate(-px, -cy);
+      }
+    }
+
+    cy += deathJumpY;
+    ctx.globalAlpha = ctx.globalAlpha * deathOpacity;
+
+    if (breakingAnimTimer > 0) {
+      if (breakingAnimTimer >= 45) {
+        // Fase 1 — Ocultamiento (Ticks 54-45)
+        limbsScale = 0;
+        isNaked = false;
+        breakScale = 0.9;
+      } else if (breakingAnimTimer >= 24) {
+        // Fase 2 — Lanzamiento e Impacto (Ticks 44-24)
+        limbsScale = 1.0;
+        isNaked = true;
+        isShocked = true;
+
+        let vueloOffset = 0;
+        if (breakingAnimTimer >= 36) {
+          const tVuelo = (44 - breakingAnimTimer) / 8;
+          vueloOffset = tVuelo * TILE;
+        } else {
+          vueloOffset = TILE;
+        }
+
+        localOffsetX = Math.abs(dir.x) * vueloOffset;
+        localOffsetY = dir.y * vueloOffset;
+
+        shellRotation = (44 - breakingAnimTimer) * 0.5;
+
+        if (breakingAnimTimer === 36 || breakingAnimTimer === 35) {
+          shellScaleX = 0.8;
+          shellScaleY = 1.15;
+        } else {
+          shellScaleX = 1.15;
+          shellScaleY = 0.85;
+        }
+      } else if (breakingAnimTimer >= 12) {
+        // Fase 3 — El Regreso (Ticks 23-12)
+        limbsScale = 1.0;
+        isNaked = true;
+        isShocked = true;
+
+        const tReturn = (breakingAnimTimer - 12) / 11;
+        const vueloOffset = tReturn * TILE;
+
+        localOffsetX = Math.abs(dir.x) * vueloOffset;
+        localOffsetY = dir.y * vueloOffset;
+
+        shellRotation = breakingAnimTimer * 0.25;
+      } else {
+        // Fase 4 — Reasentamiento (Ticks 11-1)
+        limbsScale = 1.0;
+        isNaked = false;
+        const progress = breakingAnimTimer / 11;
+        breakScale = 0.85 + (1 - progress) * 0.15;
+      }
+    }
+
+    const finalPx = px + breakOffsetX;
+    const finalCy = cy + breakOffsetY;
+
+    const s = TILE * 0.58 * breakScale;
+
+    // Draw motion lines during impact frames (ticks 36 and 35 of breakingAnimTimer)
+    if (breakingAnimTimer === 36 || breakingAnimTimer === 35) {
+      ctx.save();
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
+      ctx.lineWidth = 2.5;
+      ctx.lineCap = 'round';
+
+      const perpX = -dir.y;
+      const perpY = dir.x;
+
+      // Draw 3 wind lines along dir
+      const offsets = [-12, 0, 12];
+      offsets.forEach(off => {
+        const startX = finalPx + perpX * off - dir.x * s * 0.2;
+        const startY = finalCy + perpY * off - dir.y * s * 0.2;
+        const endX = startX + dir.x * TILE * 0.9;
+        const endY = startY + dir.y * TILE * 0.9;
+
+        ctx.beginPath();
+        ctx.moveTo(startX, startY);
+        ctx.lineTo(endX, endY);
+        ctx.stroke();
+      });
+      ctx.restore();
+    }
 
     const playerIsMoving = playerRef.current.moving;
     const walkOffset = playerIsMoving ? Math.sin(t * 0.015) * 0.18 : 0;
@@ -1349,7 +1585,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // Grounded oval shadow directly under the feet (doesn't bob)
     ctx.fillStyle = 'rgba(0, 0, 0, 0.45)';
     ctx.beginPath();
-    ctx.ellipse(px, py + s * 0.58, s * 0.68, s * 0.22, 0, 0, Math.PI * 2);
+    ctx.ellipse(finalPx, py + s * 0.58, s * 0.68, s * 0.22, 0, 0, Math.PI * 2);
     ctx.fill();
 
     // Color palettes for the cute Tortiland turtle
@@ -1368,17 +1604,95 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const blushColor = '#fb7185'; // bright rosy blush cheeks
     const mouthColor = isGolden ? '#5c3e03' : '#1f3807';
 
+    // Animation frames logic for planting/siembra (snappy 18-frame organic effect)
+    const isPlanting = plantingAnimTimer > 0;
+    let headOffsetX = 0;
+    let headOffsetY = 0;
+    let headScale = 1;
+    let bodyScaleY = 1;
+    let bodyOffsetY = 0;
+    let legScaleY = 1;
+    let legOffsetY = 0;
+    let tailScale = 1.0;
+
+    if (isPlanting) {
+      if (plantingAnimTimer >= 45) {
+        // Fase 1 — El Hundimiento (Ticks 54-45): Carga (hide partially & lower center of gravity)
+        headScale = 0.45;
+        headOffsetX = -s * 0.15;
+        headOffsetY = s * 0.12;
+        bodyScaleY = 0.8;
+        bodyOffsetY = s * 0.1;
+        legScaleY = 0.5;
+        legOffsetY = -s * 0.08;
+        tailScale = 0.5;
+      } else if (plantingAnimTimer >= 15) {
+        // Fase 2 — Lanzamiento (Ticks 44-15): head profile normal, legs will stretch independently
+        headScale = 1.0;
+        headOffsetX = s * 0.05; // normal profile position
+        headOffsetY = 0;
+      } else {
+        // Fase 3 — Retorno y Limpieza (Ticks 14-1): cabeza oscila en X
+        const progress = plantingAnimTimer / 14;
+        headOffsetX = Math.sin(t * 0.3) * 3 * progress;
+      }
+    }
+
+    // Hide limbs completely when tucked in shell during death
+    if (isTuckedDeath) {
+      headScale = 0;
+      tailScale = 0;
+      legScaleY = 0;
+    }
+
     // If moving left, flip horizontally around turtle's center point
     if (dir.x < 0) {
-      ctx.translate(px, 0);
+      ctx.translate(finalPx, 0);
       ctx.scale(-1, 1);
-      ctx.translate(-px, 0);
+      ctx.translate(-finalPx, 0);
     }
 
     // Helper to draw chubby legs
-    const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number) => {
+    const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number, isFront: boolean) => {
+      if (legScaleY === 0 || limbsScale === 0) return; // Skip drawing when tucked in shell
+      
       ctx.save();
-      ctx.translate(lx, ly + legWalkOffset * s * 0.3);
+      let scaleY = legScaleY;
+      let scaleX = 1.0;
+      let offY = legOffsetY;
+      let offX = 0;
+
+      if (isPlanting) {
+        if (plantingAnimTimer >= 45) {
+          scaleY = 0.5;
+          offY = -s * 0.08;
+        } else if (plantingAnimTimer >= 15) {
+          // Fase 2 — Pisotón vertical en ambas patas (Ticks 44-15)
+          if (plantingAnimTimer >= 30) {
+            // Levantamiento (Ticks 44-30)
+            offY = -s * 0.5;
+          } else {
+            // Golpe de impacto (Ticks 29-15)
+            offY = s * 0.25;
+            if (plantingAnimTimer === 29 || plantingAnimTimer === 28) {
+              scaleY = 0.7;
+              scaleX = 1.3;
+            }
+          }
+        } else {
+          // Fase 3 — Retorno (Ticks 14-1)
+          const progress = plantingAnimTimer / 14;
+          const pushAmount = s * 0.1 * progress;
+          if (dir.x !== 0) {
+            offX = pushAmount;
+          } else {
+            offY = dir.y * pushAmount;
+          }
+        }
+      }
+
+      ctx.translate(lx + offX, ly + offY + legWalkOffset * s * 0.3);
+      ctx.scale(scaleX, scaleY);
 
       // Chubby round capsule leg
       ctx.fillStyle = skinColor;
@@ -1415,130 +1729,285 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
 
     // Draw Tail (cute tiny green tail)
-    ctx.fillStyle = skinColor;
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.moveTo(px - s * 0.65, cy + s * 0.28);
-    ctx.quadraticCurveTo(px - s * 0.88, cy + s * 0.36, px - s * 0.68, cy + s * 0.40);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
+    if (tailScale > 0 && limbsScale > 0) {
+      ctx.save();
+      ctx.translate(finalPx - s * 0.65, finalCy + s * 0.28);
+      ctx.scale(tailScale * limbsScale, tailScale * limbsScale);
+      ctx.fillStyle = skinColor;
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.quadraticCurveTo(-s * 0.23, s * 0.08, -s * 0.03, s * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
-    // Draw shell behind body
+    // If naked, draw the exposed pink/light-green textured back of Torti behind shell
+    if (isNaked) {
+      ctx.save();
+      const nakedCx = finalPx - s * 0.32;
+      const nakedCy = finalCy + s * 0.06 + bodyOffsetY;
+      ctx.translate(nakedCx, nakedCy);
+
+      // Draw the naked body oval
+      ctx.fillStyle = '#e8a7a1'; // soft pink naked skin color
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.35, s * 0.40, Math.PI * 0.04, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw spine lines/wrinkles
+      ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(0, -s * 0.2);
+      ctx.lineTo(0, s * 0.2);
+      ctx.stroke();
+
+      ctx.restore();
+    }
+
+    // Draw shell behind body (with independent translation, rotation, and squash/stretch scale)
+    ctx.save();
+    const shellCx = finalPx - s * 0.32 + localOffsetX;
+    const shellCy = finalCy + s * 0.06 + bodyOffsetY + localOffsetY;
+    ctx.translate(shellCx, shellCy);
+    ctx.rotate(shellRotation);
+    ctx.scale(shellScaleX, shellScaleY);
+
     ctx.fillStyle = shellBase;
     ctx.strokeStyle = shellOutline;
     ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.ellipse(px - s * 0.32, cy + s * 0.06, s * 0.50, s * 0.55, Math.PI * 0.04, 0, Math.PI * 2);
+    ctx.ellipse(0, 0, s * 0.50, s * 0.55, Math.PI * 0.04, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Add white spots/circles on shell
+    // Add white spots/circles on shell relative to shell center (0, 0)
     ctx.fillStyle = shellSpot;
     ctx.beginPath();
-    ctx.arc(px - s * 0.48, cy - s * 0.24, s * 0.11, 0, Math.PI * 2);
-    ctx.arc(px - s * 0.54, cy + s * 0.02, s * 0.13, 0, Math.PI * 2);
-    ctx.arc(px - s * 0.42, cy + s * 0.26, s * 0.10, 0, Math.PI * 2);
-    ctx.arc(px - s * 0.24, cy - s * 0.16, s * 0.08, 0, Math.PI * 2);
+    ctx.arc(-s * 0.16, -s * 0.30, s * 0.11, 0, Math.PI * 2);
+    ctx.arc(-s * 0.22, -s * 0.04, s * 0.13, 0, Math.PI * 2);
+    ctx.arc(-s * 0.10,  s * 0.20, s * 0.11, 0, Math.PI * 2);
+    ctx.arc( s * 0.08, -s * 0.22, s * 0.08, 0, Math.PI * 2);
     ctx.fill();
 
+    ctx.restore();
+
     // Draw rear leg (left)
-    drawChubbyLeg(px - s * 0.20, cy + s * 0.40, walkOffset);
+    drawChubbyLeg(finalPx - s * 0.20, finalCy + s * 0.40, walkOffset, false);
 
     // Draw torso and cream/tan belly (plastron)
     ctx.fillStyle = bellyColor;
     ctx.strokeStyle = bellyOutline;
     ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.ellipse(px - s * 0.04, cy + s * 0.1, s * 0.41, s * 0.45, 0, 0, Math.PI * 2);
+    ctx.ellipse(finalPx - s * 0.04, finalCy + s * 0.1 + bodyOffsetY, s * 0.41, s * 0.45 * bodyScaleY, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
     // Draw the green letter 'T' centered on the chest
-    const bx = px - s * 0.04;
-    const by = cy + s * 0.1;
-    ctx.fillStyle = letterColor;
-    // Horizontal bar
-    ctx.fillRect(bx - s * 0.14, by - s * 0.15, s * 0.28, s * 0.08);
-    // Vertical bar
-    ctx.fillRect(bx - s * 0.045, by - s * 0.15, s * 0.09, s * 0.26);
+    if (!isTuckedDeath) {
+      const bx = finalPx - s * 0.04;
+      const by = finalCy + s * 0.1 + bodyOffsetY;
+      ctx.fillStyle = letterColor;
+      // Horizontal bar
+      ctx.fillRect(bx - s * 0.14, by - s * 0.15 * bodyScaleY, s * 0.28, s * 0.08 * bodyScaleY);
+      // Vertical bar
+      ctx.fillRect(bx - s * 0.045, by - s * 0.15 * bodyScaleY, s * 0.09, s * 0.26 * bodyScaleY);
+    }
 
     // Draw front leg (right)
-    drawChubbyLeg(px + s * 0.14, cy + s * 0.40, -walkOffset);
+    drawChubbyLeg(finalPx + s * 0.14, finalCy + s * 0.40, -walkOffset, true);
 
     // Draw cute stubby left arm (slightly visible at back)
-    ctx.fillStyle = skinColor;
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.ellipse(px - s * 0.40, cy + s * 0.08, s * 0.13, s * 0.20, Math.PI * 0.15, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (!isTuckedDeath && limbsScale > 0) {
+      ctx.save();
+      let rArmScale = 1.0;
+      if (plantingAnimTimer >= 45) {
+        rArmScale = 0.5;
+      }
+      rArmScale *= limbsScale;
+      ctx.translate(finalPx - s * 0.40, finalCy + s * 0.08 + bodyOffsetY);
+      ctx.scale(rArmScale, rArmScale);
+      ctx.fillStyle = skinColor;
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.13, s * 0.20, Math.PI * 0.15, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Draw neck
-    ctx.fillStyle = skinColor;
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.ellipse(px + s * 0.08, cy - s * 0.18, s * 0.15, s * 0.22, -Math.PI * 0.08, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (headScale > 0 && limbsScale > 0) {
+      ctx.save();
+      ctx.translate(finalPx + s * 0.08 + headOffsetX, finalCy - s * 0.18 + headOffsetY);
+      ctx.scale(headScale * limbsScale, headScale * limbsScale);
+      ctx.fillStyle = skinColor;
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.15, s * 0.22, -Math.PI * 0.08, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     // Draw head (big rounded cute green head)
-    const hx = px + s * 0.12;
-    const hy = cy - s * 0.35;
-    ctx.fillStyle = skinColor;
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.arc(hx, hy, s * 0.44, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Draw big shiny anime eyes
-    const drawCuteEye = (ex: number, ey: number) => {
-      ctx.fillStyle = '#000000';
+    if (headScale > 0 && limbsScale > 0) {
+      const hx = finalPx + s * 0.12 + headOffsetX;
+      const hy = finalCy - s * 0.35 + headOffsetY;
+      ctx.save();
+      ctx.translate(hx, hy);
+      ctx.scale(headScale * limbsScale, headScale * limbsScale);
+      ctx.fillStyle = skinColor;
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.2;
       ctx.beginPath();
-      ctx.arc(ex, ey, s * 0.09, 0, Math.PI * 2);
+      ctx.arc(0, 0, s * 0.44, 0, Math.PI * 2);
       ctx.fill();
+      ctx.stroke();
 
-      // Shiny reflection glint
-      ctx.fillStyle = '#ffffff';
+      // Draw big shiny anime eyes with detailed planting expressions
+      const drawCuteEye = (ex: number, ey: number) => {
+        if (isShocked) {
+          // Draw dramatic X_X cross eye!
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          const r = s * 0.09;
+          ctx.beginPath();
+          ctx.moveTo(ex - r, ey - r); ctx.lineTo(ex + r, ey + r);
+          ctx.moveTo(ex + r, ey - r); ctx.lineTo(ex - r, ey + r);
+          ctx.stroke();
+        } else if (isPlanting && plantingAnimTimer >= 15) {
+          ctx.strokeStyle = '#000000';
+          ctx.lineWidth = 2.5;
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          const r = s * 0.09;
+
+          if (plantingAnimTimer >= 30) {
+            // Ticks 54-30 — Concentración / Esfuerzo: semicírculo invertido
+            ctx.beginPath();
+            ctx.arc(ex, ey, r, Math.PI, 0, true);
+            ctx.stroke();
+
+            // Cejas (dos líneas cortas inclinadas hacia el centro)
+            ctx.save();
+            ctx.lineWidth = 2.0;
+            ctx.beginPath();
+            if (ex < 0) {
+              // Eyebrow left: slope down-right
+              ctx.moveTo(ex - r * 1.2, ey - r * 1.5);
+              ctx.lineTo(ex + r * 0.2, ey - r * 0.9);
+            } else {
+              // Eyebrow right: slope down-left
+              ctx.moveTo(ex + r * 1.2, ey - r * 1.5);
+              ctx.lineTo(ex - r * 0.2, ey - r * 0.9);
+            }
+            ctx.stroke();
+            ctx.restore();
+
+          } else if (plantingAnimTimer >= 28) {
+            // Ticks 29-28 — Impacto: símbolos < y > enfrentados
+            ctx.beginPath();
+            if (ex < 0) {
+              // Left eye: '<'
+              ctx.moveTo(ex + r, ey - r);
+              ctx.lineTo(ex - r, ey);
+              ctx.lineTo(ex + r, ey + r);
+            } else {
+              // Right eye: '>'
+              ctx.moveTo(ex - r, ey - r);
+              ctx.lineTo(ex + r, ey);
+              ctx.lineTo(ex - r, ey + r);
+            }
+            ctx.stroke();
+          } else {
+            // Ticks 27-15 — Satisfacción: arcos curvados hacia arriba (media luna feliz)
+            ctx.beginPath();
+            ctx.arc(ex, ey, r, Math.PI, 0, false);
+            ctx.stroke();
+          }
+        } else {
+          // Normal anime eyes with shiny glint
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.09, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Shiny reflection glint
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.03, ey - s * 0.03, s * 0.032, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      };
+
+      drawCuteEye(-s * 0.08, -s * 0.02);
+      drawCuteEye(s * 0.20, -s * 0.02);
+
+      // Draw blush cheeks (only if not shocked)
+      if (!isShocked) {
+        ctx.fillStyle = blushColor;
+        ctx.beginPath();
+        ctx.ellipse(-s * 0.18, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+        ctx.ellipse(s * 0.25, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      // Draw mouth
+      ctx.strokeStyle = mouthColor;
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
       ctx.beginPath();
-      ctx.arc(ex - s * 0.03, ey - s * 0.03, s * 0.032, 0, Math.PI * 2);
-      ctx.fill();
-    };
+      if (isShocked) {
+        // Big shocked circle mouth!
+        ctx.fillStyle = mouthColor;
+        ctx.arc(s * 0.06, s * 0.12, s * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.moveTo(s * 0.02, s * 0.08);
+        ctx.lineTo(s * 0.06, s * 0.13);
+        ctx.lineTo(s * 0.10, s * 0.08);
+        ctx.stroke();
+      }
 
-    drawCuteEye(hx - s * 0.08, hy - s * 0.02);
-    drawCuteEye(hx + s * 0.20, hy - s * 0.02);
-
-    // Draw blush cheeks
-    ctx.fillStyle = blushColor;
-    ctx.beginPath();
-    ctx.ellipse(hx - s * 0.18, hy + s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
-    ctx.ellipse(hx + s * 0.25, hy + s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Draw small cute smiling mouth (v-shaped smirk as in the image)
-    ctx.strokeStyle = mouthColor;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    ctx.moveTo(hx + s * 0.02, hy + s * 0.08);
-    ctx.lineTo(hx + s * 0.06, hy + s * 0.13);
-    ctx.lineTo(hx + s * 0.10, hy + s * 0.08);
-    ctx.stroke();
+      ctx.restore();
+    }
 
     // Draw chubby right arm (front arm, in foreground)
-    ctx.fillStyle = skinColor;
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.0;
-    ctx.beginPath();
-    ctx.ellipse(px + s * 0.30, cy + s * 0.10, s * 0.15, s * 0.22, -Math.PI * 0.1, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
+    if (!isTuckedDeath && limbsScale > 0) {
+      ctx.save();
+      let fArmScale = 1.0;
+      if (isPlanting) {
+        if (plantingAnimTimer >= 45) {
+          fArmScale = 0.5; // Carga
+        } else if (plantingAnimTimer >= 15) {
+          fArmScale = 0.8; // ligeramente retraído
+        }
+      }
+      fArmScale *= limbsScale;
+      ctx.translate(finalPx + s * 0.30, finalCy + s * 0.10);
+      ctx.scale(fArmScale, fArmScale);
+      ctx.fillStyle = skinColor;
+      ctx.strokeStyle = skinOutline;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.15, s * 0.22, -Math.PI * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
     ctx.restore();
   };
@@ -1553,7 +2022,17 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     t: number
   ) => {
     ctx.save();
-    const s = TILE * 0.42;
+    
+    // Dynamic scale based on enemy type to differentiate mechanics and threat levels:
+    let s = TILE * 0.42;
+    if (type === 'patrol') {
+      s = TILE * 0.48; // Red patrol foxes stay medium but clearly visible (up from 0.42)
+    } else if (type === 'chaser') {
+      s = TILE * 0.58; // Gray armored chaser rodent is huge, imposing, and terrifying!
+    } else if (type === 'ghost') {
+      s = TILE * 0.52; // Ghost spectral fox is intermediate size
+    }
+    
     const abc = Math.sin(t * 0.009 + frame) * 1.5;
     const cy = py + abc;
 
@@ -2000,10 +2479,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const fx = col * TILE + TILE / 2;
     const fy = row * TILE + TILE / 2;
 
-    ctx.fillStyle = isBreaking ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)';
+    const isGolden = playerRef.current.goldenBroccoliTimer > 0;
+
+    let fill = isBreaking ? 'rgba(239, 68, 68, 0.25)' : 'rgba(34, 197, 94, 0.25)';
+    let stroke = isBreaking ? 'rgba(239, 68, 68, 0.85)' : 'rgba(34, 197, 94, 0.85)';
+
+    if (!isBreaking && isGolden) {
+      fill = 'rgba(234, 179, 8, 0.25)';
+      stroke = 'rgba(234, 179, 8, 0.85)';
+    }
+
+    ctx.fillStyle = fill;
     ctx.fillRect(col * TILE + 2, row * TILE + 2, TILE - 4, TILE - 4);
 
-    ctx.strokeStyle = isBreaking ? 'rgba(239, 68, 68, 0.85)' : 'rgba(34, 197, 94, 0.85)';
+    ctx.strokeStyle = stroke;
     ctx.lineWidth = 2.5;
     const cx = fx;
     const cy = fy;
@@ -2016,7 +2505,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
       ctx.stroke();
     } else {
-      // Green Plus sign
+      // Plus sign (matches the outline strokeStyle color automatically)
       ctx.beginPath();
       ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
       ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
@@ -2027,7 +2516,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const drawPlayerIndicators = (ctx: CanvasRenderingContext2D) => {
     const player = playerRef.current;
     const dir = player.dir;
-    const powerCount = Math.min(4, Math.max(1, Math.floor(score / 2) + 1));
+    const powerCount = getPowerCount();
 
     // 1. Red preview marker overlays for breaking
     let currentCc = player.col + dir.x;
@@ -2094,7 +2583,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     }
 
     // Draw our cute Bowser character!
-    drawGardenTurtle(ctx, px, py, player.dir, player.animFrame, t, isGolden);
+    drawGardenTurtle(ctx, px, py, player.dir, player.animFrame, t, isGolden, player.plantingAnimTimer, player.breakingAnimTimer, player.deathAnimTimer);
 
     if (gameState === 'playing') {
       drawPlayerIndicators(ctx);
@@ -2182,10 +2671,75 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.clearRect(0, 0, W, H);
 
       if (gameState === 'playing') {
-        updatePlayer();
-        enemiesRef.current.forEach(e => updateEnemy(e));
-        checkCollisions();
-        detectMapChanges();
+        const player = playerRef.current;
+        
+        // Trigger Break action at start of tick 36 (Impact)
+        if (player.breakingAnimTimer === 36 && breakingTilesRef.current.length > 0) {
+          breakingTilesRef.current.forEach(({ col, row }) => {
+            mapRef.current[row][col] = T_EMPTY;
+            // Directional leaf particles!
+            spawnParticles(col, row, '#4caf50', player.dir);
+            spawnParticles(col, row, '#2e7d32', player.dir);
+          });
+          SoundEffects.playBreak();
+          breakingTilesRef.current = [];
+        }
+        
+        // Trigger Plant action at start of tick 36 (Lanzamiento)
+        if (player.plantingAnimTimer === 36 && plantingTilesRef.current.length > 0) {
+          plantingTilesRef.current.forEach(({ col, row }) => {
+            mapRef.current[row][col] = T_ICE;
+            const key = `${row}_${col}`;
+            grassAgesRef.current[key] = { createdAt: Date.now() };
+            // Spawn brown dirt particles!
+            spawnParticles(col, row, '#8B5E3C', undefined, true);
+          });
+          SoundEffects.playBuild();
+          plantingTilesRef.current = [];
+        }
+
+        if (player.deathAnimTimer > 0) {
+          player.deathAnimTimer--;
+          if (player.deathAnimTimer === 0) {
+            // Death animation completed! Handle life reduction and respawn/gameover
+            setLives((prev: number) => {
+              const updated = prev - 1;
+              if (updated <= 0) {
+                setGameState('gameover');
+                SoundEffects.playGameOver();
+              } else {
+                player.invincible = 120; // 2 seconds protection
+                respawnEntities();
+                checkGoldenBroccoliSpawn(updated);
+              }
+              return updated;
+            });
+          }
+        } else if (player.breakingAnimTimer === 36 || player.breakingAnimTimer === 35) {
+          // Freeze frame: bypass updates/collisions, manually decrement breakingAnimTimer
+          player.breakingAnimTimer--;
+        } else {
+          updatePlayer();
+          enemiesRef.current.forEach(e => updateEnemy(e));
+          checkCollisions();
+          detectMapChanges();
+        }
+      }
+
+      // Screen shake calculation: 3-5 frames during breaking impact (ticks 36-30) and planting huddle (ticks 54-45)
+      const isBreakShake = playerRef.current.breakingAnimTimer >= 30 && playerRef.current.breakingAnimTimer <= 36;
+      const isPlantShake = playerRef.current.plantingAnimTimer >= 45 && playerRef.current.plantingAnimTimer <= 54;
+
+      ctx.save();
+      
+      if (isBreakShake) {
+        const shakeX = (Math.random() * 2 - 1) * 2.5;
+        const shakeY = (Math.random() * 2 - 1) * 2.5;
+        ctx.translate(shakeX, shakeY);
+      } else if (isPlantShake) {
+        const shakeX = (Math.random() * 2 - 1) * 1.5;
+        const shakeY = (Math.random() * 2 - 1) * 1.5;
+        ctx.translate(shakeX, shakeY);
       }
 
       // Render game layers
@@ -2197,6 +2751,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         drawPlayerMain(ctx, timestamp);
         drawEnemies(ctx, timestamp);
       }
+
+      ctx.restore();
 
       requestAnimationFrame(renderLoop);
     };
