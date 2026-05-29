@@ -456,6 +456,9 @@ export const useGameEntities = ({
     }
 
     if (!player.moving) {
+      // NUEVO: No iniciar movimiento mientras se está sembrando
+      if (player.plantingAnimTimer > 0) return;
+
       if (!turnBlockedRef.current) {
         // Pick current direction requested
         let dir = lastDirRef.current;
@@ -493,7 +496,7 @@ export const useGameEntities = ({
 
     // Move center coordinates smoothly toward targeted cell
     if (player.moving) {
-      if (mapRef.current[player.targetRow]?.[player.targetCol] === T_ICE && !(player.goldenBroccoliTimer > 0)) {
+      if (mapRef.current[player.targetRow]?.[player.targetCol] === T_ICE && !player.goldenBroccoliTimer) {
         player.moving = false;
         player.x = player.col * TILE + TILE / 2;
         player.y = player.row * TILE + TILE / 2;

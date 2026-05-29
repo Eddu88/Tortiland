@@ -155,14 +155,14 @@ export const usePlayerInput = ({
   const triggerAction = () => {
     const player = playerRef.current;
     if (player.powerCooldown > 0) return;
-    if (player.moving) {
-      player.moving = false;
-      player.x = player.col * TILE + TILE / 2;
-      player.y = player.row * TILE + TILE / 2;
-      player.targetCol = player.col;
-      player.targetRow = player.row;
-    }
     if (player.deathAnimTimer > 0) return;
+
+    // Detener movimiento en curso siempre antes de actuar
+    player.moving = false;
+    player.x = player.col * TILE + TILE / 2;
+    player.y = player.row * TILE + TILE / 2;
+    player.targetCol = player.col;
+    player.targetRow = player.row;
 
     const dir = player.dir;
     const targetCol = player.col + dir.x;
