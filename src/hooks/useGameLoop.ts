@@ -203,6 +203,14 @@ export const useGameLoop = ({
       if (gameState === 'playing') {
         const player = playerRef.current;
 
+        // Escape active particles
+        const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
+        if (escapeActive && frameCountRef.current % 30 === 0) {
+          const randomCol = 16 + Math.floor(Math.random() * 3);
+          const randomRow = 11 + Math.floor(Math.random() * 3);
+          spawnParticles(randomCol, randomRow, '#5ec263', { x: 0, y: -1 });
+        }
+
         // Process scheduled plants
         scheduledPlantsRef.current.forEach(plant => {
           if (plant.triggerAt > 0) {
@@ -290,8 +298,10 @@ export const useGameLoop = ({
         ctx.translate(shakeX, shakeY);
       }
 
+      const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
+
       // Render game layers
-      drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, playerRef.current.breakingAnimTimer);
+      drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, playerRef.current.breakingAnimTimer, escapeActive, timestamp);
       renderParticlesAndFlush(ctx);
       drawFruits(ctx, fruitsRef.current, mapRef.current, timestamp);
 

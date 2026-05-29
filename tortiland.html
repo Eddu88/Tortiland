@@ -138,7 +138,7 @@
     const ctx = canvas.getContext('2d');
 
     // Tipos de tile
-    const T_EMPTY = 0, T_WALL = 1, T_ICE = 2;
+    const T_EMPTY = 0, T_WALL = 1, T_ICE = 2, T_BURROW = 3;
 
     // ============================================================
     // MAPA BASE — paredes interiores fijas (laberinto tipo arcade)
@@ -148,9 +148,11 @@
       for (let r = 0; r < ROWS; r++) {
         m.push([]);
         for (let c = 0; c < COLS; c++) {
-          // Bordes exteriores siempre son paredes
+          // Bordes exteriores siempre son paredes, y el centro es la Madriguera del Jefe
           if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
             m[r].push(T_WALL);
+          } else if (r >= 5 && r <= 9 && c >= 8 && c <= 12) {
+            m[r].push(T_WALL); // permanent Boss Burrow
           } else {
             m[r].push(T_EMPTY);
           }
@@ -180,7 +182,8 @@
         [13, 10], [13, 11],
       ];
       innerWalls.forEach(([r, c]) => {
-        if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1) m[r][c] = T_WALL;
+        const isBossBurrow = r >= 5 && r <= 9 && c >= 8 && c <= 12;
+        if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) m[r][c] = T_ICE;
       });
       return m;
     }
@@ -195,6 +198,7 @@
     let levelPhase = 'apples'; // 'apples' | 'oranges'
     let gameTimeElapsed = 0;
     let isPaused = false;
+    let awaitingBurrow = false;
 
     // ============================================================
     // INICIALIZACIÓN DEL NIVEL
@@ -202,7 +206,11 @@
     function initLevel() {
       gameTimeElapsed = 0;
       isPaused = false;
+      awaitingBurrow = false;
       map = buildBaseMap();
+
+      // Initialize Torti's House (T_BURROW) in cell col 17, row 13
+      map[13][17] = T_BURROW;
 
       // Bloques de hielo iniciales (6-8 distribuidos)
       const icePositions = [
@@ -237,7 +245,7 @@
       // Enemigos
       enemies = [
         // Tipo 1: patrullero lento (×2)
-        makeEnemy('patrol', 18, 13, 0, 1),
+        makeEnemy('patrol', 18, 10, 0, 1),
         makeEnemy('patrol', 18, 1, 1, 0),
         // Tipo 2: perseguidor rápido (×1)
         makeEnemy('chaser', 10, 13, -1, 0),
@@ -289,13 +297,16 @@
       return map[row][col] === T_ICE;
     }
     function isSolid(col, row, ghostMode, isPlayer) {
-      // isPlayer=true: aplica el buff del Brócoli Dorado. Enemigos nunca lo pasan.
       if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
       if (map[row][col] === T_WALL) return true;
       if (map[row][col] === T_ICE) {
         if (ghostMode) return false;                                      // ghost atraviesa pasto
         if (isPlayer && player && player.goldenBroccoliTimer > 0) return false; // buff exclusivo
         return true;
+      }
+      if (map[row][col] === T_BURROW) {
+        if (isPlayer && awaitingBurrow) return false;
+        return true; // solid for all enemies, and normal player movement
       }
       return false;
     }
@@ -304,13 +315,19 @@
       return map[row][col] === T_EMPTY;
     }
 
-    // Devuelve posición vacía aleatoria (no sobre paredes, arbustos, player, vegetales)
     function randomEmptyCell() {
       let tries = 0;
       while (tries++ < 500) {
         const c = 1 + Math.floor(Math.random() * (COLS - 2));
         const r = 1 + Math.floor(Math.random() * (ROWS - 2));
         if (map[r][c] !== T_EMPTY) continue;
+
+        // Excluir casa de Torti (1x1)
+        if (c === 17 && r === 13) continue;
+
+        // Excluir fortaleza del jefe (4x4)
+        if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
+
         if (c === player.col && r === player.row) continue;
         if (fruits.some(f => f.col === c && f.row === r)) continue;
         return { col: c, row: r };
@@ -504,6 +521,14 @@
 
           // Recoger fruta si hay una en esta celda
           checkFruitPickup();
+
+          // Check escape victory condition when Torti enters a T_BURROW cell and escape is active
+          const awaitingBurrow = levelPhase === 'oranges' && fruits.filter(f => f.type === 4).length === 0;
+          if (map[player.row]?.[player.col] === T_BURROW && awaitingBurrow) {
+            gameState = 'win';
+            const finalTime = formatTime(gameTimeElapsed);
+            showOverlay('🏆 ¡NIVEL COMPLETADO!', `¡Felicidades! Recogiste todas las frutas (${score} total) para un total de ${score * 100} puntos en ${finalTime}.`, 'Jugar de nuevo');
+          }
         } else {
           player.x += (dx / dist) * player.speed;
           player.y += (dy / dist) * player.speed;
@@ -544,10 +569,8 @@
             checkGoldenBroccoliSpawn();
             updateUI(); // Actualizar interfaz para mostrar la fase de naranjas
           } else if (levelPhase === 'oranges') {
-            // ¡Se comió todas las naranjas! Ganaste el nivel 1
-            gameState = 'win';
-            const finalTime = formatTime(gameTimeElapsed);
-            showOverlay('🏆 ¡NIVEL COMPLETADO!', `¡Felicidades! Recogiste todas las frutas (${score} total) para un total de ${score * 100} puntos en ${finalTime}.`, 'Jugar de nuevo');
+            // Se activa la Madriguera de Torti para el escape final!
+            updateUI();
           }
         }
       }
@@ -712,7 +735,7 @@
       player.targetCol = 1; player.targetRow = 1;
       player.moving = false;
 
-      enemies[0].col = 18; enemies[0].row = 13; enemies[0].x = 18 * TILE + TILE / 2; enemies[0].y = 13 * TILE + TILE / 2;
+      enemies[0].col = 18; enemies[0].row = 10; enemies[0].x = 18 * TILE + TILE / 2; enemies[0].y = 10 * TILE + TILE / 2;
       enemies[1].col = 18; enemies[1].row = 1; enemies[1].x = 18 * TILE + TILE / 2; enemies[1].y = 1 * TILE + TILE / 2;
       enemies[2].col = 10; enemies[2].row = 7; enemies[2].x = 10 * TILE + TILE / 2; enemies[2].y = 7 * TILE + TILE / 2;
       enemies[3].col = 1; enemies[3].row = 13; enemies[3].x = 1 * TILE + TILE / 2; enemies[3].y = 13 * TILE + TILE / 2;
@@ -745,13 +768,29 @@
       'Naranja Dulce'
     ];
 
+    function drawLeafLocal(cx, cy, rSize, fillCol, outlineCol) {
+      ctx.fillStyle = fillCol;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rSize, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Draw subtle bottom outline for leaf depth
+      ctx.strokeStyle = outlineCol;
+      ctx.lineWidth = 1.0;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rSize, 0, Math.PI);
+      ctx.stroke();
+    }
+
     function drawMap() {
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           const x = c * TILE, y = r * TILE;
           const t = map[r][c];
 
-          if (t === T_WALL) {
+          const isBossBurrowTile = c >= 8 && c <= 11 && r >= 5 && r <= 8;
+
+          if (t === T_WALL && !isBossBurrowTile) {
             // Muro exterior / Seto florido denso (indestructible)
             ctx.fillStyle = '#1b4332'; // Base seto verde oscuro
             ctx.fillRect(x, y, TILE, TILE);
@@ -797,6 +836,30 @@
               ctx.arc(x + 23, y + 20, 0.8, 0, Math.PI * 2);
               ctx.fill();
             }
+
+            // Draw small wild moss/shrub leaves overflowing on borders with T_EMPTY
+            const hasLeftEmpty = c > 0 && map[r][c - 1] === 0;
+            const hasRightEmpty = c < COLS - 1 && map[r][c + 1] === 0;
+            const hasUpEmpty = r > 0 && map[r - 1][c] === 0;
+            const hasDownEmpty = r < ROWS - 1 && map[r + 1][c] === 0;
+
+            if (hasLeftEmpty) {
+              drawLeafLocal(x, y + 10, 4, '#2d6a4f', '#1b4332');
+              drawLeafLocal(x - 1, y + 25, 3.5, '#40916c', '#2d6a4f');
+            }
+            if (hasRightEmpty) {
+              drawLeafLocal(x + TILE, y + 15, 3.5, '#2d6a4f', '#1b4332');
+              drawLeafLocal(x + TILE + 1, y + 30, 4, '#40916c', '#2d6a4f');
+            }
+            if (hasUpEmpty) {
+              drawLeafLocal(x + 12, y, 4, '#2d6a4f', '#1b4332');
+              drawLeafLocal(x + 28, y - 1, 3.5, '#40916c', '#2d6a4f');
+            }
+            if (hasDownEmpty) {
+              drawLeafLocal(x + 15, y + TILE, 3.5, '#2d6a4f', '#1b4332');
+              drawLeafLocal(x + 30, y + TILE + 1, 4, '#40916c', '#2d6a4f');
+            }
+
           } else if (t === T_ICE) {
             // Bloque de pasto / hierba denso
             ctx.fillStyle = '#4caf50'; // Pasto base
@@ -833,6 +896,233 @@
             ctx.fillRect(x, y, TILE, TILE);
           }
         }
+      }
+
+      // ==========================================
+      // MADRIGUERA DEL JEFE (4x4 - Center: col 8-11, row 5-8)
+      // ==========================================
+      const bossX = 8 * TILE;
+      const bossY = 5 * TILE;
+      const bCenterX = bossX + 80;
+      const bCenterY = bossY + 80;
+
+      // Large ambient ground shadow surrounding the boss burrow
+      const shadowGrad = ctx.createRadialGradient(
+        bCenterX, bCenterY, 50,
+        bCenterX, bCenterY, 100
+      );
+      shadowGrad.addColorStop(0, 'rgba(16, 8, 4, 0.7)');
+      shadowGrad.addColorStop(1, 'rgba(16, 8, 4, 0)');
+      ctx.fillStyle = shadowGrad;
+      ctx.beginPath();
+      ctx.arc(bCenterX, bCenterY, 105, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Circular deep mouth of the cave with breathing animation
+      const breath = Math.sin(lastTimestamp * 0.0015);
+      const caveRadius = 60 + breath * 1.5;
+      const caveGrad = ctx.createRadialGradient(
+        bCenterX, bCenterY - 6, 8,
+        bCenterX, bCenterY, caveRadius
+      );
+      const cDeep = breath > 0 ? '#1f1008' : '#2d1a10';
+      caveGrad.addColorStop(0, '#0d0704');
+      caveGrad.addColorStop(0.5, cDeep);
+      caveGrad.addColorStop(1, '#3d261a');
+
+      ctx.fillStyle = caveGrad;
+      ctx.beginPath();
+      ctx.arc(bCenterX, bCenterY, caveRadius, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Outer beveled lip border
+      ctx.strokeStyle = '#4a2e19';
+      ctx.lineWidth = 4.5;
+      ctx.beginPath();
+      ctx.arc(bCenterX, bCenterY, caveRadius + 2, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // ZZZ floating effects
+      for (let i = 0; i < 3; i++) {
+        const tZ = (lastTimestamp * 0.0008 + i * 0.65) % 2.0;
+        const alpha = 1.0 - (tZ / 2.0);
+        if (alpha > 0) {
+          ctx.fillStyle = `rgba(180, 220, 255, ${alpha * 0.85})`;
+          ctx.font = `bold ${9 + tZ * 10}px monospace`;
+          const zx = bCenterX - 12 + Math.sin(tZ * 3.5 + i) * 15;
+          const zy = bCenterY - 15 - tZ * 50;
+          ctx.fillText("Z", zx, zy);
+        }
+      }
+
+      // Micro dust particles
+      for (let i = 0; i < 8; i++) {
+        const phase = (lastTimestamp * 0.0004 + i * 1.5) % 1.0;
+        const angle = i * Math.PI * 0.25 + phase * Math.PI * 2;
+        const rDist = 12 + ((i * 11) % 36) + Math.sin(phase * 3) * 6;
+        const px = bCenterX + Math.cos(angle) * rDist;
+        const py = bCenterY + Math.sin(angle) * rDist;
+        ctx.fillStyle = `rgba(220, 190, 160, ${0.12 + Math.sin(phase * Math.PI) * 0.3})`;
+        ctx.fillRect(px, py, 1.8, 1.8);
+      }
+
+      // Blinking red eyes
+      const isBlinking = (lastTimestamp % 6000) < 180;
+      if (!isBlinking) {
+        ctx.fillStyle = '#ef4444';
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = 8;
+        ctx.beginPath(); ctx.arc(bCenterX - 8, bCenterY - 12, 2.8, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(bCenterX + 8, bCenterY - 12, 2.8, 0, Math.PI * 2); ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // Crossed stone bones
+      ctx.strokeStyle = '#8e8680';
+      ctx.lineWidth = 3.5;
+      ctx.lineCap = 'round';
+      const hx = bCenterX;
+      const hy = bCenterY + 35;
+      ctx.beginPath();
+      ctx.moveTo(hx - 18, hy - 6); ctx.lineTo(hx + 18, hy + 6);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(hx - 18, hy + 6); ctx.lineTo(hx + 18, hy - 6);
+      ctx.stroke();
+      ctx.fillStyle = '#8e8680';
+      ctx.beginPath();
+      ctx.arc(hx - 18, hy - 6, 3.0, 0, Math.PI * 2); ctx.arc(hx - 18, hy - 4, 3.0, 0, Math.PI * 2);
+      ctx.arc(hx + 18, hy + 6, 3.0, 0, Math.PI * 2); ctx.arc(hx + 18, hy + 4, 3.0, 0, Math.PI * 2);
+      ctx.arc(hx - 18, hy + 6, 3.0, 0, Math.PI * 2); ctx.arc(hx - 18, hy - 4, 3.0, 0, Math.PI * 2);
+      ctx.arc(hx + 18, hy - 6, 3.0, 0, Math.PI * 2); ctx.arc(hx + 18, hy - 4, 3.0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // ==========================================
+      // CASA DE TORTI (1x1 - col 17, row 13)
+      // ==========================================
+      const bx = 17 * TILE;
+      const by = 13 * TILE;
+
+      // Draw base floor first
+      ctx.fillStyle = (13 + 17) % 2 === 0 ? COLORS.floor : COLORS.floorAlt;
+      ctx.fillRect(bx, by, TILE, TILE);
+
+      // A. Marco de contorno oscuro y firme delimitando la celda completa
+      ctx.strokeStyle = '#2d1a10';
+      ctx.lineWidth = 2.0;
+      ctx.strokeRect(bx, by, TILE, TILE);
+
+      // B. Parte inferior: troncos horizontales apilados color #8B5A2B
+      ctx.fillStyle = '#8B5A2B';
+      ctx.fillRect(bx, by + 16, TILE, 24);
+
+      ctx.strokeStyle = '#5c3a1b';
+      ctx.lineWidth = 1.0;
+      for (let i = 0; i < 3; i++) {
+        const ty = by + 16 + i * 8;
+        ctx.beginPath();
+        ctx.moveTo(bx, ty);
+        ctx.lineTo(bx + TILE, ty);
+        ctx.stroke();
+
+        // Sombra cilíndrica para dar volumen 2.5D
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
+        ctx.fillRect(bx, ty + 5, TILE, 3);
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.fillRect(bx, ty + 1, TILE, 2);
+      }
+
+      // C. Parte superior: tejado inclinado que sobresale ligeramente del grid (hojas superpuestas)
+      ctx.fillStyle = '#2e7d32'; // dark green tejas base
+      ctx.beginPath();
+      ctx.moveTo(bx - 3, by + 18);
+      ctx.lineTo(bx + TILE / 2, by - 4);
+      ctx.lineTo(bx + TILE + 3, by + 18);
+      ctx.closePath();
+      ctx.fill();
+
+      ctx.fillStyle = '#4caf50'; // light green layers
+      for (let row = 0; row < 3; row++) {
+        const rowY = by + 14 - row * 6;
+        const rowWidth = TILE - row * 10;
+        const rowX = bx + (TILE - rowWidth) / 2;
+        const leafCount = 4 - row;
+        const leafW = rowWidth / leafCount;
+        
+        for (let j = 0; j < leafCount; j++) {
+          const lx = rowX + j * leafW;
+          ctx.beginPath();
+          ctx.arc(lx + leafW / 2, rowY + 3, leafW / 2, 0, Math.PI, false);
+          ctx.fill();
+        }
+      }
+
+      // D. Puerta arqueada de madera centrada en la celda
+      const doorX = bx + 14;
+      const doorY = by + 22;
+      const doorW = 12;
+      const doorH = 18;
+
+      const escapeActive = levelPhase === 'oranges' && fruits.filter(f => f.type === 4).length === 0;
+      if (escapeActive) {
+        // Puerta abierta con luz amarilla interior nítida saliendo del interior
+        ctx.fillStyle = '#ffeb3b';
+        ctx.beginPath();
+        ctx.moveTo(doorX, doorY + doorH);
+        ctx.lineTo(doorX, doorY + 6);
+        ctx.arc(doorX + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
+        ctx.lineTo(doorX + doorW, doorY + doorH);
+        ctx.closePath();
+        ctx.fill();
+
+        // Dibujar la puerta arqueada entreabierta flotando desplazada
+        ctx.fillStyle = '#5c3a1b';
+        ctx.beginPath();
+        ctx.moveTo(doorX + 4, doorY + doorH);
+        ctx.lineTo(doorX + 4, doorY + 6);
+        ctx.arc(doorX + 4 + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
+        ctx.lineTo(doorX + 4 + doorW, doorY + doorH);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#2d1a10';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+
+        // Pomo dorado brillante
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(doorX + 6, doorY + doorH / 2 + 1, 1.5, 0, Math.PI * 2);
+        ctx.fill();
+
+        // Halo dorado pulsante exterior
+        const goldPulse = Math.sin(lastTimestamp * 0.005) * 8 + 12;
+        ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(lastTimestamp * 0.005) * 0.2})`;
+        ctx.lineWidth = 2.5;
+        ctx.shadowColor = '#ffd700';
+        ctx.shadowBlur = goldPulse;
+        ctx.strokeRect(bx - 2, by - 2, TILE + 4, TILE + 4);
+        ctx.shadowBlur = 0; // reset
+      } else {
+        // Puerta cerrada de madera arqueada
+        ctx.fillStyle = '#5c3a1b';
+        ctx.beginPath();
+        ctx.moveTo(doorX, doorY + doorH);
+        ctx.lineTo(doorX, doorY + 6);
+        ctx.arc(doorX + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
+        ctx.lineTo(doorX + doorW, doorY + doorH);
+        ctx.closePath();
+        ctx.fill();
+
+        ctx.strokeStyle = '#2d1a10';
+        ctx.lineWidth = 1.0;
+        ctx.stroke();
+
+        // Pomo dorado de metal brillante
+        ctx.fillStyle = '#ffd700';
+        ctx.beginPath();
+        ctx.arc(doorX + 2, doorY + doorH / 2 + 1, 1.5, 0, Math.PI * 2);
+        ctx.fill();
       }
     }
 
@@ -1411,7 +1701,11 @@
     // BUCLE PRINCIPAL
     // ============================================================
     let lastTime = 0;
+    let frameCount = 0;
+    let lastTimestamp = 0;
     function gameLoop(timestamp) {
+      lastTimestamp = timestamp;
+      frameCount++;
       const dt = timestamp - lastTime;
       lastTime = timestamp;
 
@@ -1423,6 +1717,22 @@
           enemies.forEach(e => updateEnemy(e));
           checkPlayerEnemyCollision();
           detectMapChanges();
+
+          // Particle emitter for escape portal
+          const escapeActive = levelPhase === 'oranges' && fruits.filter(f => f.type === 4).length === 0;
+          if (escapeActive && frameCount % 30 === 0) {
+            const randomCol = 16 + Math.floor(Math.random() * 3);
+            const randomRow = 11 + Math.floor(Math.random() * 3);
+            const cx = randomCol * TILE + TILE / 2;
+            const cy = randomRow * TILE + TILE / 2;
+            particles.push({
+              x: cx, y: cy,
+              vx: (Math.random() - 0.5) * 1.0,
+              vy: -1.5 - Math.random() * 1.5,
+              life: 45, maxLife: 45,
+              color: '#81c784',
+            });
+          }
 
           gameTimeElapsed += dt;
           document.getElementById('timerDisplay').textContent = formatTime(gameTimeElapsed);

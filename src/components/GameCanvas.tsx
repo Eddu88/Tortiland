@@ -104,6 +104,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const frameCountRef = useRef<number>(0);
   const scheduledPlantsRef = useRef<{ col: number; row: number; triggerAt: number }[]>([]);
   const tileReadyRef = useRef<number[][]>([]);
+  const awaitingBurrowRef = useRef<boolean>(false);
 
   // Sounds active state tracker (to sync with prop without closures stale)
   const soundOnRef = useRef<boolean>(soundOn);
@@ -181,6 +182,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     tileReadyRef,
     scheduledPlantsRef,
     frameCountRef,
+    awaitingBurrowRef,
   });
 
   // Initialize main canvas requestAnimationFrame loop hook

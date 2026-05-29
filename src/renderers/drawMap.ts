@@ -6,22 +6,49 @@
 import { TileType, GridPos } from '../types';
 import { COLS, ROWS, TILE, T_WALL, T_ICE } from '../constants';
 
+// Helper to draw leaf circles that can jut out past the standard grid boundaries
+const drawLeaf = (
+  ctx: CanvasRenderingContext2D,
+  cx: number,
+  cy: number,
+  rSize: number,
+  fillCol: string,
+  outlineCol: string
+) => {
+  ctx.fillStyle = fillCol;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rSize, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Draw subtle bottom outline for leaf depth
+  ctx.strokeStyle = outlineCol;
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  ctx.arc(cx, cy, rSize, 0, Math.PI);
+  ctx.stroke();
+};
+
 export const drawMap = (
   ctx: CanvasRenderingContext2D,
   map: TileType[][],
   grassAges: { [key: string]: { createdAt: number } },
   breakingTiles: GridPos[],
-  playerBreakingAnimTimer: number
+  playerBreakingAnimTimer: number,
+  escapeActive = false,
+  timestamp = 0
 ) => {
   ctx.shadowBlur = 0;
 
+  // Main tile render loop
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < COLS; c++) {
       let x = c * TILE;
       const y = r * TILE;
       const t = map[r]?.[c] ?? 0;
 
-      if (t === T_WALL) {
+      const isBossBurrowTile = c >= 8 && c <= 11 && r >= 5 && r <= 8;
+
+      if (t === T_WALL && !isBossBurrowTile) {
         // ==========================================
         // 1. 2.5D BONE-WHITE GARDEN STONE WALLS (#CAC6C7)
         // ==========================================
@@ -121,6 +148,30 @@ export const drawMap = (
         ctx.strokeStyle = '#2B2728';
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x, y, TILE, TILE);
+
+        // Draw small wild moss/shrub leaves overflowing on borders with T_EMPTY
+        const hasLeftEmpty = c > 0 && map[r][c - 1] === 0;
+        const hasRightEmpty = c < COLS - 1 && map[r][c + 1] === 0;
+        const hasUpEmpty = r > 0 && map[r - 1][c] === 0;
+        const hasDownEmpty = r < ROWS - 1 && map[r + 1][c] === 0;
+
+        if (hasLeftEmpty) {
+          drawLeaf(ctx, x, y + 10, 4, '#2b7835', '#1c472d');
+          drawLeaf(ctx, x - 1, y + 25, 3.5, '#5ec263', '#2b7835');
+        }
+        if (hasRightEmpty) {
+          drawLeaf(ctx, x + TILE, y + 15, 3.5, '#2b7835', '#1c472d');
+          drawLeaf(ctx, x + TILE + 1, y + 30, 4, '#5ec263', '#2b7835');
+        }
+        if (hasUpEmpty) {
+          drawLeaf(ctx, x + 12, y, 4, '#2b7835', '#1c472d');
+          drawLeaf(ctx, x + 28, y - 1, 3.5, '#5ec263', '#2b7835');
+        }
+        if (hasDownEmpty) {
+          drawLeaf(ctx, x + 15, y + TILE, 3.5, '#2b7835', '#1c472d');
+          drawLeaf(ctx, x + 30, y + TILE + 1, 4, '#5ec263', '#2b7835');
+        }
+
       } else if (t === T_ICE) {
         // ==========================================
         // 2. LUSH ORGANIC 2.5D CONNECTED SHRUB HEDGES (PASTO/HIERBA)
@@ -135,7 +186,7 @@ export const drawMap = (
         const record = grassAges[key];
         const ageMs = record ? Date.now() - record.createdAt : 1000;
 
-        // Check adjacent tiles of the same type to support autotiling (Defined first to avoid ReferenceError!)
+        // Check adjacent tiles of the same type to support autotiling
         const isNeighborGrass = (nc: number, nr: number) => {
           if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
           return map[nr]?.[nc] === T_ICE;
@@ -146,7 +197,6 @@ export const drawMap = (
         const hasRight = isNeighborGrass(c + 1, r);
 
         // FIX 1: Extender el dirt base 1px hacia vecinos del mismo tipo
-        // Esto elimina el gap negro de 1px entre tiles adyacentes
         ctx.fillStyle = '#C78757';
         const dL = hasLeft ? -1 : 0;
         const dT = hasUp ? -1 : 0;
@@ -158,7 +208,6 @@ export const drawMap = (
         let growProgress = 1.0;
         if (ageMs < 250) {
           const tNorm = ageMs / 250;
-          // Bouncy spring equation: f(t) = -((t-1)^2) * (t-1.25) + 1
           growProgress = -Math.pow(tNorm - 1, 2) * (tNorm - 1.25) + 1;
           growProgress = Math.max(0, Math.min(1.1, growProgress));
         }
@@ -170,7 +219,6 @@ export const drawMap = (
         // A. Organic base shadow projected onto the earth
         if (!hasDown) {
           ctx.fillStyle = 'rgba(32, 19, 10, 0.48)';
-          // Rounded shadow beneath the bottom of the shrub hedge
           ctx.beginPath();
           ctx.ellipse(x + TILE / 2, y + TILE + 2, TILE * 0.55, 4, 0, 0, Math.PI * 2);
           ctx.fill();
@@ -182,12 +230,11 @@ export const drawMap = (
         ctx.translate(-(x + TILE / 2), -(y + TILE / 2));
 
         // Set up colors based on variant to break monotony and add depth
-        // Adjusted original palettes: lightened and softened to be more fresh lettuce-green.
-        let colDark = '#1c472d'; // softened original dark foliage
-        let colMid = '#2b7835';  // softened original forest base
-        let colLight = '#5ec263'; // softened original bright green highlights
-        let colWarm = '#94db97'; // softened original sunlit neon tips
-        let colLeafGlint = '#b4f07a'; // softened original neon warm leaf glint
+        let colDark = '#1c472d';
+        let colMid = '#2b7835';
+        let colLight = '#5ec263';
+        let colWarm = '#94db97';
+        let colLeafGlint = '#b4f07a';
 
         if (variant === 1) {
           colDark = '#1a3e26';
@@ -203,17 +250,15 @@ export const drawMap = (
           colLeafGlint = '#9be69e';
         }
 
-        // Base fill con padding para no tocar los bordes exactos del tile
+        // Base fill con padding
         ctx.fillStyle = colDark;
-        // Connect seamless fills with neighbors (extended by 1px to prevent any subpixel anti-aliasing gaps!)
         const padL = hasLeft ? -1 : 2;
         const padR = hasRight ? -1 : 2;
         const padT = hasUp ? -1 : 2;
         const padB = hasDown ? -1 : 2;
         ctx.fillRect(x + padL, y + padT, TILE - padL - padR, TILE - padT - padB);
 
-        // FIX 2 + FIX 3: Bordes autotile dibujados 1px hacia ADENTRO del tile
-        // con opacidad reducida para eliminar el efecto de marco duro
+        // Bordes autotile dibujados 1px hacia ADENTRO del tile
         ctx.strokeStyle = 'rgba(5, 20, 8, 0.55)';
         ctx.lineWidth = 1.0;
         ctx.beginPath();
@@ -235,23 +280,8 @@ export const drawMap = (
         }
         ctx.stroke();
 
-        // Helper to draw leaf circles that can jut out past the standard grid boundaries
-        const drawLeaf = (cx: number, cy: number, rSize: number, fillCol: string, outlineCol: string) => {
-          ctx.fillStyle = fillCol;
-          ctx.beginPath();
-          ctx.arc(cx, cy, rSize, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Draw subtle bottom outline for leaf depth
-          ctx.strokeStyle = outlineCol;
-          ctx.lineWidth = 1.0;
-          ctx.beginPath();
-          ctx.arc(cx, cy, rSize, 0, Math.PI);
-          ctx.stroke();
-        };
-
-        // Draw interior branches (visible in small gaps)
-        ctx.strokeStyle = '#4a2e19'; // dark rustic wood brown
+        // Draw interior branches
+        ctx.strokeStyle = '#4a2e19';
         ctx.lineWidth = 1.6;
         ctx.beginPath();
         if (variant === 0) {
@@ -266,69 +296,60 @@ export const drawMap = (
         }
         ctx.stroke();
 
-        // Draw dense organic leaf layers with shading (cenital lighting: top light, bottom dark)
-        // 1. Dark bottom foliage base layer
-        drawLeaf(x + 10, y + 28, 7.5, colDark, '#051408');
-        drawLeaf(x + TILE - 10, y + 28, 7.5, colDark, '#051408');
-        drawLeaf(x + 20, y + 30, 8.0, colDark, '#051408');
+        // Draw dense organic leaf layers with shading
+        drawLeaf(ctx, x + 10, y + 28, 7.5, colDark, '#051408');
+        drawLeaf(ctx, x + TILE - 10, y + 28, 7.5, colDark, '#051408');
+        drawLeaf(ctx, x + 20, y + 30, 8.0, colDark, '#051408');
 
-        // 2. Middle green foliage layer
-        drawLeaf(x + 8, y + 20, 7.0, colMid, colDark);
-        drawLeaf(x + TILE - 8, y + 20, 7.0, colMid, colDark);
-        drawLeaf(x + 20, y + 22, 7.5, colMid, colDark);
+        drawLeaf(ctx, x + 8, y + 20, 7.0, colMid, colDark);
+        drawLeaf(ctx, x + TILE - 8, y + 20, 7.0, colMid, colDark);
+        drawLeaf(ctx, x + 20, y + 22, 7.5, colMid, colDark);
 
-        // 3. Bright light foliage layer (closer to top)
-        drawLeaf(x + 10, y + 12, 6.5, colLight, colMid);
-        drawLeaf(x + TILE - 10, y + 12, 6.5, colLight, colMid);
-        drawLeaf(x + 20, y + 13, 7.0, colLight, colMid);
+        drawLeaf(ctx, x + 10, y + 12, 6.5, colLight, colMid);
+        drawLeaf(ctx, x + TILE - 10, y + 12, 6.5, colLight, colMid);
+        drawLeaf(ctx, x + 20, y + 13, 7.0, colLight, colMid);
 
-        // 4. Hot direct sunlit top tips layer
-        drawLeaf(x + 12, y + 6, 5.0, colWarm, colLight);
-        drawLeaf(x + TILE - 12, y + 6, 5.0, colWarm, colLight);
-        drawLeaf(x + 20, y + 7, 5.5, colWarm, colLight);
+        drawLeaf(ctx, x + 12, y + 6, 5.0, colWarm, colLight);
+        drawLeaf(ctx, x + TILE - 12, y + 6, 5.0, colWarm, colLight);
+        drawLeaf(ctx, x + 20, y + 7, 5.5, colWarm, colLight);
 
-        // 5. Warm pixel yellow-green highlights (cenital glint)
-        drawLeaf(x + 14, y + 3, 3.5, colLeafGlint, colWarm);
-        drawLeaf(x + TILE - 14, y + 3, 3.5, colLeafGlint, colWarm);
-        drawLeaf(x + 20, y + 4, 4.0, colLeafGlint, colWarm);
+        drawLeaf(ctx, x + 14, y + 3, 3.5, colLeafGlint, colWarm);
+        drawLeaf(ctx, x + TILE - 14, y + 3, 3.5, colLeafGlint, colWarm);
+        drawLeaf(ctx, x + 20, y + 4, 4.0, colLeafGlint, colWarm);
 
-        // B. Leaves that BREAK the rigidity of the square (Jutting out of boundaries!)
+        // Leaves that jut out
         if (!hasLeft) {
-          // Draw overlapping leaves sticking out left
-          drawLeaf(x - 2, y + 14, 4.5, colMid, colDark);
-          drawLeaf(x - 3, y + 22, 5.0, colDark, '#051408');
-          drawLeaf(x - 1, y + 8, 4.0, colLight, colMid);
+          drawLeaf(ctx, x - 2, y + 14, 4.5, colMid, colDark);
+          drawLeaf(ctx, x - 3, y + 22, 5.0, colDark, '#051408');
+          drawLeaf(ctx, x - 1, y + 8, 4.0, colLight, colMid);
         }
         if (!hasRight) {
-          // Draw overlapping leaves sticking out right
-          drawLeaf(x + TILE + 2, y + 14, 4.5, colMid, colDark);
-          drawLeaf(x + TILE + 3, y + 22, 5.0, colDark, '#051408');
-          drawLeaf(x + TILE + 1, y + 8, 4.0, colLight, colMid);
+          drawLeaf(ctx, x + TILE + 2, y + 14, 4.5, colMid, colDark);
+          drawLeaf(ctx, x + TILE + 3, y + 22, 5.0, colDark, '#051408');
+          drawLeaf(ctx, x + TILE + 1, y + 8, 4.0, colLight, colMid);
         }
         if (!hasUp) {
-          // Draw overlapping leaves sticking out top
-          drawLeaf(x + 12, y - 2, 4.5, colLeafGlint, colWarm);
-          drawLeaf(x + 28, y - 2, 4.2, colWarm, colLight);
-          drawLeaf(x + 20, y - 3, 5.0, colLeafGlint, colWarm);
+          drawLeaf(ctx, x + 12, y - 2, 4.5, colLeafGlint, colWarm);
+          drawLeaf(ctx, x + 28, y - 2, 4.2, colWarm, colLight);
+          drawLeaf(ctx, x + 20, y - 3, 5.0, colLeafGlint, colWarm);
         }
         if (!hasDown) {
-          // Draw leaves sticking out bottom
-          drawLeaf(x + 12, y + TILE - 1, 4.5, colDark, '#051408');
-          drawLeaf(x + 28, y + TILE - 1, 4.5, colDark, '#051408');
+          drawLeaf(ctx, x + 12, y + TILE - 1, 4.5, colDark, '#051408');
+          drawLeaf(ctx, x + 28, y + TILE - 1, 4.5, colDark, '#051408');
         }
 
-        // C. Cute wild flowers (Variant 0: Pink/Yellow flower, Variant 1: Orange/White flower, Variant 2: deep foliage only)
+        // Cute wild flowers
         if (variant === 0) {
           const fx = x + 15, fy = y + 14;
-          ctx.fillStyle = '#ff3366'; // Gorgeous glowing pink
+          ctx.fillStyle = '#ff3366';
           ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ffcc00'; // Yellow center
+          ctx.fillStyle = '#ffcc00';
           ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
         } else if (variant === 1) {
           const fx = x + TILE - 15, fy = y + 16;
-          ctx.fillStyle = '#ff6600'; // Hot vibrant orange
+          ctx.fillStyle = '#ff6600';
           ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ffffff'; // White center
+          ctx.fillStyle = '#ffffff';
           ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
         }
 
@@ -339,36 +360,31 @@ export const drawMap = (
         // 3. SEAMLESS EARTHEN GARDEN GROUND (EMPTY)
         // ==========================================
 
-        // Organic Light Brown Earth (#C78757)
         ctx.fillStyle = '#C78757';
         ctx.fillRect(x, y, TILE, TILE);
 
-        // Soften the grid: make it almost invisible, giving a seamless seamless ground
         ctx.strokeStyle = 'rgba(150, 95, 55, 0.06)';
         ctx.lineWidth = 0.8;
         ctx.strokeRect(x, y, TILE, TILE);
 
-        // Shadow/dirt corner accumulations to organically suggest depth
         ctx.fillStyle = 'rgba(145, 95, 55, 0.22)';
         ctx.fillRect(x, y, 4, 4);
         ctx.fillRect(x + TILE - 4, y, 4, 4);
         ctx.fillRect(x, y + TILE - 4, 4, 4);
         ctx.fillRect(x + TILE - 4, y + TILE - 4, 4, 4);
 
-        // Deterministic hash value for organic decorations
         const hashVal = Math.abs(Math.sin(r * 12.9898 + c * 78.233)) * 43758.5453;
 
-        // Sand grains / Porosity spots (light and dark micro-dots)
-        ctx.fillStyle = 'rgba(110, 65, 30, 0.35)'; // dark porous dots
+        ctx.fillStyle = 'rgba(110, 65, 30, 0.35)';
         ctx.fillRect(x + 4 + (hashVal % 6), y + 6 + ((hashVal * 3) % 8), 1.2, 1.2);
         ctx.fillRect(x + 22 + (hashVal % 10), y + 14 + ((hashVal * 5) % 12), 1.0, 1.0);
         ctx.fillRect(x + 12 + (hashVal % 8), y + 26 + ((hashVal * 7) % 10), 1.2, 1.2);
 
-        ctx.fillStyle = '#deb089'; // light shiny grains
+        ctx.fillStyle = '#deb089';
         ctx.fillRect(x + 8 + (hashVal % 12), y + 18 + ((hashVal * 11) % 6), 1.0, 1.0);
         ctx.fillRect(x + 28 + (hashVal % 6), y + 22 + ((hashVal * 13) % 8), 1.2, 1.2);
 
-        // Occasional gray Pebbles (10% of tiles)
+        // Pebbles
         if (hashVal % 10 < 1.0) {
           const px = x + 8 + (hashVal % 24);
           const py = y + 8 + ((hashVal * 7) % 24);
@@ -385,7 +401,7 @@ export const drawMap = (
           ctx.stroke();
         }
 
-        // Occasional dry Twigs (10% of tiles)
+        // Dry Twigs
         if (hashVal % 10 > 9.0) {
           const tx = x + 10 + (hashVal % 20);
           const ty = y + 10 + ((hashVal * 13) % 20);
@@ -399,15 +415,14 @@ export const drawMap = (
           ctx.stroke();
         }
 
-        // Stepped-on mud footprint marks (24% of tiles)
+        // Footprint marks
         if (hashVal % 5 < 1.2) {
           const hx = x + 12 + (hashVal % 16);
           const hy = y + 12 + ((hashVal * 3) % 16);
-          ctx.fillStyle = 'rgba(142, 92, 52, 0.35)'; // mud depression
+          ctx.fillStyle = 'rgba(142, 92, 52, 0.35)';
           ctx.beginPath();
           ctx.ellipse(hx, hy, 4.5, 2.8, Math.PI / 4, 0, Math.PI * 2);
           ctx.fill();
-          // Tiny toe prints
           ctx.beginPath();
           ctx.arc(hx - 2.5, hy - 2.5, 0.9, 0, Math.PI * 2);
           ctx.arc(hx + 2.5, hy - 2.5, 0.9, 0, Math.PI * 2);
@@ -416,4 +431,321 @@ export const drawMap = (
       }
     }
   }
+
+  // ==========================================
+  // 4. MADRIGUERA DEL JEFE (4x4 - Center: col 8-11, row 5-8)
+  // Hollow Tree Trunk Stump Cave matching Mockup Image
+  // ==========================================
+  const bossX = 8 * TILE;
+  const bossY = 5 * TILE;
+  const bCenterX = bossX + 80;
+  const bCenterY = bossY + 80;
+
+  // Base ellipse with radial gradient simulating depth
+  const baseGrad = ctx.createRadialGradient(
+    bCenterX, bCenterY, 0,
+    bCenterX, bCenterY, 80
+  );
+  baseGrad.addColorStop(0, '#1a0a02');
+  baseGrad.addColorStop(1, '#3d1f0a');
+  ctx.fillStyle = baseGrad;
+  ctx.beginPath();
+  ctx.ellipse(bCenterX, bCenterY, 80, 70, 0, 0, Math.PI * 2);
+  ctx.fill();
+  // Breathing effect: slight colour oscillation
+  const breath = Math.sin(timestamp * 0.001) * 0.05;
+  ctx.fillStyle = `rgba(${58 + breath * 10}, ${31 + breath * 8}, ${10 + breath * 5}, 1)`;
+  ctx.beginPath();
+  ctx.ellipse(bCenterX, bCenterY, 78, 68, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // A. Main Tree Stump organic body in wood brown with bark shape flare
+  ctx.fillStyle = '#8B5A2B';
+  ctx.beginPath();
+  ctx.moveTo(bCenterX - 75, bCenterY + 60); // bottom left root flare
+  ctx.bezierCurveTo(bCenterX - 60, bCenterY + 20, bCenterX - 50, bCenterY - 45, bCenterX - 30, bCenterY - 50); // left side up
+  ctx.bezierCurveTo(bCenterX - 10, bCenterY - 55, bCenterX + 10, bCenterY - 55, bCenterX + 30, bCenterY - 50); // top cap
+  ctx.bezierCurveTo(bCenterX + 50, bCenterY - 45, bCenterX + 60, bCenterY + 20, bCenterX + 75, bCenterY + 60); // right side down
+  ctx.bezierCurveTo(bCenterX + 45, bCenterY + 60, bCenterX + 25, bCenterY + 50, bCenterX, bCenterY + 55); // bottom center curve
+  ctx.closePath();
+  ctx.fill();
+
+  // Vertical dark wood grains texture
+  ctx.strokeStyle = '#5c3a1b';
+  ctx.lineWidth = 2.0;
+  ctx.beginPath();
+  // Left grain line
+  ctx.moveTo(bCenterX - 25, bCenterY - 45);
+  ctx.bezierCurveTo(bCenterX - 35, bCenterY - 10, bCenterX - 45, bCenterY + 20, bCenterX - 55, bCenterY + 55);
+  // Center grain line
+  ctx.moveTo(bCenterX, bCenterY - 48);
+  ctx.bezierCurveTo(bCenterX + 5, bCenterY - 15, bCenterX - 5, bCenterY + 15, bCenterX - 10, bCenterY + 50);
+  // Right grain line
+  ctx.moveTo(bCenterX + 25, bCenterY - 45);
+  ctx.bezierCurveTo(bCenterX + 35, bCenterY - 10, bCenterX + 45, bCenterY + 20, bCenterX + 55, bCenterY + 55);
+  ctx.stroke();
+
+  // B. Left Cave Tunnel opening
+  // Left cave tunnel opening (oval)
+  ctx.fillStyle = '#0a0502'; // deep black
+  ctx.beginPath();
+  ctx.ellipse(bCenterX - 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2d1a0a'; // compressed earth border
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  // C. Right Cave Tunnel opening
+  // Right cave tunnel opening (oval)
+  ctx.fillStyle = '#0a0502';
+  ctx.beginPath();
+  ctx.ellipse(bCenterX + 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2d1a0a';
+  ctx.lineWidth = 3.5;
+  ctx.stroke();
+
+  // D. Central Cave entrance opening
+  // Central cave entrance (oval arch)
+  ctx.fillStyle = '#0a0502';
+  ctx.beginPath();
+  ctx.ellipse(bCenterX, bCenterY + 45, 35, 20, 0, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#2d1a0a';
+  ctx.lineWidth = 4.5;
+  ctx.stroke();
+
+  // E. ZZZ floating sleeping effects
+  for (let i = 0; i < 3; i++) {
+    const tZ = (timestamp * 0.0008 + i * 0.65) % 2.0;
+    const alpha = 1.0 - (tZ / 2.0);
+    if (alpha > 0) {
+      ctx.fillStyle = `rgba(180, 220, 255, ${alpha * 0.85})`;
+      ctx.font = `bold ${9 + tZ * 10}px "Press Start 2P", monospace`;
+      const zx = bCenterX - 12 + Math.sin(tZ * 3.5 + i) * 15;
+      const zy = bCenterY - 15 - tZ * 50;
+      ctx.fillText("Z", zx, zy);
+    }
+  }
+
+  // F. Micro dust particles in the hollow center
+  for (let i = 0; i < 8; i++) {
+    const phase = (timestamp * 0.0004 + i * 1.5) % 1.0;
+    const angle = i * Math.PI * 0.25 + phase * Math.PI * 2;
+    const rDist = 12 + ((i * 11) % 36) + Math.sin(phase * 3) * 6;
+    const px = bCenterX + Math.cos(angle) * rDist;
+    const py = bCenterY + Math.sin(angle) * rDist;
+    ctx.fillStyle = `rgba(220, 190, 160, ${0.12 + Math.sin(phase * Math.PI) * 0.3})`;
+    ctx.fillRect(px, py, 1.8, 1.8);
+  }
+
+  // G. Three Pairs of Blinking Glowing Red Eyes deep inside central cave
+  const isBlinking = (timestamp % 6000) < 180;
+  if (!isBlinking) {
+    ctx.fillStyle = '#ef4444';
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 8;
+
+    // Pair 1 (Left of center cave)
+    // Pair 1 (Left side)
+    ctx.beginPath(); ctx.arc(bCenterX - 22, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bCenterX - 12, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+    // Pair 2 (Right side)
+    ctx.beginPath(); ctx.arc(bCenterX + 12, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+    ctx.beginPath(); ctx.arc(bCenterX + 22, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+
+
+
+    ctx.shadowBlur = 0; // reset
+  }
+
+  // H. Thick exposed gnarled tree roots wrapping the opening
+  ctx.strokeStyle = '#5c3a1b'; // main root colour
+  ctx.lineCap = 'round';
+
+  // Left gnarled root
+  // Left gnarled root with highlight and shadow
+  ctx.lineWidth = 6;
+  ctx.beginPath();
+  ctx.moveTo(bCenterX - 15, bCenterY - 10);
+  ctx.bezierCurveTo(bCenterX - 35, bCenterY + 10, bCenterX - 40, bCenterY + 30, bCenterX - 38, bCenterY + 50);
+  ctx.stroke();
+  // Highlight
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bCenterX - 20, bCenterY - 5);
+  ctx.bezierCurveTo(bCenterX - 30, bCenterY + 12, bCenterX - 35, bCenterY + 28, bCenterX - 33, bCenterY + 45);
+  ctx.stroke();
+  // Reset colour
+  ctx.strokeStyle = '#5c3a1b';
+
+  // Right gnarled root
+  // Right gnarled root with highlight and shadow
+  ctx.beginPath();
+  ctx.moveTo(bCenterX + 15, bCenterY - 10);
+  ctx.bezierCurveTo(bCenterX + 35, bCenterY + 10, bCenterX + 40, bCenterY + 30, bCenterX + 38, bCenterY + 50);
+  ctx.stroke();
+  ctx.strokeStyle = '#8B5A2B';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(bCenterX + 20, bCenterY - 5);
+  ctx.bezierCurveTo(bCenterX + 30, bCenterY + 12, bCenterX + 35, bCenterY + 28, bCenterX + 33, bCenterY + 45);
+  ctx.stroke();
+  ctx.strokeStyle = '#5c3a1b';
+
+  // Crawling top root
+  ctx.lineWidth = 4;
+  ctx.beginPath();
+  ctx.moveTo(bCenterX - 25, bCenterY - 30);
+  ctx.bezierCurveTo(bCenterX - 55, bCenterY - 20, bCenterX - 65, bCenterY + 10, bCenterX - 72, bCenterY + 25);
+  ctx.stroke();
+
+  // I. Round Grey Stones scattered around the base roots
+  const drawRock = (rx: number, ry: number, rSize: number) => {
+    ctx.fillStyle = '#9e9a96'; // stone colour
+    ctx.strokeStyle = '#6e6a66'; // dark border
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Small white highlight
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.arc(rx - rSize * 0.3, ry - rSize * 0.3, rSize * 0.15, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Light reflection bevel highlight
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(rx, ry, rSize * 0.85, Math.PI, Math.PI * 1.8, false);
+    ctx.stroke();
+  };
+
+  drawRock(bCenterX - 35, bCenterY + 45, 8);
+  drawRock(bCenterX + 35, bCenterY + 46, 7);
+  drawRock(bCenterX - 62, bCenterY + 25, 9);
+  drawRock(bCenterX + 62, bCenterY + 32, 8);
+  drawRock(bCenterX - 15, bCenterY + 52, 6);
+  drawRock(bCenterX + 18, bCenterY + 52, 6.5);
+
+  // J. Centered label: Boss Den (Dormant)
+  // Centered label: Boss Den (Dormant)
+  ctx.save();
+  ctx.fillStyle = '#fed7aa';
+  ctx.globalAlpha = 0.6;
+  ctx.font = '7px "Press Start 2P", monospace';
+  ctx.textAlign = 'center';
+  ctx.shadowColor = '#000000';
+  ctx.shadowBlur = 4;
+  ctx.fillText('Boss Den (Dormant)', bCenterX, bCenterY + 68);
+  ctx.restore();
+  ctx.globalAlpha = 1.0;
+
+
+  // ==========================================
+  // 5. CASA DE TORTI (1x1 - col 17, row 13)
+  // Rustic cabin house matching mockup
+  // ==========================================
+  const bx = 17 * TILE;
+  const by = 13 * TILE;
+
+  // Draw base floor first
+  ctx.fillStyle = '#C78757';
+  ctx.fillRect(bx, by, TILE, TILE);
+
+  // A. Earthen green dome mound cover
+  ctx.fillStyle = '#2e7d32'; // dark green base
+  ctx.beginPath();
+  ctx.ellipse(bx + 20, by + 22, 21, 19, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  ctx.fillStyle = '#4caf50'; // light green cap
+  ctx.beginPath();
+  ctx.ellipse(bx + 20, by + 16, 17, 12, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // B. Exposed stone arch/pebbles border surrounding the cave mouth
+  const drawMiniRock = (mx: number, my: number, mr: number) => {
+    ctx.fillStyle = '#8e8680';
+    ctx.strokeStyle = '#5a5450';
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(mx, my, mr, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+  };
+
+  drawMiniRock(bx + 9, by + 30, 4);
+  drawMiniRock(bx + 31, by + 30, 4);
+  drawMiniRock(bx + 11, by + 18, 3.5);
+  drawMiniRock(bx + 29, by + 18, 3.5);
+  drawMiniRock(bx + 20, by + 13, 3);
+
+  // C. Cave mouth opening (Lower center circular entrance)
+  const caveMouthX = bx + 20;
+  const caveMouthY = by + 26;
+  const caveMouthR = 9;
+
+  if (escapeActive) {
+    // Glowing active entrance (open and shining yellow/gold)
+    ctx.fillStyle = '#ffeb3b';
+    ctx.beginPath();
+    ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Golden outer halo
+    const goldPulse = Math.sin(timestamp * 0.005) * 6 + 10;
+    ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(timestamp * 0.005) * 0.2})`;
+    ctx.lineWidth = 2.0;
+    ctx.shadowColor = '#ffd700';
+    ctx.shadowBlur = goldPulse;
+    ctx.beginPath();
+    ctx.arc(caveMouthX, caveMouthY, caveMouthR + 2, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.shadowBlur = 0; // reset
+    // God rays (2 translucent lines)
+    ctx.strokeStyle = 'rgba(255, 235, 59, 0.15)';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
+    ctx.lineTo(caveMouthX, caveMouthY - caveMouthR - 20);
+    ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
+    ctx.lineTo(caveMouthX + 12, caveMouthY - caveMouthR - 10);
+    ctx.stroke();
+  } else {
+    // Dark dormant entrance
+    // Dark dormant entrance (door closed)
+    ctx.fillStyle = '#0d0704';
+    ctx.beginPath();
+    ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
+    ctx.fill();
+    // Door knob
+    ctx.fillStyle = '#ffd700';
+    ctx.beginPath();
+    ctx.arc(caveMouthX + 4, caveMouthY, 2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // D. Cute green sprouts/blades growing on top of the dome
+  ctx.strokeStyle = '#acf2ad';
+  ctx.lineWidth = 1.5;
+  // Blade 1
+  ctx.beginPath();
+  ctx.moveTo(bx + 16, by + 6);
+  ctx.quadraticCurveTo(bx + 13, by + 1, bx + 10, by + 2);
+  ctx.stroke();
+  // Blade 2
+  ctx.beginPath();
+  ctx.moveTo(bx + 24, by + 6);
+  ctx.quadraticCurveTo(bx + 27, by + 1, bx + 30, by + 2);
+  ctx.stroke();
+
+  // E. Cell outer boundary frame
+  ctx.strokeStyle = '#2d1a0a'; // firm outline
+  ctx.lineWidth = 2.0;
+  ctx.strokeRect(bx, by, TILE, TILE);
 };

@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position } from '../types';
-import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_ICE, INNER_WALLS } from '../constants';
+import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_ICE, T_BURROW, INNER_WALLS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 
 interface UseGameEntitiesProps {
@@ -27,6 +27,7 @@ interface UseGameEntitiesProps {
   tileReadyRef: React.MutableRefObject<number[][]>;
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
   frameCountRef: React.MutableRefObject<number>;
+  awaitingBurrowRef: React.MutableRefObject<boolean>;
 }
 
 export const useGameEntities = ({
@@ -53,6 +54,7 @@ export const useGameEntities = ({
   tileReadyRef,
   scheduledPlantsRef,
   frameCountRef,
+  awaitingBurrowRef,
 }: UseGameEntitiesProps) => {
 
   const getPowerCount = () => {
@@ -76,7 +78,12 @@ export const useGameEntities = ({
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
     if (mapRef.current[row]?.[col] === T_WALL) return true;
     if (mapRef.current[row]?.[col] === T_ICE) {
+      if (ghostMode) return false;
       if (isPlayer && playerRef.current.goldenBroccoliTimer > 0) return false;
+      return true;
+    }
+    if (mapRef.current[row]?.[col] === T_BURROW) {
+      if (isPlayer && awaitingBurrowRef.current) return false;
       return true;
     }
     return false;
@@ -94,14 +101,20 @@ export const useGameEntities = ({
       for (let c = 0; c < COLS; c++) {
         if (r === 0 || r === ROWS - 1 || c === 0 || c === COLS - 1) {
           m[r].push(T_WALL);
+        } else if (r >= 5 && r <= 8 && c >= 8 && c <= 11) {
+          m[r].push(T_WALL); // permanent Boss Burrow (4x4)
         } else {
           m[r].push(T_EMPTY);
         }
       }
     }
     INNER_WALLS.forEach(([r, c]) => {
-      if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1) {
-        m[r][c] = T_WALL;
+      const isBossBurrow = r >= 5 && r <= 8 && c >= 8 && c <= 11;
+      if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) {
+        m[r][c] = T_ICE;
+        if (grassAgesRef.current) {
+          grassAgesRef.current[`${r}_${c}`] = { createdAt: Date.now() - 5000 };
+        }
       }
     });
     return m;
@@ -113,6 +126,13 @@ export const useGameEntities = ({
       const c = 1 + Math.floor(Math.random() * (COLS - 2));
       const r = 1 + Math.floor(Math.random() * (ROWS - 2));
       if (mapRef.current[r]?.[c] !== T_EMPTY) continue;
+
+      // Excluir casa de Torti (1x1 en 17, 13)
+      if (c === 17 && r === 13) continue;
+
+      // Excluir fortaleza del jefe (4x4)
+      if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
+
       if (c === playerRef.current.col && r === playerRef.current.row) continue;
       if (fruitsRef.current.some(f => f.col === c && f.row === r)) continue;
       return { col: c, row: r };
@@ -203,9 +223,13 @@ export const useGameEntities = ({
   };
 
   const initLevel = (currentLives: number) => {
-    mapRef.current = buildBaseMap();
+    awaitingBurrowRef.current = false;
     grassAgesRef.current = {};
+    mapRef.current = buildBaseMap();
     tileReadyRef.current = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
+
+    // Initialize Torti's House (T_BURROW) in cell col 17, row 13
+    mapRef.current[13][17] = T_BURROW;
 
     // Initial ice/grass blocks (distributed in free cells)
     const icePositions = [
@@ -248,9 +272,9 @@ export const useGameEntities = ({
     enemiesRef.current = [ // TODO: serpientes, cocodrilos
       {
         id: '1', type: 'patrol',
-        col: 18, row: 13,
-        x: 18 * TILE + TILE / 2, y: 13 * TILE + TILE / 2,
-        targetCol: 18, targetRow: 13,
+        col: 18, row: 10,
+        x: 18 * TILE + TILE / 2, y: 10 * TILE + TILE / 2,
+        targetCol: 18, targetRow: 10,
         moving: false,
         dir: { x: 0, y: -1 },
         speed: 0.7,
@@ -338,9 +362,8 @@ export const useGameEntities = ({
           }
           checkGoldenBroccoliSpawn(lives);
         } else {
-          // All phases complete! Victory
-          setGameState('win');
-          SoundEffects.playVictory();
+          // Carrots phase complete! The escape house is now active.
+          awaitingBurrowRef.current = true;
         }
       }
     }
@@ -517,6 +540,12 @@ export const useGameEntities = ({
           player.moving = false;
 
           checkFruitPickup();
+
+          // Check escape victory condition when Torti enters the house cell and escape is active
+          if (player.col === 17 && player.row === 13 && awaitingBurrowRef.current) {
+            setGameState('win');
+            SoundEffects.playVictory();
+          }
         } else {
           player.x += (dx / dist) * player.speed;
           player.y += (dy / dist) * player.speed;
@@ -633,7 +662,7 @@ export const useGameEntities = ({
 
     if (enemiesRef.current.length >= 4) {
       const e0 = enemiesRef.current[0];
-      e0.col = 18; e0.row = 13; e0.x = 18 * TILE + TILE / 2; e0.y = 13 * TILE + TILE / 2;
+      e0.col = 18; e0.row = 10; e0.x = 18 * TILE + TILE / 2; e0.y = 10 * TILE + TILE / 2;
       e0.moving = false; e0.chaseTimer = 1;
 
       const e1 = enemiesRef.current[1];

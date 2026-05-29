@@ -201,7 +201,7 @@ export default function App() {
                       🏆
                     </div>
                     <h2 className="font-press-start text-sm text-[#facc15] tracking-wider uppercase">
-                      ¡JARDÍN SALVADO!
+                      ¡TORTI SALVADO!
                     </h2>
                     <p className="text-[#86efac]/70 text-xs">
                       ¡Magnífico! Has recolectado todos los consumibles silvestres con agilidad.
