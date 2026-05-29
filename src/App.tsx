@@ -160,8 +160,7 @@ export default function App() {
                         CRÓNICA DEL JARDÍN
                       </div>
                       <p>🎮 <span className="text-white font-semibold">Flechas:</span> Mueve a la tortuga por el laberinto.</p>
-                      <p>🌱 <span className="text-[#4ade80] font-semibold">Espacio / F:</span> Siembra arbustos mágicos al instante.</p>
-                      <p>🍂 <span className="text-[#f87171] font-semibold">Shift / C:</span> Poda y elimina el arbusto del frente.</p>
+                      <p>⚡ <span className="text-[#facc15] font-semibold">Espacio / F:</span> Acción Contextual (Siembra en celda vacía o Poda/Quita el arbusto del frente).</p>
                       <p>🥦 Al quedar con <span className="text-[#facc15] font-semibold">1 sola vida</span>... ¡Búsca el <span className="text-[#facc15] font-semibold">Brócoli Dorado</span> para atravesar arbustos libremente!</p>
                     </div>
 

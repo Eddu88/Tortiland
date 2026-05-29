@@ -151,23 +151,15 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </button>
         </div>
 
-        {/* Action construction keys (Lush Sprout Planting vs Autumn Foliage Clearing) */}
-        <div className="grid grid-cols-2 gap-3.5 mt-1.5">
+        {/* Contextual Action Button (Golden theme matching lightning bolt) */}
+        <div className="mt-1.5">
           <button
-            onTouchStart={() => triggerVirtualCommand('BUILD')}
-            onMouseDown={() => triggerVirtualCommand('BUILD')}
-            className="flex flex-col items-center justify-center gap-1 rounded-xl bg-[#14532d] hover:bg-[#166534] border-2 border-[#22c55e] px-3 py-2.5 text-[#dbfde3] active:scale-95 cursor-pointer transition-all shadow-md shadow-emerald-950/40"
+            onTouchStart={() => triggerVirtualCommand('ACTION')}
+            onMouseDown={() => triggerVirtualCommand('ACTION')}
+            className="w-full flex flex-col items-center justify-center gap-1.5 rounded-xl bg-[#854d0e] hover:bg-[#a16207] border-2 border-[#eab308] px-3 py-3 text-[#fef9c3] active:scale-95 cursor-pointer transition-all shadow-md shadow-amber-950/40"
           >
-            <span className="font-press-start text-[8px] tracking-wider font-extrabold flex items-center gap-1">🌱 SEMBRAR</span>
-            <span className="text-[10px] text-[#dbfde3]/80 font-mono font-bold">Espacio / F</span>
-          </button>
-          <button
-            onTouchStart={() => triggerVirtualCommand('BREAK')}
-            onMouseDown={() => triggerVirtualCommand('BREAK')}
-            className="flex flex-col items-center justify-center gap-1 rounded-xl bg-[#7f1d1d] hover:bg-[#991b1b] border-2 border-[#f87171] px-3 py-2.5 text-[#fee2e2] active:scale-95 cursor-pointer transition-all shadow-md shadow-rose-950/40"
-          >
-            <span className="font-press-start text-[8px] tracking-wider font-extrabold flex items-center gap-1">🍂 QUITAR</span>
-            <span className="text-[10px] text-[#fee2e2]/80 font-mono font-bold">Shift / C</span>
+            <span className="font-press-start text-[9px] tracking-wider font-extrabold flex items-center gap-1">⚡ ACCIÓN CONTEXTUAL</span>
+            <span className="text-[10px] text-[#fef9c3]/80 font-mono font-bold">Espacio / F</span>
           </button>
         </div>
       </div>
