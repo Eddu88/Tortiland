@@ -4,7 +4,7 @@
  */
 
 import { Fruit, TileType, Player, Enemy } from '../types';
-import { TILE, T_ICE, T_WALL, T_EMPTY, COLS, ROWS } from '../constants';
+import { TILE, T_BUSH, T_WALL, T_EMPTY, COLS, ROWS } from '../constants';
 
 export const drawIndicatorCell = (
   ctx: CanvasRenderingContext2D,
@@ -65,7 +65,7 @@ export const drawPlayerIndicators = (
 
   const isIce = (col: number, row: number) => {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return map[row]?.[col] === T_ICE;
+    return map[row]?.[col] === T_BUSH;
   };
 
   const isEmpty = (col: number, row: number) => {
@@ -122,7 +122,7 @@ export const drawFruits = (
     const bob = Math.sin(t * 0.003 + f.anim) * 3;
     const yBob = py + bob;
 
-    const isCovered = map[f.row]?.[f.col] === T_ICE;
+    const isCovered = map[f.row]?.[f.col] === T_BUSH;
 
     ctx.save();
 

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos } from '../types';
-import { W, H, TILE, T_EMPTY, T_ICE } from '../constants';
+import { W, H, TILE, T_EMPTY, T_BUSH } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 import { drawMap } from '../renderers/drawMap';
 import { drawFruits, drawPlayerIndicators } from '../renderers/drawFruits';
@@ -69,6 +69,7 @@ export const useGameLoop = ({
   scheduledPlantsRef,
   tileReadyRef,
 }: UseGameLoopProps) => {
+  const dyingBushesRef = useRef<{ col: number; row: number; alpha: number; variant: number }[]>([]);
 
   const renderParticlesAndFlush = (ctx: CanvasRenderingContext2D) => {
     const parts = particlesRef.current;
@@ -203,6 +204,15 @@ export const useGameLoop = ({
       if (gameState === 'playing') {
         const player = playerRef.current;
 
+        // Update dying bushes alpha
+        const db = dyingBushesRef.current;
+        for (let i = db.length - 1; i >= 0; i--) {
+          db[i].alpha -= 0.06;
+          if (db[i].alpha <= 0) {
+            db.splice(i, 1);
+          }
+        }
+
         // Escape active particles
         const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
         if (escapeActive && frameCountRef.current % 30 === 0) {
@@ -216,7 +226,7 @@ export const useGameLoop = ({
           if (plant.triggerAt > 0) {
             plant.triggerAt--;
             if (plant.triggerAt === 0) {
-              mapRef.current[plant.row][plant.col] = T_ICE;
+              mapRef.current[plant.row][plant.col] = T_BUSH;
               const key = `${plant.row}_${plant.col}`;
               grassAgesRef.current[key] = { createdAt: Date.now() };
               // Spawn brown dirt particles!
@@ -229,10 +239,13 @@ export const useGameLoop = ({
         // Filter active schedules
         scheduledPlantsRef.current = scheduledPlantsRef.current.filter(p => p.triggerAt > 0);
         
-        // Trigger Break action at start of tick 36 (Impact)
-        if (player.breakingAnimTimer === 36 && breakingTilesRef.current.length > 0) {
+        // Trigger Break action at start of tick 48 (Impact)
+        if (player.breakingAnimTimer === 48 && breakingTilesRef.current.length > 0) {
           breakingTilesRef.current.forEach(({ col, row }) => {
             mapRef.current[row][col] = T_EMPTY;
+            const hashVal = Math.abs(Math.sin(row * 12.9898 + col * 78.233)) * 43758.5453;
+            const variant = Math.floor(hashVal % 3);
+            dyingBushesRef.current.push({ col, row, alpha: 1.0, variant });
             // Directional leaf particles!
             spawnParticles(col, row, '#4caf50', player.dir);
             spawnParticles(col, row, '#2e7d32', player.dir);
@@ -241,11 +254,11 @@ export const useGameLoop = ({
           breakingTilesRef.current = [];
         }
         
-        // Trigger Plant action at start of tick 36 (Lanzamiento)
-        if (player.plantingAnimTimer === 36 && plantingTilesRef.current.length > 0) {
+        // Trigger Plant action at start of tick 48 (Lanzamiento)
+        if (player.plantingAnimTimer === 48 && plantingTilesRef.current.length > 0) {
           plantingTilesRef.current.forEach(({ col, row }, index) => {
             const delay = index * 8; // 8 frames delay between shrubs
-            const triggerOffset = 54 - 36 + delay;
+            const triggerOffset = 72 - 48 + delay;
             scheduledPlantsRef.current.push({ col, row, triggerAt: triggerOffset });
             
             // Set individual ready frame
@@ -271,7 +284,7 @@ export const useGameLoop = ({
               return updated;
             });
           }
-        } else if (player.breakingAnimTimer === 36 || player.breakingAnimTimer === 35) {
+        } else if (player.breakingAnimTimer === 48 || player.breakingAnimTimer === 47) {
           // Freeze frame: bypass updates/collisions, manually decrement breakingAnimTimer
           player.breakingAnimTimer--;
         } else {
@@ -282,9 +295,9 @@ export const useGameLoop = ({
         }
       }
 
-      // Screen shake calculation: 3-5 frames during breaking impact (ticks 36-30) and planting huddle (ticks 54-45)
-      const isBreakShake = playerRef.current.breakingAnimTimer >= 30 && playerRef.current.breakingAnimTimer <= 36;
-      const isPlantShake = playerRef.current.plantingAnimTimer >= 45 && playerRef.current.plantingAnimTimer <= 54;
+      // Screen shake calculation: 3-5 frames during breaking impact (ticks 48-40) and planting huddle (ticks 72-60)
+      const isBreakShake = playerRef.current.breakingAnimTimer >= 40 && playerRef.current.breakingAnimTimer <= 48;
+      const isPlantShake = playerRef.current.plantingAnimTimer >= 60 && playerRef.current.plantingAnimTimer <= 72;
 
       ctx.save();
       
@@ -301,7 +314,7 @@ export const useGameLoop = ({
       const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
 
       // Render game layers
-      drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, playerRef.current.breakingAnimTimer, escapeActive, timestamp);
+      drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, playerRef.current.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current);
       renderParticlesAndFlush(ctx);
       drawFruits(ctx, fruitsRef.current, mapRef.current, timestamp);
 

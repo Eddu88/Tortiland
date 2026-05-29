@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type TileType = 0 | 1 | 2 | 3; // 0: EMPTY, 1: WALL, 2: ICE/GRASS, 3: BURROW
+export type TileType = 0 | 1 | 2 | 3; // 0: EMPTY, 1: WALL, 2: BUSH/GRASS, 3: BURROW
 
 export type EnemyType = 'patrol' | 'chaser' | 'ghost';
 

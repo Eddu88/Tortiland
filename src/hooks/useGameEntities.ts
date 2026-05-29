@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position } from '../types';
-import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_ICE, T_BURROW, INNER_WALLS } from '../constants';
+import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, INNER_WALLS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 
 interface UseGameEntitiesProps {
@@ -69,15 +69,15 @@ export const useGameEntities = ({
     return mapRef.current[row]?.[col] === T_WALL;
   };
 
-  const isIce = (col: number, row: number) => {
+  const isBush = (col: number, row: number) => {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_ICE;
+    return mapRef.current[row]?.[col] === T_BUSH;
   };
 
   const isSolid = (col: number, row: number, ghostMode = false, isPlayer = false) => {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
     if (mapRef.current[row]?.[col] === T_WALL) return true;
-    if (mapRef.current[row]?.[col] === T_ICE) {
+    if (mapRef.current[row]?.[col] === T_BUSH) {
       if (ghostMode) return false;
       if (isPlayer && playerRef.current.goldenBroccoliTimer > 0) return false;
       return true;
@@ -111,7 +111,7 @@ export const useGameEntities = ({
     INNER_WALLS.forEach(([r, c]) => {
       const isBossBurrow = r >= 5 && r <= 8 && c >= 8 && c <= 11;
       if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) {
-        m[r][c] = T_ICE;
+        m[r][c] = T_BUSH;
         if (grassAgesRef.current) {
           grassAgesRef.current[`${r}_${c}`] = { createdAt: Date.now() - 5000 };
         }
@@ -127,8 +127,8 @@ export const useGameEntities = ({
       const r = 1 + Math.floor(Math.random() * (ROWS - 2));
       if (mapRef.current[r]?.[c] !== T_EMPTY) continue;
 
-      // Excluir casa de Torti (1x1 en 17, 13)
-      if (c === 17 && r === 13) continue;
+      // Excluir casa de Torti (1x1 en 18, 13)
+      if (c === 18 && r === 13) continue;
 
       // Excluir fortaleza del jefe (4x4)
       if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
@@ -199,7 +199,7 @@ export const useGameEntities = ({
         const perpX = -dir.y;
         const perpY = dir.x;
         const factor = (Math.random() - 0.5) * 5.0; // spread of ±2.5
-        
+
         vx = dir.x * 4.5 + perpX * factor + (Math.random() - 0.5) * 1.0;
         vy = dir.y * 4.5 + perpY * factor - (Math.random() * 1.5); // slight upward pop
       } else {
@@ -228,16 +228,16 @@ export const useGameEntities = ({
     mapRef.current = buildBaseMap();
     tileReadyRef.current = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-    // Initialize Torti's House (T_BURROW) in cell col 17, row 13
-    mapRef.current[13][17] = T_BURROW;
+    // Initialize Torti's House (T_BURROW) in cell col 18, row 13
+    mapRef.current[13][18] = T_BURROW;
 
-    // Initial ice/grass blocks (distributed in free cells)
-    const icePositions = [
-      [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11], [13, 17]
+    // Initial bush blocks (distributed in free cells)
+    const bushPositions = [
+      [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11], [13, 18]
     ];
-    icePositions.forEach(([r, c]) => {
+    bushPositions.forEach(([r, c]) => {
       if (mapRef.current[r]?.[c] === T_EMPTY) {
-        mapRef.current[r][c] = T_ICE;
+        mapRef.current[r][c] = T_BUSH;
         const key = `${r}_${c}`;
         grassAgesRef.current[key] = { createdAt: Date.now() - 5000 };
       }
@@ -461,16 +461,16 @@ export const useGameEntities = ({
       const now = Date.now();
       if (player.dir.x === 0 && player.dir.y === -1) {
         isHoldingDir = (keysRef.current['ArrowUp'] && (now - (keysPressTimeRef.current['ArrowUp'] || 0) > 100)) ||
-                       (keysRef.current['KeyW'] && (now - (keysPressTimeRef.current['KeyW'] || 0) > 100));
+          (keysRef.current['KeyW'] && (now - (keysPressTimeRef.current['KeyW'] || 0) > 100));
       } else if (player.dir.x === 0 && player.dir.y === 1) {
         isHoldingDir = (keysRef.current['ArrowDown'] && (now - (keysPressTimeRef.current['ArrowDown'] || 0) > 100)) ||
-                       (keysRef.current['KeyS'] && (now - (keysPressTimeRef.current['KeyS'] || 0) > 100));
+          (keysRef.current['KeyS'] && (now - (keysPressTimeRef.current['KeyS'] || 0) > 100));
       } else if (player.dir.x === -1 && player.dir.y === 0) {
         isHoldingDir = (keysRef.current['ArrowLeft'] && (now - (keysPressTimeRef.current['ArrowLeft'] || 0) > 100)) ||
-                       (keysRef.current['KeyA'] && (now - (keysPressTimeRef.current['KeyA'] || 0) > 100));
+          (keysRef.current['KeyA'] && (now - (keysPressTimeRef.current['KeyA'] || 0) > 100));
       } else if (player.dir.x === 1 && player.dir.y === 0) {
         isHoldingDir = (keysRef.current['ArrowRight'] && (now - (keysPressTimeRef.current['ArrowRight'] || 0) > 100)) ||
-                       (keysRef.current['KeyD'] && (now - (keysPressTimeRef.current['KeyD'] || 0) > 100));
+          (keysRef.current['KeyD'] && (now - (keysPressTimeRef.current['KeyD'] || 0) > 100));
       }
 
       if (isHoldingDir) {
@@ -510,16 +510,16 @@ export const useGameEntities = ({
     }
 
     const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
-                           keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
-                           keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
-                           keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+      keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+      keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+      keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
     if (!hasMovementKey) {
       turnBlockedRef.current = false;
     }
 
     // Move center coordinates smoothly toward targeted cell
     if (player.moving) {
-      if (mapRef.current[player.targetRow]?.[player.targetCol] === T_ICE && !player.goldenBroccoliTimer) {
+      if (mapRef.current[player.targetRow]?.[player.targetCol] === T_BUSH && !player.goldenBroccoliTimer) {
         player.moving = false;
         player.x = player.col * TILE + TILE / 2;
         player.y = player.row * TILE + TILE / 2;
@@ -542,7 +542,7 @@ export const useGameEntities = ({
           checkFruitPickup();
 
           // Check escape victory condition when Torti enters the house cell and escape is active
-          if (player.col === 17 && player.row === 13 && awaitingBurrowRef.current) {
+          if (player.col === 18 && player.row === 13 && awaitingBurrowRef.current) {
             setGameState('win');
             SoundEffects.playVictory();
           }
@@ -600,7 +600,7 @@ export const useGameEntities = ({
     }
 
     if (e.moving) {
-      if (mapRef.current[e.targetRow]?.[e.targetCol] === T_ICE) {
+      if (mapRef.current[e.targetRow]?.[e.targetCol] === T_BUSH && !ghost) {
         e.moving = false;
         e.targetCol = e.col;
         e.targetRow = e.row;
@@ -644,7 +644,7 @@ export const useGameEntities = ({
       if (dist < TILE * 0.72) {
         // Trigger arcade death sequence!
         SoundEffects.playHurt();
-        player.deathAnimTimer = 75; // 75 frames (1.25s) of cartoon shock, shell refuge, and fall-out
+        player.deathAnimTimer = 180; // 180 frames (3s) of cartoon shock, shell refuge, and fall-out
         return;
       }
     }
@@ -688,7 +688,7 @@ export const useGameEntities = ({
     for (let r = 0; r < ROWS; r++) {
       for (let c = 0; c < COLS; c++) {
         if (prevMapRef.current[r]?.[c] !== mapRef.current[r]?.[c]) {
-          if (mapRef.current[r]?.[c] === T_ICE) {
+          if (mapRef.current[r]?.[c] === T_BUSH) {
             // Only spawn radial green particles for other map changes (e.g. initLevel)
             if (player.plantingAnimTimer === 0) {
               spawnParticles(c, r, '#4caf50'); // vibrant leaf green grow particles

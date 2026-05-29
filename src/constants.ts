@@ -11,7 +11,7 @@ export const H = ROWS * TILE;
 
 export const T_EMPTY = 0;
 export const T_WALL = 1;
-export const T_ICE = 2;
+export const T_BUSH = 2;
 export const T_BURROW = 3;
 
 // Fixed maze design based on Tortiland

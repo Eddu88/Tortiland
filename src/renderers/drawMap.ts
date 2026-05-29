@@ -4,7 +4,7 @@
  */
 
 import { TileType, GridPos } from '../types';
-import { COLS, ROWS, TILE, T_WALL, T_ICE } from '../constants';
+import { COLS, ROWS, TILE, T_WALL, T_BUSH } from '../constants';
 
 // Helper to draw leaf circles that can jut out past the standard grid boundaries
 const drawLeaf = (
@@ -28,6 +28,165 @@ const drawLeaf = (
   ctx.stroke();
 };
 
+// Helper to draw a single bush/shrub with optional scale and alpha
+const drawBushSingle = (
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  c: number,
+  r: number,
+  variant: number,
+  alpha: number,
+  growProgress: number,
+  hasLeft: boolean,
+  hasRight: boolean,
+  hasUp: boolean,
+  hasDown: boolean
+) => {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+
+  // A. Organic base shadow projected onto the earth
+  if (!hasDown) {
+    ctx.fillStyle = 'rgba(32, 19, 10, 0.48)';
+    ctx.beginPath();
+    ctx.ellipse(x + TILE / 2, y + TILE + 2, TILE * 0.55, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.save();
+  ctx.translate(x + TILE / 2, y + TILE / 2);
+  ctx.scale(growProgress, growProgress);
+  ctx.translate(-(x + TILE / 2), -(y + TILE / 2));
+
+  // Set up colors based on variant to break monotony and add depth
+  let colDark = '#1c472d';
+  let colMid = '#2b7835';
+  let colLight = '#5ec263';
+  let colWarm = '#94db97';
+  let colLeafGlint = '#b4f07a';
+
+  if (variant === 1) {
+    colDark = '#1a3e26';
+    colMid = '#328543';
+    colLight = '#7ccc81';
+    colWarm = '#acf2ad';
+    colLeafGlint = '#daf7a6';
+  } else if (variant === 2) {
+    colDark = '#133317';
+    colMid = '#24632b';
+    colLight = '#439c48';
+    colWarm = '#7cd181';
+    colLeafGlint = '#9be69e';
+  }
+
+  // Base fill con padding
+  ctx.fillStyle = colDark;
+  const padL = hasLeft ? -1 : 2;
+  const padR = hasRight ? -1 : 2;
+  const padT = hasUp ? -1 : 2;
+  const padB = hasDown ? -1 : 2;
+  ctx.fillRect(x + padL, y + padT, TILE - padL - padR, TILE - padT - padB);
+
+  // Bordes autotile dibujados 1px hacia ADENTRO del tile
+  ctx.strokeStyle = 'rgba(5, 20, 8, 0.55)';
+  ctx.lineWidth = 1.0;
+  ctx.beginPath();
+  if (!hasUp) {
+    ctx.moveTo(x + (hasLeft ? 0 : 3), y + 1);
+    ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + 1);
+  }
+  if (!hasDown) {
+    ctx.moveTo(x + (hasLeft ? 0 : 3), y + TILE - 1);
+    ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + TILE - 1);
+  }
+  if (!hasLeft) {
+    ctx.moveTo(x + 1, y + (hasUp ? 0 : 3));
+    ctx.lineTo(x + 1, y + TILE - (hasDown ? 0 : 3));
+  }
+  if (!hasRight) {
+    ctx.moveTo(x + TILE - 1, y + (hasUp ? 0 : 3));
+    ctx.lineTo(x + TILE - 1, y + TILE - (hasDown ? 0 : 3));
+  }
+  ctx.stroke();
+
+  // Draw interior branches
+  ctx.strokeStyle = '#4a2e19';
+  ctx.lineWidth = 1.6;
+  ctx.beginPath();
+  if (variant === 0) {
+    ctx.moveTo(x + 10, y + 25);
+    ctx.quadraticCurveTo(x + 18, y + 16, x + 25, y + 22);
+  } else if (variant === 1) {
+    ctx.moveTo(x + 30, y + 12);
+    ctx.quadraticCurveTo(x + 22, y + 20, x + 15, y + 15);
+  } else {
+    ctx.moveTo(x + 12, y + 12);
+    ctx.lineTo(x + 28, y + 28);
+  }
+  ctx.stroke();
+
+  // Draw dense organic leaf layers with shading
+  drawLeaf(ctx, x + 10, y + 28, 7.5, colDark, '#051408');
+  drawLeaf(ctx, x + TILE - 10, y + 28, 7.5, colDark, '#051408');
+  drawLeaf(ctx, x + 20, y + 30, 8.0, colDark, '#051408');
+
+  drawLeaf(ctx, x + 8, y + 20, 7.0, colMid, colDark);
+  drawLeaf(ctx, x + TILE - 8, y + 20, 7.0, colMid, colDark);
+  drawLeaf(ctx, x + 20, y + 22, 7.5, colMid, colDark);
+
+  drawLeaf(ctx, x + 10, y + 12, 6.5, colLight, colMid);
+  drawLeaf(ctx, x + TILE - 10, y + 12, 6.5, colLight, colMid);
+  drawLeaf(ctx, x + 20, y + 13, 7.0, colLight, colMid);
+
+  drawLeaf(ctx, x + 12, y + 6, 5.0, colWarm, colLight);
+  drawLeaf(ctx, x + TILE - 12, y + 6, 5.0, colWarm, colLight);
+  drawLeaf(ctx, x + 20, y + 7, 5.5, colWarm, colLight);
+
+  drawLeaf(ctx, x + 14, y + 3, 3.5, colLeafGlint, colWarm);
+  drawLeaf(ctx, x + TILE - 14, y + 3, 3.5, colLeafGlint, colWarm);
+  drawLeaf(ctx, x + 20, y + 4, 4.0, colLeafGlint, colWarm);
+
+  // Leaves that jut out
+  if (!hasLeft) {
+    drawLeaf(ctx, x - 2, y + 14, 4.5, colMid, colDark);
+    drawLeaf(ctx, x - 3, y + 22, 5.0, colDark, '#051408');
+    drawLeaf(ctx, x - 1, y + 8, 4.0, colLight, colMid);
+  }
+  if (!hasRight) {
+    drawLeaf(ctx, x + TILE + 2, y + 14, 4.5, colMid, colDark);
+    drawLeaf(ctx, x + TILE + 3, y + 22, 5.0, colDark, '#051408');
+    drawLeaf(ctx, x + TILE + 1, y + 8, 4.0, colLight, colMid);
+  }
+  if (!hasUp) {
+    drawLeaf(ctx, x + 12, y - 2, 4.5, colLeafGlint, colWarm);
+    drawLeaf(ctx, x + 28, y - 2, 4.2, colWarm, colLight);
+    drawLeaf(ctx, x + 20, y - 3, 5.0, colLeafGlint, colWarm);
+  }
+  if (!hasDown) {
+    drawLeaf(ctx, x + 12, y + TILE - 1, 4.5, colDark, '#051408');
+    drawLeaf(ctx, x + 28, y + TILE - 1, 4.5, colDark, '#051408');
+  }
+
+  // Cute wild flowers
+  if (variant === 0) {
+    const fx = x + 15, fy = y + 14;
+    ctx.fillStyle = '#ff3366';
+    ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffcc00';
+    ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
+  } else if (variant === 1) {
+    const fx = x + TILE - 15, fy = y + 16;
+    ctx.fillStyle = '#ff6600';
+    ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ctx.restore();
+  ctx.restore();
+};
+
 export const drawMap = (
   ctx: CanvasRenderingContext2D,
   map: TileType[][],
@@ -35,7 +194,8 @@ export const drawMap = (
   breakingTiles: GridPos[],
   playerBreakingAnimTimer: number,
   escapeActive = false,
-  timestamp = 0
+  timestamp = 0,
+  dyingBushes: { col: number; row: number; alpha: number; variant: number }[] = []
 ) => {
   ctx.shadowBlur = 0;
 
@@ -149,30 +309,9 @@ export const drawMap = (
         ctx.lineWidth = 1.5;
         ctx.strokeRect(x, y, TILE, TILE);
 
-        // Draw small wild moss/shrub leaves overflowing on borders with T_EMPTY
-        const hasLeftEmpty = c > 0 && map[r][c - 1] === 0;
-        const hasRightEmpty = c < COLS - 1 && map[r][c + 1] === 0;
-        const hasUpEmpty = r > 0 && map[r - 1][c] === 0;
-        const hasDownEmpty = r < ROWS - 1 && map[r + 1][c] === 0;
 
-        if (hasLeftEmpty) {
-          drawLeaf(ctx, x, y + 10, 4, '#2b7835', '#1c472d');
-          drawLeaf(ctx, x - 1, y + 25, 3.5, '#5ec263', '#2b7835');
-        }
-        if (hasRightEmpty) {
-          drawLeaf(ctx, x + TILE, y + 15, 3.5, '#2b7835', '#1c472d');
-          drawLeaf(ctx, x + TILE + 1, y + 30, 4, '#5ec263', '#2b7835');
-        }
-        if (hasUpEmpty) {
-          drawLeaf(ctx, x + 12, y, 4, '#2b7835', '#1c472d');
-          drawLeaf(ctx, x + 28, y - 1, 3.5, '#5ec263', '#2b7835');
-        }
-        if (hasDownEmpty) {
-          drawLeaf(ctx, x + 15, y + TILE, 3.5, '#2b7835', '#1c472d');
-          drawLeaf(ctx, x + 30, y + TILE + 1, 4, '#5ec263', '#2b7835');
-        }
 
-      } else if (t === T_ICE) {
+      } else if (t === T_BUSH) {
         // ==========================================
         // 2. LUSH ORGANIC 2.5D CONNECTED SHRUB HEDGES (PASTO/HIERBA)
         // ==========================================
@@ -189,7 +328,7 @@ export const drawMap = (
         // Check adjacent tiles of the same type to support autotiling
         const isNeighborGrass = (nc: number, nr: number) => {
           if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
-          return map[nr]?.[nc] === T_ICE;
+          return map[nr]?.[nc] === T_BUSH;
         };
         const hasUp = isNeighborGrass(c, r - 1);
         const hasDown = isNeighborGrass(c, r + 1);
@@ -204,11 +343,11 @@ export const drawMap = (
         const dB = hasDown ? 1 : 0;
         ctx.fillRect(x + dL, y + dT, TILE - dL + dR, TILE - dT + dB);
 
-        // Grow animation with bouncy elastic spring overshoot effect
+        // Grow animation with soft elastic overshoot curve (420ms duration)
         let growProgress = 1.0;
-        if (ageMs < 250) {
-          const tNorm = ageMs / 250;
-          growProgress = -Math.pow(tNorm - 1, 2) * (tNorm - 1.25) + 1;
+        if (ageMs < 420) {
+          const tNorm = ageMs / 420;
+          growProgress = 1 - Math.pow(1 - tNorm, 3) + Math.sin(tNorm * Math.PI) * 0.08;
           growProgress = Math.max(0, Math.min(1.1, growProgress));
         }
 
@@ -216,144 +355,7 @@ export const drawMap = (
         const hashVal = Math.abs(Math.sin(r * 12.9898 + c * 78.233)) * 43758.5453;
         const variant = Math.floor(hashVal % 3);
 
-        // A. Organic base shadow projected onto the earth
-        if (!hasDown) {
-          ctx.fillStyle = 'rgba(32, 19, 10, 0.48)';
-          ctx.beginPath();
-          ctx.ellipse(x + TILE / 2, y + TILE + 2, TILE * 0.55, 4, 0, 0, Math.PI * 2);
-          ctx.fill();
-        }
-
-        ctx.save();
-        ctx.translate(x + TILE / 2, y + TILE / 2);
-        ctx.scale(growProgress, growProgress);
-        ctx.translate(-(x + TILE / 2), -(y + TILE / 2));
-
-        // Set up colors based on variant to break monotony and add depth
-        let colDark = '#1c472d';
-        let colMid = '#2b7835';
-        let colLight = '#5ec263';
-        let colWarm = '#94db97';
-        let colLeafGlint = '#b4f07a';
-
-        if (variant === 1) {
-          colDark = '#1a3e26';
-          colMid = '#328543';
-          colLight = '#7ccc81';
-          colWarm = '#acf2ad';
-          colLeafGlint = '#daf7a6';
-        } else if (variant === 2) {
-          colDark = '#133317';
-          colMid = '#24632b';
-          colLight = '#439c48';
-          colWarm = '#7cd181';
-          colLeafGlint = '#9be69e';
-        }
-
-        // Base fill con padding
-        ctx.fillStyle = colDark;
-        const padL = hasLeft ? -1 : 2;
-        const padR = hasRight ? -1 : 2;
-        const padT = hasUp ? -1 : 2;
-        const padB = hasDown ? -1 : 2;
-        ctx.fillRect(x + padL, y + padT, TILE - padL - padR, TILE - padT - padB);
-
-        // Bordes autotile dibujados 1px hacia ADENTRO del tile
-        ctx.strokeStyle = 'rgba(5, 20, 8, 0.55)';
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        if (!hasUp) {
-          ctx.moveTo(x + (hasLeft ? 0 : 3), y + 1);
-          ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + 1);
-        }
-        if (!hasDown) {
-          ctx.moveTo(x + (hasLeft ? 0 : 3), y + TILE - 1);
-          ctx.lineTo(x + TILE - (hasRight ? 0 : 3), y + TILE - 1);
-        }
-        if (!hasLeft) {
-          ctx.moveTo(x + 1, y + (hasUp ? 0 : 3));
-          ctx.lineTo(x + 1, y + TILE - (hasDown ? 0 : 3));
-        }
-        if (!hasRight) {
-          ctx.moveTo(x + TILE - 1, y + (hasUp ? 0 : 3));
-          ctx.lineTo(x + TILE - 1, y + TILE - (hasDown ? 0 : 3));
-        }
-        ctx.stroke();
-
-        // Draw interior branches
-        ctx.strokeStyle = '#4a2e19';
-        ctx.lineWidth = 1.6;
-        ctx.beginPath();
-        if (variant === 0) {
-          ctx.moveTo(x + 10, y + 25);
-          ctx.quadraticCurveTo(x + 18, y + 16, x + 25, y + 22);
-        } else if (variant === 1) {
-          ctx.moveTo(x + 30, y + 12);
-          ctx.quadraticCurveTo(x + 22, y + 20, x + 15, y + 15);
-        } else {
-          ctx.moveTo(x + 12, y + 12);
-          ctx.lineTo(x + 28, y + 28);
-        }
-        ctx.stroke();
-
-        // Draw dense organic leaf layers with shading
-        drawLeaf(ctx, x + 10, y + 28, 7.5, colDark, '#051408');
-        drawLeaf(ctx, x + TILE - 10, y + 28, 7.5, colDark, '#051408');
-        drawLeaf(ctx, x + 20, y + 30, 8.0, colDark, '#051408');
-
-        drawLeaf(ctx, x + 8, y + 20, 7.0, colMid, colDark);
-        drawLeaf(ctx, x + TILE - 8, y + 20, 7.0, colMid, colDark);
-        drawLeaf(ctx, x + 20, y + 22, 7.5, colMid, colDark);
-
-        drawLeaf(ctx, x + 10, y + 12, 6.5, colLight, colMid);
-        drawLeaf(ctx, x + TILE - 10, y + 12, 6.5, colLight, colMid);
-        drawLeaf(ctx, x + 20, y + 13, 7.0, colLight, colMid);
-
-        drawLeaf(ctx, x + 12, y + 6, 5.0, colWarm, colLight);
-        drawLeaf(ctx, x + TILE - 12, y + 6, 5.0, colWarm, colLight);
-        drawLeaf(ctx, x + 20, y + 7, 5.5, colWarm, colLight);
-
-        drawLeaf(ctx, x + 14, y + 3, 3.5, colLeafGlint, colWarm);
-        drawLeaf(ctx, x + TILE - 14, y + 3, 3.5, colLeafGlint, colWarm);
-        drawLeaf(ctx, x + 20, y + 4, 4.0, colLeafGlint, colWarm);
-
-        // Leaves that jut out
-        if (!hasLeft) {
-          drawLeaf(ctx, x - 2, y + 14, 4.5, colMid, colDark);
-          drawLeaf(ctx, x - 3, y + 22, 5.0, colDark, '#051408');
-          drawLeaf(ctx, x - 1, y + 8, 4.0, colLight, colMid);
-        }
-        if (!hasRight) {
-          drawLeaf(ctx, x + TILE + 2, y + 14, 4.5, colMid, colDark);
-          drawLeaf(ctx, x + TILE + 3, y + 22, 5.0, colDark, '#051408');
-          drawLeaf(ctx, x + TILE + 1, y + 8, 4.0, colLight, colMid);
-        }
-        if (!hasUp) {
-          drawLeaf(ctx, x + 12, y - 2, 4.5, colLeafGlint, colWarm);
-          drawLeaf(ctx, x + 28, y - 2, 4.2, colWarm, colLight);
-          drawLeaf(ctx, x + 20, y - 3, 5.0, colLeafGlint, colWarm);
-        }
-        if (!hasDown) {
-          drawLeaf(ctx, x + 12, y + TILE - 1, 4.5, colDark, '#051408');
-          drawLeaf(ctx, x + 28, y + TILE - 1, 4.5, colDark, '#051408');
-        }
-
-        // Cute wild flowers
-        if (variant === 0) {
-          const fx = x + 15, fy = y + 14;
-          ctx.fillStyle = '#ff3366';
-          ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ffcc00';
-          ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
-        } else if (variant === 1) {
-          const fx = x + TILE - 15, fy = y + 16;
-          ctx.fillStyle = '#ff6600';
-          ctx.beginPath(); ctx.arc(fx, fy, 3.0, 0, Math.PI * 2); ctx.fill();
-          ctx.fillStyle = '#ffffff';
-          ctx.beginPath(); ctx.arc(fx, fy, 1.0, 0, Math.PI * 2); ctx.fill();
-        }
-
-        ctx.restore();
+        drawBushSingle(ctx, x, y, c, r, variant, 1.0, growProgress, hasLeft, hasRight, hasUp, hasDown);
 
       } else {
         // ==========================================
@@ -428,6 +430,21 @@ export const drawMap = (
           ctx.arc(hx + 2.5, hy - 2.5, 0.9, 0, Math.PI * 2);
           ctx.fill();
         }
+
+        // Draw dying bushes overlay
+        const dyingBush = dyingBushes.find(b => b.col === c && b.row === r);
+        if (dyingBush) {
+          const isNeighborGrass = (nc: number, nr: number) => {
+            if (nc < 0 || nc >= COLS || nr < 0 || nr >= ROWS) return false;
+            return map[nr]?.[nc] === T_BUSH || dyingBushes.some(db => db.col === nc && db.row === nr);
+          };
+          const hasUp = isNeighborGrass(c, r - 1);
+          const hasDown = isNeighborGrass(c, r + 1);
+          const hasLeft = isNeighborGrass(c - 1, r);
+          const hasRight = isNeighborGrass(c + 1, r);
+
+          drawBushSingle(ctx, x, y, c, r, dyingBush.variant, dyingBush.alpha, 1.0, hasLeft, hasRight, hasUp, hasDown);
+        }
       }
     }
   }
@@ -448,10 +465,79 @@ export const drawMap = (
   );
   baseGrad.addColorStop(0, '#1a0a02');
   baseGrad.addColorStop(1, '#3d1f0a');
+
+  // --- Drawing Winding Trenches/Tunnels emerging from the Boss Den (Mockup Match) ---
+  ctx.save();
+  ctx.lineCap = 'round';
+  ctx.lineJoin = 'round';
+
+  const trenches = [
+    // 1. Top-Right Trench (winding up and right)
+    {
+      start: { x: bCenterX + 45, y: bCenterY - 15 },
+      cp1: { x: bCenterX + 70, y: bCenterY - 50 },
+      cp2: { x: bCenterX + 100, y: bCenterY - 80 },
+      end: { x: bCenterX + 140, y: bCenterY - 110 },
+      width: 24
+    },
+    // 2. Left Trench (winding left)
+    {
+      start: { x: bCenterX - 50, y: bCenterY + 30 },
+      cp1: { x: bCenterX - 90, y: bCenterY + 20 },
+      cp2: { x: bCenterX - 130, y: bCenterY + 15 },
+      end: { x: bCenterX - 180, y: bCenterY + 30 },
+      width: 22
+    },
+    // 3. Right Trench (winding right and curving down)
+    {
+      start: { x: bCenterX + 50, y: bCenterY + 30 },
+      cp1: { x: bCenterX + 90, y: bCenterY + 35 },
+      cp2: { x: bCenterX + 120, y: bCenterY + 60 },
+      end: { x: bCenterX + 130, y: bCenterY + 130 },
+      width: 22
+    },
+    // 4. Bottom-Left Trench (winding down and curving left)
+    {
+      start: { x: bCenterX - 10, y: bCenterY + 50 },
+      cp1: { x: bCenterX - 20, y: bCenterY + 100 },
+      cp2: { x: bCenterX - 80, y: bCenterY + 120 },
+      end: { x: bCenterX - 130, y: bCenterY + 110 },
+      width: 20
+    }
+  ];
+
+  trenches.forEach(t => {
+    // A. Outer trench shadow/edge (extra wide, dark)
+    ctx.strokeStyle = '#2d1a0a';
+    ctx.lineWidth = t.width + 4;
+    ctx.beginPath();
+    ctx.moveTo(t.start.x, t.start.y);
+    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+    ctx.stroke();
+
+    // B. Main trench channel (medium dirt brown)
+    ctx.strokeStyle = '#854c24';
+    ctx.lineWidth = t.width;
+    ctx.beginPath();
+    ctx.moveTo(t.start.x, t.start.y);
+    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+    ctx.stroke();
+
+    // C. Deep inner shading line (thin, very dark)
+    ctx.strokeStyle = '#3d1f0a';
+    ctx.lineWidth = t.width * 0.4;
+    ctx.beginPath();
+    ctx.moveTo(t.start.x, t.start.y);
+    ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+    ctx.stroke();
+  });
+  ctx.restore();
+
   ctx.fillStyle = baseGrad;
   ctx.beginPath();
   ctx.ellipse(bCenterX, bCenterY, 80, 70, 0, 0, Math.PI * 2);
   ctx.fill();
+
   // Breathing effect: slight colour oscillation
   const breath = Math.sin(timestamp * 0.001) * 0.05;
   ctx.fillStyle = `rgba(${58 + breath * 10}, ${31 + breath * 8}, ${10 + breath * 5}, 1)`;
@@ -539,24 +625,44 @@ export const drawMap = (
     ctx.fillRect(px, py, 1.8, 1.8);
   }
 
-  // G. Three Pairs of Blinking Glowing Red Eyes deep inside central cave
+  // G. Three Pairs of Blinking Glowing Amber Eyes deep inside central cave (Mockup Match)
   const isBlinking = (timestamp % 6000) < 180;
   if (!isBlinking) {
-    ctx.fillStyle = '#ef4444';
-    ctx.shadowColor = '#ff0000';
+    ctx.save();
+    ctx.fillStyle = '#ff9f1c'; // Beautiful glowing amber/orange eyes
+    ctx.shadowColor = '#ff6b00';
     ctx.shadowBlur = 8;
 
-    // Pair 1 (Left of center cave)
+    const drawEyePair = (ex: number, ey: number) => {
+      // Left eye of the pair (tilted)
+      ctx.beginPath();
+      ctx.ellipse(ex - 5, ey, 3.5, 2.0, -Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ex - 5, ey, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ff9f1c';
+
+      // Right eye of the pair (tilted)
+      ctx.beginPath();
+      ctx.ellipse(ex + 5, ey, 3.5, 2.0, Math.PI / 6, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(ex + 5, ey, 0.8, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ff9f1c';
+    };
+
     // Pair 1 (Left side)
-    ctx.beginPath(); ctx.arc(bCenterX - 22, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bCenterX - 12, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
-    // Pair 2 (Right side)
-    ctx.beginPath(); ctx.arc(bCenterX + 12, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
-    ctx.beginPath(); ctx.arc(bCenterX + 22, bCenterY + 8, 2.5, 0, Math.PI * 2); ctx.fill();
+    drawEyePair(bCenterX - 22, bCenterY + 8);
+    // Pair 2 (Center-top side)
+    drawEyePair(bCenterX, bCenterY - 2);
+    // Pair 3 (Right side)
+    drawEyePair(bCenterX + 22, bCenterY + 8);
 
-
-
-    ctx.shadowBlur = 0; // reset
+    ctx.restore();
   }
 
   // H. Thick exposed gnarled tree roots wrapping the opening
@@ -647,10 +753,10 @@ export const drawMap = (
 
 
   // ==========================================
-  // 5. CASA DE TORTI (1x1 - col 17, row 13)
+  // 5. CASA DE TORTI (1x1 - col 18, row 13)
   // Rustic cabin house matching mockup
   // ==========================================
-  const bx = 17 * TILE;
+  const bx = 18 * TILE;
   const by = 13 * TILE;
 
   // Draw base floor first

@@ -5,7 +5,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { GameState, LevelPhase, Player, Enemy, TileType, GridPos, Position } from '../types';
-import { COLS, ROWS, TILE, T_WALL, T_ICE, T_EMPTY } from '../constants';
+import { COLS, ROWS, TILE, T_WALL, T_BUSH, T_EMPTY } from '../constants';
 
 interface UsePlayerInputProps {
   gameState: GameState;
@@ -53,9 +53,9 @@ export const usePlayerInput = ({
     return mapRef.current[row]?.[col] === T_WALL;
   };
 
-  const isIce = (col: number, row: number) => {
+  const isBush = (col: number, row: number) => {
     if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-    return mapRef.current[row]?.[col] === T_ICE;
+    return mapRef.current[row]?.[col] === T_BUSH;
   };
 
   const isEmpty = (col: number, row: number) => {
@@ -63,7 +63,7 @@ export const usePlayerInput = ({
     return mapRef.current[row]?.[col] === T_EMPTY;
   };
 
-  const useIcePower = (action: 'create' | 'break') => {
+  const useBushPower = (action: 'create' | 'break') => {
     const player = playerRef.current;
     if (player.powerCooldown > 0) return;
     if (player.moving) return; // Prevent bugs mid-motion
@@ -87,7 +87,7 @@ export const usePlayerInput = ({
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
         if (isWall(currentCc, currentCr)) break;
 
-        if (isIce(currentCc, currentCr)) {
+        if (isBush(currentCc, currentCr)) {
           // Check ready frame for individual tiles
           const readyFrame = tileReadyRef.current[currentCr]?.[currentCc] ?? 0;
           if (readyFrame <= frameCountRef.current) {
@@ -103,8 +103,8 @@ export const usePlayerInput = ({
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        player.powerCooldown = 54; // 54 frames cooldown (matches animation)
-        player.breakingAnimTimer = 54; // 54 frames of break animation
+        player.powerCooldown = 72; // 72 frames cooldown (matches animation)
+        player.breakingAnimTimer = 72; // 72 frames of break animation
       }
     } else if (action === 'create') {
       plantingTilesRef.current = [];
@@ -122,7 +122,7 @@ export const usePlayerInput = ({
         const isScheduled = scheduledPlantsRef.current.some(p => p.col === currentCc && p.row === currentCr);
 
         // Check blockage
-        if (isWall(currentCc, currentCr) || isIce(currentCc, currentCr) || hasPlayer || enemyAtCurrent || isScheduled) {
+        if (isWall(currentCc, currentCr) || isBush(currentCc, currentCr) || hasPlayer || enemyAtCurrent || isScheduled) {
           break;
         }
 
@@ -146,8 +146,8 @@ export const usePlayerInput = ({
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        player.powerCooldown = 54; // 54 frames cooldown (matches animation)
-        player.plantingAnimTimer = 54; // 54 ticks duration for planting animation
+        player.powerCooldown = 72; // 72 frames cooldown (matches animation)
+        player.plantingAnimTimer = 72; // 72 ticks duration for planting animation
       }
     }
   };
@@ -171,13 +171,13 @@ export const usePlayerInput = ({
     if (targetCol <= 0 || targetCol >= COLS - 1 || targetRow <= 0 || targetRow >= ROWS - 1) return;
     if (isWall(targetCol, targetRow)) return;
 
-    if (isIce(targetCol, targetRow)) {
+    if (isBush(targetCol, targetRow)) {
       const readyFrame = tileReadyRef.current[targetRow]?.[targetCol] ?? 0;
       if (readyFrame <= frameCountRef.current) {
-        useIcePower('break');
+        useBushPower('break');
       }
     } else if (isEmpty(targetCol, targetRow)) {
-      useIcePower('create');
+      useBushPower('create');
     }
   };
 
@@ -256,7 +256,7 @@ export const usePlayerInput = ({
     lastDirRef,
     turnBlockedRef,
     triggerAction,
-    useIcePower,
+    useBushPower,
     getPowerCount,
   };
 };

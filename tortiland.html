@@ -138,7 +138,7 @@
     const ctx = canvas.getContext('2d');
 
     // Tipos de tile
-    const T_EMPTY = 0, T_WALL = 1, T_ICE = 2, T_BURROW = 3;
+    const T_EMPTY = 0, T_WALL = 1, T_BUSH = 2, T_BURROW = 3;
 
     // ============================================================
     // MAPA BASE — paredes interiores fijas (laberinto tipo arcade)
@@ -183,7 +183,7 @@
       ];
       innerWalls.forEach(([r, c]) => {
         const isBossBurrow = r >= 5 && r <= 9 && c >= 8 && c <= 12;
-        if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) m[r][c] = T_ICE;
+        if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) m[r][c] = T_BUSH;
       });
       return m;
     }
@@ -209,15 +209,15 @@
       awaitingBurrow = false;
       map = buildBaseMap();
 
-      // Initialize Torti's House (T_BURROW) in cell col 17, row 13
-      map[13][17] = T_BURROW;
+      // Initialize Torti's House (T_BURROW) in cell col 18, row 13
+      map[13][18] = T_BURROW;
 
-      // Bloques de hielo iniciales (6-8 distribuidos)
-      const icePositions = [
-        [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11], [13, 17]
+      // Bloques de arbusto iniciales (6-8 distribuidos)
+      const bushPositions = [
+        [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11], [13, 18]
       ];
-      icePositions.forEach(([r, c]) => {
-        if (map[r][c] === T_EMPTY) map[r][c] = T_ICE;
+      bushPositions.forEach(([r, c]) => {
+        if (map[r][c] === T_EMPTY) map[r][c] = T_BUSH;
       });
 
       // Jugador — empieza en esquina libre
@@ -292,14 +292,14 @@
       if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
       return map[row][col] === T_WALL;
     }
-    function isIce(col, row) {
+    function isBush(col, row) {
       if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return false;
-      return map[row][col] === T_ICE;
+      return map[row][col] === T_BUSH;
     }
     function isSolid(col, row, ghostMode, isPlayer) {
       if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
       if (map[row][col] === T_WALL) return true;
-      if (map[row][col] === T_ICE) {
+      if (map[row][col] === T_BUSH) {
         if (ghostMode) return false;                                      // ghost atraviesa pasto
         if (isPlayer && player && player.goldenBroccoliTimer > 0) return false; // buff exclusivo
         return true;
@@ -323,7 +323,7 @@
         if (map[r][c] !== T_EMPTY) continue;
 
         // Excluir casa de Torti (1x1)
-        if (c === 17 && r === 13) continue;
+        if (c === 18 && r === 13) continue;
 
         // Excluir fortaleza del jefe (4x4)
         if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
@@ -384,12 +384,12 @@
       // Crear pasto (Espacio)
       if (e.code === 'Space' && gameState === 'playing') {
         e.preventDefault();
-        useIcePower('create');
+        useBushPower('create');
       }
       // Quitar pasto (Tab)
       if (e.code === 'Tab' && gameState === 'playing') {
         e.preventDefault();
-        useIcePower('break');
+        useBushPower('break');
       }
       if ((e.code === 'Space' || e.code === 'Tab') && gameState !== 'playing') e.preventDefault();
     });
@@ -409,9 +409,9 @@
     }
 
     // ============================================================
-    // MECÁNICA DE HIELO — Crear o destruir delante del jugador
+    // MECÁNICA DE ARBUSTO — Crear o destruir delante del jugador
     // ============================================================
-    function useIcePower(action) {
+    function useBushPower(action) {
       if (player.powerCooldown > 0) return;
       if (player.moving) return; // Bloquear uso del poder mientras el jugador está en movimiento (evita bugs de colisión)
 
@@ -434,7 +434,7 @@
           if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
           if (isWall(currentCc, currentCr)) break;
 
-          if (isIce(currentCc, currentCr)) {
+          if (isBush(currentCc, currentCr)) {
             map[currentCr][currentCc] = T_EMPTY;
             actionExecuted = true;
           } else {
@@ -455,12 +455,12 @@
           const hasEnemy = enemies.some(e => e.col === currentCc && e.row === currentCr);
 
           // Si choca con un obstáculo, detiene la creación inmediatamente
-          if (isWall(currentCc, currentCr) || isIce(currentCc, currentCr) || hasPlayer || hasEnemy) {
+          if (isWall(currentCc, currentCr) || isBush(currentCc, currentCr) || hasPlayer || hasEnemy) {
             break;
           }
 
           if (isEmpty(currentCc, currentCr)) {
-            map[currentCr][currentCc] = T_ICE;
+            map[currentCr][currentCc] = T_BUSH;
             actionExecuted = true;
           }
 
@@ -470,7 +470,7 @@
       }
 
       if (actionExecuted) {
-        player.powerCooldown = 50; // Ritmo aún más pausado: cooldown de 50 frames (0.83s)
+        player.powerCooldown = 72; // Ritmo aún más pausado: cooldown de 72 frames (1.2s)
       }
     }
 
@@ -837,30 +837,9 @@
               ctx.fill();
             }
 
-            // Draw small wild moss/shrub leaves overflowing on borders with T_EMPTY
-            const hasLeftEmpty = c > 0 && map[r][c - 1] === 0;
-            const hasRightEmpty = c < COLS - 1 && map[r][c + 1] === 0;
-            const hasUpEmpty = r > 0 && map[r - 1][c] === 0;
-            const hasDownEmpty = r < ROWS - 1 && map[r + 1][c] === 0;
 
-            if (hasLeftEmpty) {
-              drawLeafLocal(x, y + 10, 4, '#2d6a4f', '#1b4332');
-              drawLeafLocal(x - 1, y + 25, 3.5, '#40916c', '#2d6a4f');
-            }
-            if (hasRightEmpty) {
-              drawLeafLocal(x + TILE, y + 15, 3.5, '#2d6a4f', '#1b4332');
-              drawLeafLocal(x + TILE + 1, y + 30, 4, '#40916c', '#2d6a4f');
-            }
-            if (hasUpEmpty) {
-              drawLeafLocal(x + 12, y, 4, '#2d6a4f', '#1b4332');
-              drawLeafLocal(x + 28, y - 1, 3.5, '#40916c', '#2d6a4f');
-            }
-            if (hasDownEmpty) {
-              drawLeafLocal(x + 15, y + TILE, 3.5, '#2d6a4f', '#1b4332');
-              drawLeafLocal(x + 30, y + TILE + 1, 4, '#40916c', '#2d6a4f');
-            }
 
-          } else if (t === T_ICE) {
+          } else if (t === T_BUSH) {
             // Bloque de pasto / hierba denso
             ctx.fillStyle = '#4caf50'; // Pasto base
             ctx.fillRect(x + 1, y + 1, TILE - 2, TILE - 2);
@@ -918,31 +897,146 @@
       ctx.arc(bCenterX, bCenterY, 105, 0, Math.PI * 2);
       ctx.fill();
 
-      // Circular deep mouth of the cave with breathing animation
-      const breath = Math.sin(lastTimestamp * 0.0015);
-      const caveRadius = 60 + breath * 1.5;
-      const caveGrad = ctx.createRadialGradient(
-        bCenterX, bCenterY - 6, 8,
-        bCenterX, bCenterY, caveRadius
-      );
-      const cDeep = breath > 0 ? '#1f1008' : '#2d1a10';
-      caveGrad.addColorStop(0, '#0d0704');
-      caveGrad.addColorStop(0.5, cDeep);
-      caveGrad.addColorStop(1, '#3d261a');
+      // --- Drawing Winding Trenches/Tunnels emerging from the Boss Den (Mockup Match) ---
+      ctx.save();
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
 
-      ctx.fillStyle = caveGrad;
+      const trenches = [
+        // 1. Top-Right Trench (winding up and right)
+        {
+          start: { x: bCenterX + 45, y: bCenterY - 15 },
+          cp1: { x: bCenterX + 70, y: bCenterY - 50 },
+          cp2: { x: bCenterX + 100, y: bCenterY - 80 },
+          end: { x: bCenterX + 140, y: bCenterY - 110 },
+          width: 24
+        },
+        // 2. Left Trench (winding left)
+        {
+          start: { x: bCenterX - 50, y: bCenterY + 30 },
+          cp1: { x: bCenterX - 90, y: bCenterY + 20 },
+          cp2: { x: bCenterX - 130, y: bCenterY + 15 },
+          end: { x: bCenterX - 180, y: bCenterY + 30 },
+          width: 22
+        },
+        // 3. Right Trench (winding right and curving down)
+        {
+          start: { x: bCenterX + 50, y: bCenterY + 30 },
+          cp1: { x: bCenterX + 90, y: bCenterY + 35 },
+          cp2: { x: bCenterX + 120, y: bCenterY + 60 },
+          end: { x: bCenterX + 130, y: bCenterY + 130 },
+          width: 22
+        },
+        // 4. Bottom-Left Trench (winding down and curving left)
+        {
+          start: { x: bCenterX - 10, y: bCenterY + 50 },
+          cp1: { x: bCenterX - 20, y: bCenterY + 100 },
+          cp2: { x: bCenterX - 80, y: bCenterY + 120 },
+          end: { x: bCenterX - 130, y: bCenterY + 110 },
+          width: 20
+        }
+      ];
+
+      trenches.forEach(t => {
+        // A. Outer trench shadow/edge (extra wide, dark)
+        ctx.strokeStyle = '#2d1a0a';
+        ctx.lineWidth = t.width + 4;
+        ctx.beginPath();
+        ctx.moveTo(t.start.x, t.start.y);
+        ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+        ctx.stroke();
+
+        // B. Main trench channel (medium dirt brown)
+        ctx.strokeStyle = '#854c24';
+        ctx.lineWidth = t.width;
+        ctx.beginPath();
+        ctx.moveTo(t.start.x, t.start.y);
+        ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+        ctx.stroke();
+
+        // C. Deep inner shading line (thin, very dark)
+        ctx.strokeStyle = '#3d1f0a';
+        ctx.lineWidth = t.width * 0.4;
+        ctx.beginPath();
+        ctx.moveTo(t.start.x, t.start.y);
+        ctx.bezierCurveTo(t.cp1.x, t.cp1.y, t.cp2.x, t.cp2.y, t.end.x, t.end.y);
+        ctx.stroke();
+      });
+      ctx.restore();
+
+      // Base ellipse with radial gradient simulating depth
+      const baseGrad = ctx.createRadialGradient(
+        bCenterX, bCenterY, 0,
+        bCenterX, bCenterY, 80
+      );
+      baseGrad.addColorStop(0, '#1a0a02');
+      baseGrad.addColorStop(1, '#3d1f0a');
+      ctx.fillStyle = baseGrad;
       ctx.beginPath();
-      ctx.arc(bCenterX, bCenterY, caveRadius, 0, Math.PI * 2);
+      ctx.ellipse(bCenterX, bCenterY, 80, 70, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Outer beveled lip border
-      ctx.strokeStyle = '#4a2e19';
-      ctx.lineWidth = 4.5;
+      // Breathing effect: slight colour oscillation
+      const breath = Math.sin(lastTimestamp * 0.001) * 0.05;
+      ctx.fillStyle = `rgba(${58 + breath * 10}, ${31 + breath * 8}, ${10 + breath * 5}, 1)`;
       ctx.beginPath();
-      ctx.arc(bCenterX, bCenterY, caveRadius + 2, 0, Math.PI * 2);
+      ctx.ellipse(bCenterX, bCenterY, 78, 68, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // A. Main Tree Stump organic body in wood brown with bark shape flare
+      ctx.fillStyle = '#8B5A2B';
+      ctx.beginPath();
+      ctx.moveTo(bCenterX - 75, bCenterY + 60); // bottom left root flare
+      ctx.bezierCurveTo(bCenterX - 60, bCenterY + 20, bCenterX - 50, bCenterY - 45, bCenterX - 30, bCenterY - 50); // left side up
+      ctx.bezierCurveTo(bCenterX - 10, bCenterY - 55, bCenterX + 10, bCenterY - 55, bCenterX + 30, bCenterY - 50); // top cap
+      ctx.bezierCurveTo(bCenterX + 50, bCenterY - 45, bCenterX + 60, bCenterY + 20, bCenterX + 75, bCenterY + 60); // right side down
+      ctx.bezierCurveTo(bCenterX + 45, bCenterY + 60, bCenterX + 25, bCenterY + 50, bCenterX, bCenterY + 55); // bottom center curve
+      ctx.closePath();
+      ctx.fill();
+
+      // Vertical wood grains
+      ctx.strokeStyle = '#5c3a1b';
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      // Left grain
+      ctx.moveTo(bCenterX - 25, bCenterY - 45);
+      ctx.bezierCurveTo(bCenterX - 35, bCenterY - 10, bCenterX - 45, bCenterY + 20, bCenterX - 55, bCenterY + 55);
+      // Center grain
+      ctx.moveTo(bCenterX, bCenterY - 48);
+      ctx.bezierCurveTo(bCenterX + 5, bCenterY - 15, bCenterX - 5, bCenterY + 15, bCenterX - 10, bCenterY + 50);
+      // Right grain
+      ctx.moveTo(bCenterX + 25, bCenterY - 45);
+      ctx.bezierCurveTo(bCenterX + 35, bCenterY - 10, bCenterX + 45, bCenterY + 20, bCenterX + 55, bCenterY + 55);
       ctx.stroke();
 
-      // ZZZ floating effects
+      // B. Left Cave Tunnel opening
+      ctx.fillStyle = '#0a0502'; // deep black
+      ctx.beginPath();
+      ctx.ellipse(bCenterX - 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2d1a0a'; // compressed earth border
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      // C. Right Cave Tunnel opening
+      ctx.fillStyle = '#0a0502';
+      ctx.beginPath();
+      ctx.ellipse(bCenterX + 50, bCenterY + 30, 12, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2d1a0a';
+      ctx.lineWidth = 3.5;
+      ctx.stroke();
+
+      // D. Central Cave entrance opening
+      ctx.fillStyle = '#0a0502';
+      ctx.beginPath();
+      ctx.ellipse(bCenterX, bCenterY + 45, 35, 20, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#2d1a0a';
+      ctx.lineWidth = 4.5;
+      ctx.stroke();
+
+      // E. ZZZ floating sleeping effects
       for (let i = 0; i < 3; i++) {
         const tZ = (lastTimestamp * 0.0008 + i * 0.65) % 2.0;
         const alpha = 1.0 - (tZ / 2.0);
@@ -955,7 +1049,7 @@
         }
       }
 
-      // Micro dust particles
+      // F. Micro dust particles in the hollow center
       for (let i = 0; i < 8; i++) {
         const phase = (lastTimestamp * 0.0004 + i * 1.5) % 1.0;
         const angle = i * Math.PI * 0.25 + phase * Math.PI * 2;
@@ -966,164 +1060,230 @@
         ctx.fillRect(px, py, 1.8, 1.8);
       }
 
-      // Blinking red eyes
+      // G. Three Pairs of Blinking Glowing Amber Eyes deep inside central cave (Mockup Match)
       const isBlinking = (lastTimestamp % 6000) < 180;
       if (!isBlinking) {
-        ctx.fillStyle = '#ef4444';
-        ctx.shadowColor = '#ff0000';
+        ctx.save();
+        ctx.fillStyle = '#ff9f1c'; // Glowing amber/orange eyes
+        ctx.shadowColor = '#ff6b00';
         ctx.shadowBlur = 8;
-        ctx.beginPath(); ctx.arc(bCenterX - 8, bCenterY - 12, 2.8, 0, Math.PI * 2); ctx.fill();
-        ctx.beginPath(); ctx.arc(bCenterX + 8, bCenterY - 12, 2.8, 0, Math.PI * 2); ctx.fill();
-        ctx.shadowBlur = 0;
+
+        const drawEyePair = (ex, ey) => {
+          // Left eye of the pair (tilted)
+          ctx.beginPath();
+          ctx.ellipse(ex - 5, ey, 3.5, 2.0, -Math.PI / 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(ex - 5, ey, 0.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ff9f1c';
+
+          // Right eye of the pair (tilted)
+          ctx.beginPath();
+          ctx.ellipse(ex + 5, ey, 3.5, 2.0, Math.PI / 6, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(ex + 5, ey, 0.8, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = '#ff9f1c';
+        };
+
+        // Pair 1 (Left side)
+        drawEyePair(bCenterX - 22, bCenterY + 8);
+        // Pair 2 (Center-top side)
+        drawEyePair(bCenterX, bCenterY - 2);
+        // Pair 3 (Right side)
+        drawEyePair(bCenterX + 22, bCenterY + 8);
+
+        ctx.restore();
       }
 
-      // Crossed stone bones
-      ctx.strokeStyle = '#8e8680';
-      ctx.lineWidth = 3.5;
+      // H. Thick exposed gnarled tree roots wrapping the opening
+      ctx.strokeStyle = '#5c3a1b';
       ctx.lineCap = 'round';
-      const hx = bCenterX;
-      const hy = bCenterY + 35;
+
+      // Left gnarled root
+      ctx.lineWidth = 6;
       ctx.beginPath();
-      ctx.moveTo(hx - 18, hy - 6); ctx.lineTo(hx + 18, hy + 6);
+      ctx.moveTo(bCenterX - 15, bCenterY - 10);
+      ctx.bezierCurveTo(bCenterX - 35, bCenterY + 10, bCenterX - 40, bCenterY + 30, bCenterX - 38, bCenterY + 50);
       ctx.stroke();
+      // Root highlight
+      ctx.strokeStyle = '#8B5A2B';
+      ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.moveTo(hx - 18, hy + 6); ctx.lineTo(hx + 18, hy - 6);
+      ctx.moveTo(bCenterX - 20, bCenterY - 5);
+      ctx.bezierCurveTo(bCenterX - 30, bCenterY + 12, bCenterX - 35, bCenterY + 28, bCenterX - 33, bCenterY + 45);
       ctx.stroke();
-      ctx.fillStyle = '#8e8680';
+
+      // Right gnarled root
+      ctx.strokeStyle = '#5c3a1b';
+      ctx.lineWidth = 6;
       ctx.beginPath();
-      ctx.arc(hx - 18, hy - 6, 3.0, 0, Math.PI * 2); ctx.arc(hx - 18, hy - 4, 3.0, 0, Math.PI * 2);
-      ctx.arc(hx + 18, hy + 6, 3.0, 0, Math.PI * 2); ctx.arc(hx + 18, hy + 4, 3.0, 0, Math.PI * 2);
-      ctx.arc(hx - 18, hy + 6, 3.0, 0, Math.PI * 2); ctx.arc(hx - 18, hy - 4, 3.0, 0, Math.PI * 2);
-      ctx.arc(hx + 18, hy - 6, 3.0, 0, Math.PI * 2); ctx.arc(hx + 18, hy - 4, 3.0, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(bCenterX + 15, bCenterY - 10);
+      ctx.bezierCurveTo(bCenterX + 35, bCenterY + 10, bCenterX + 40, bCenterY + 30, bCenterX + 38, bCenterY + 50);
+      ctx.stroke();
+      // Root highlight
+      ctx.strokeStyle = '#8B5A2B';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(bCenterX + 20, bCenterY - 5);
+      ctx.bezierCurveTo(bCenterX + 30, bCenterY + 12, bCenterX + 35, bCenterY + 28, bCenterX + 33, bCenterY + 45);
+      ctx.stroke();
+
+      // Crawling top root
+      ctx.strokeStyle = '#5c3a1b';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.moveTo(bCenterX - 25, bCenterY - 30);
+      ctx.bezierCurveTo(bCenterX - 55, bCenterY - 20, bCenterX - 65, bCenterY + 10, bCenterX - 72, bCenterY + 25);
+      ctx.stroke();
+
+      // I. Round Grey Stones scattered around the base roots
+      const drawRock = (rx, ry, rSize) => {
+        ctx.fillStyle = '#9e9a96';
+        ctx.strokeStyle = '#6e6a66';
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.arc(rx - rSize * 0.3, ry - rSize * 0.3, rSize * 0.15, 0, Math.PI * 2);
+        ctx.stroke();
+
+        ctx.strokeStyle = '#ffffff';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(rx, ry, rSize * 0.85, Math.PI, Math.PI * 1.8, false);
+        ctx.stroke();
+      };
+
+      drawRock(bCenterX - 35, bCenterY + 45, 8);
+      drawRock(bCenterX + 35, bCenterY + 46, 7);
+      drawRock(bCenterX - 62, bCenterY + 25, 9);
+      drawRock(bCenterX + 62, bCenterY + 32, 8);
+      drawRock(bCenterX - 15, bCenterY + 52, 6);
+      drawRock(bCenterX + 18, bCenterY + 52, 6.5);
+
+      // J. Centered label
+      ctx.save();
+      ctx.fillStyle = '#fed7aa';
+      ctx.globalAlpha = 0.6;
+      ctx.font = 'bold 9px monospace';
+      ctx.textAlign = 'center';
+      ctx.shadowColor = '#000000';
+      ctx.shadowBlur = 4;
+      ctx.fillText('Boss Den (Dormant)', bCenterX, bCenterY + 68);
+      ctx.restore();
 
       // ==========================================
-      // CASA DE TORTI (1x1 - col 17, row 13)
+      // CASA DE TORTI (1x1 - col 18, row 13)
       // ==========================================
-      const bx = 17 * TILE;
+      const bx = 18 * TILE;
       const by = 13 * TILE;
 
       // Draw base floor first
-      ctx.fillStyle = (13 + 17) % 2 === 0 ? COLORS.floor : COLORS.floorAlt;
+      ctx.fillStyle = (13 + 18) % 2 === 0 ? COLORS.floor : COLORS.floorAlt;
       ctx.fillRect(bx, by, TILE, TILE);
 
-      // A. Marco de contorno oscuro y firme delimitando la celda completa
-      ctx.strokeStyle = '#2d1a10';
-      ctx.lineWidth = 2.0;
-      ctx.strokeRect(bx, by, TILE, TILE);
-
-      // B. Parte inferior: troncos horizontales apilados color #8B5A2B
-      ctx.fillStyle = '#8B5A2B';
-      ctx.fillRect(bx, by + 16, TILE, 24);
-
-      ctx.strokeStyle = '#5c3a1b';
-      ctx.lineWidth = 1.0;
-      for (let i = 0; i < 3; i++) {
-        const ty = by + 16 + i * 8;
-        ctx.beginPath();
-        ctx.moveTo(bx, ty);
-        ctx.lineTo(bx + TILE, ty);
-        ctx.stroke();
-
-        // Sombra cilíndrica para dar volumen 2.5D
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)';
-        ctx.fillRect(bx, ty + 5, TILE, 3);
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.15)';
-        ctx.fillRect(bx, ty + 1, TILE, 2);
-      }
-
-      // C. Parte superior: tejado inclinado que sobresale ligeramente del grid (hojas superpuestas)
-      ctx.fillStyle = '#2e7d32'; // dark green tejas base
+      // A. Earthen green dome mound cover
+      ctx.fillStyle = '#2e7d32'; // dark green base
       ctx.beginPath();
-      ctx.moveTo(bx - 3, by + 18);
-      ctx.lineTo(bx + TILE / 2, by - 4);
-      ctx.lineTo(bx + TILE + 3, by + 18);
-      ctx.closePath();
+      ctx.ellipse(bx + 20, by + 22, 21, 19, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.fillStyle = '#4caf50'; // light green layers
-      for (let row = 0; row < 3; row++) {
-        const rowY = by + 14 - row * 6;
-        const rowWidth = TILE - row * 10;
-        const rowX = bx + (TILE - rowWidth) / 2;
-        const leafCount = 4 - row;
-        const leafW = rowWidth / leafCount;
-        
-        for (let j = 0; j < leafCount; j++) {
-          const lx = rowX + j * leafW;
-          ctx.beginPath();
-          ctx.arc(lx + leafW / 2, rowY + 3, leafW / 2, 0, Math.PI, false);
-          ctx.fill();
-        }
-      }
+      ctx.fillStyle = '#4caf50'; // light green cap
+      ctx.beginPath();
+      ctx.ellipse(bx + 20, by + 16, 17, 12, 0, 0, Math.PI * 2);
+      ctx.fill();
 
-      // D. Puerta arqueada de madera centrada en la celda
-      const doorX = bx + 14;
-      const doorY = by + 22;
-      const doorW = 12;
-      const doorH = 18;
+      // B. Exposed stone arch/pebbles border surrounding the cave mouth
+      const drawMiniRock = (mx, my, mr) => {
+        ctx.fillStyle = '#8e8680';
+        ctx.strokeStyle = '#5a5450';
+        ctx.lineWidth = 0.8;
+        ctx.beginPath();
+        ctx.arc(mx, my, mr, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      };
+
+      drawMiniRock(bx + 9, by + 30, 4);
+      drawMiniRock(bx + 31, by + 30, 4);
+      drawMiniRock(bx + 11, by + 18, 3.5);
+      drawMiniRock(bx + 29, by + 18, 3.5);
+      drawMiniRock(bx + 20, by + 13, 3);
+
+      // C. Cave mouth opening (Lower center circular entrance)
+      const caveMouthX = bx + 20;
+      const caveMouthY = by + 26;
+      const caveMouthR = 9;
 
       const escapeActive = levelPhase === 'oranges' && fruits.filter(f => f.type === 4).length === 0;
       if (escapeActive) {
-        // Puerta abierta con luz amarilla interior nítida saliendo del interior
+        // Glowing active entrance (open and shining yellow/gold)
         ctx.fillStyle = '#ffeb3b';
         ctx.beginPath();
-        ctx.moveTo(doorX, doorY + doorH);
-        ctx.lineTo(doorX, doorY + 6);
-        ctx.arc(doorX + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
-        ctx.lineTo(doorX + doorW, doorY + doorH);
-        ctx.closePath();
+        ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
         ctx.fill();
 
-        // Dibujar la puerta arqueada entreabierta flotando desplazada
-        ctx.fillStyle = '#5c3a1b';
-        ctx.beginPath();
-        ctx.moveTo(doorX + 4, doorY + doorH);
-        ctx.lineTo(doorX + 4, doorY + 6);
-        ctx.arc(doorX + 4 + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
-        ctx.lineTo(doorX + 4 + doorW, doorY + doorH);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#2d1a10';
-        ctx.lineWidth = 1;
-        ctx.stroke();
-
-        // Pomo dorado brillante
-        ctx.fillStyle = '#ffd700';
-        ctx.beginPath();
-        ctx.arc(doorX + 6, doorY + doorH / 2 + 1, 1.5, 0, Math.PI * 2);
-        ctx.fill();
-
-        // Halo dorado pulsante exterior
-        const goldPulse = Math.sin(lastTimestamp * 0.005) * 8 + 12;
+        // Golden outer halo
+        const goldPulse = Math.sin(lastTimestamp * 0.005) * 6 + 10;
         ctx.strokeStyle = `rgba(255, 215, 0, ${0.4 + Math.sin(lastTimestamp * 0.005) * 0.2})`;
-        ctx.lineWidth = 2.5;
+        ctx.lineWidth = 2.0;
         ctx.shadowColor = '#ffd700';
         ctx.shadowBlur = goldPulse;
-        ctx.strokeRect(bx - 2, by - 2, TILE + 4, TILE + 4);
-        ctx.shadowBlur = 0; // reset
-      } else {
-        // Puerta cerrada de madera arqueada
-        ctx.fillStyle = '#5c3a1b';
         ctx.beginPath();
-        ctx.moveTo(doorX, doorY + doorH);
-        ctx.lineTo(doorX, doorY + 6);
-        ctx.arc(doorX + doorW / 2, doorY + 6, doorW / 2, Math.PI, 0, false);
-        ctx.lineTo(doorX + doorW, doorY + doorH);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.strokeStyle = '#2d1a10';
-        ctx.lineWidth = 1.0;
+        ctx.arc(caveMouthX, caveMouthY, caveMouthR + 2, 0, Math.PI * 2);
         ctx.stroke();
+        ctx.shadowBlur = 0; // reset
 
-        // Pomo dorado de metal brillante
+        // God rays
+        ctx.strokeStyle = 'rgba(255, 235, 59, 0.15)';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
+        ctx.lineTo(caveMouthX, caveMouthY - caveMouthR - 20);
+        ctx.moveTo(caveMouthX, caveMouthY - caveMouthR);
+        ctx.lineTo(caveMouthX + 12, caveMouthY - caveMouthR - 10);
+        ctx.stroke();
+      } else {
+        // Dark dormant entrance (door closed)
+        ctx.fillStyle = '#0d0704';
+        ctx.beginPath();
+        ctx.arc(caveMouthX, caveMouthY, caveMouthR, 0, Math.PI * 2);
+        ctx.fill();
+        // Door knob
         ctx.fillStyle = '#ffd700';
         ctx.beginPath();
-        ctx.arc(doorX + 2, doorY + doorH / 2 + 1, 1.5, 0, Math.PI * 2);
+        ctx.arc(caveMouthX + 4, caveMouthY, 2, 0, Math.PI * 2);
         ctx.fill();
       }
+
+      // D. Cute green sprouts/blades growing on top of the dome
+      ctx.strokeStyle = '#acf2ad';
+      ctx.lineWidth = 1.5;
+      // Blade 1
+      ctx.beginPath();
+      ctx.moveTo(bx + 16, by + 6);
+      ctx.quadraticCurveTo(bx + 13, by + 1, bx + 10, by + 2);
+      ctx.stroke();
+      // Blade 2
+      ctx.beginPath();
+      ctx.moveTo(bx + 24, by + 6);
+      ctx.quadraticCurveTo(bx + 27, by + 1, bx + 30, by + 2);
+      ctx.stroke();
+
+      // E. Cell outer boundary frame
+      ctx.strokeStyle = '#2d1a0a';
+      ctx.lineWidth = 2.0;
+      ctx.strokeRect(bx, by, TILE, TILE);
     }
 
     function drawFruits(t) {
@@ -1133,7 +1293,7 @@
         const bob = Math.sin(t * 0.003 + f.anim) * 3;
         const yBob = py + bob;
 
-        const isCovered = map[f.row][f.col] === T_ICE;
+        const isCovered = map[f.row][f.col] === T_BUSH;
 
         ctx.save();
 
@@ -1618,8 +1778,8 @@
       for (let r = 0; r < ROWS; r++) {
         for (let c = 0; c < COLS; c++) {
           if (prevMap[r][c] !== map[r][c]) {
-            if (map[r][c] === T_ICE) spawnParticles(c, r, '#81c784');
-            else if (prevMap[r][c] === T_ICE) spawnParticles(c, r, '#a7c957');
+            if (map[r][c] === T_BUSH) spawnParticles(c, r, '#81c784');
+            else if (prevMap[r][c] === T_BUSH) spawnParticles(c, r, '#a7c957');
           }
         }
       }
