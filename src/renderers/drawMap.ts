@@ -457,367 +457,892 @@ export const drawMap = (
     }
   }
 
-  // ==========================================
-  // 4. MADRIGUERA DEL JEFE (4x4 - Center: col 8-11, row 5-8)
-  // Pixel art isométrico de alta calidad: montículo de tierra multi‑nivel, asimétrico, con raíces secas y retorcidas, rocas grises y musgo verde apagado.
-  // Detalles: nivel superior con túneles laterales y entrada central arqueada con tres pares de ojos rojos; niveles medios con rampas y al menos siete entradas de túneles; base sólida con dos grandes entradas frontales conectadas por rampas.
-  // Texto UI: dos líneas pixeladas centradas "Boss Den (Dormant)" (línea inferior ligeramente más grande), fondo marrón‑ocre uniforme y un ícono de brillo en esquina inferior derecha.
-  // ==========================================
-  const bossX = 8 * TILE;
-  const bossY = 5 * TILE;
-  const bCenterX = bossX + (TILE * 2);
-  const bCenterY = bossY + (TILE * 2);
+  // ─ Boss Den: columnas 8–11, filas 5–8 (4×4) ─
+  drawBossDen(ctx, 8 * TILE, 5 * TILE, timestamp);
 
+  // ─ Turtle Shrine: columna 18, fila 13 (1×2) ─
+  drawTurtleShrine(ctx, 18 * TILE, 12 * TILE, timestamp, escapeActive);
+};
+
+// ─── Utility helpers ─────────────────────────────────────────────
+function lerpColor(a: string, b: string, t: number): string {
+  const h = (s: string) => parseInt(s, 16);
+  const r1 = h(a.slice(1, 3)), g1 = h(a.slice(3, 5)), b1 = h(a.slice(5, 7));
+  const r2 = h(b.slice(1, 3)), g2 = h(b.slice(3, 5)), b2 = h(b.slice(5, 7));
+  const ri = Math.round(r1 + (r2 - r1) * t);
+  const gi = Math.round(g1 + (g2 - g1) * t);
+  const bi = Math.round(b1 + (b2 - b1) * t);
+  return `rgb(${ri},${gi},${bi})`;
+}
+
+// ==========================================
+// 3. BOSS DEN
+// Montículo de tierra multi-nivel, asimétrico.
+// Ocupa cuadrícula 4×4 (col 0–3, row 0–3).
+// Detalle máximo: entrada central con arco de raíces, 7+ entradas
+// de túnel, 3 pares de ojos acechando, ZZZ durmientes.
+// ==========================================
+function drawBossDen(
+  ctx: CanvasRenderingContext2D,
+  ox: number,
+  oy: number,
+  timestamp: number
+) {
   ctx.save();
 
-  // --- 1. Sombra base difuminada (Ocupa el espacio central) ---
-  ctx.fillStyle = 'rgba(20, 8, 2, 0.55)';
+  const W = TILE * 4; // 160px
+  const H = TILE * 4; // 160px
+  const cx = ox + W / 2;
+  const cy = oy + H / 2 + 8;
+
+  // ── 1. Sombra suelo difuminada ─────────────────────────────────
+  const shadowGrad = ctx.createRadialGradient(cx, cy + 55, 5, cx, cy + 55, 90);
+  shadowGrad.addColorStop(0, "rgba(10,4,0,0.65)");
+  shadowGrad.addColorStop(1, "rgba(10,4,0,0)");
+  ctx.fillStyle = shadowGrad;
   ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY + 15, 105, 65, 0, 0, Math.PI * 2);
+  ctx.ellipse(cx, cy + 55, 90, 28, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // --- 2. Lista de Raíces con Curvatura Bézier Fiel al Prototipo ---
-  ctx.lineCap = 'round';
-  ctx.lineJoin = 'round';
+  // ── 2. Función: dibujar un bloque de tierra isométrico ─────────
+  // iso top face + side face right + side face left
+  const drawEarthBlock = (
+    bx: number,
+    by: number,
+    bw: number,
+    bh: number,
+    depth: number,
+    colorTop: string,
+    colorRight: string,
+    colorLeft: string
+  ) => {
+    // Top face (parallelogram isométrico simplificado = rect con leve skew)
+    ctx.fillStyle = colorTop;
+    ctx.beginPath();
+    ctx.moveTo(bx, by);
+    ctx.lineTo(bx + bw, by);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.lineTo(bx, by + bh);
+    ctx.closePath();
+    ctx.fill();
 
-  const fixedRoots = [
-    // Raíz 1: Superior Derecha (Sinuosa, esquiva arbustos, se angosta en la punta)
-    {
-      start: { x: bCenterX + 35, y: bCenterY - 15 },
-      cp1: { x: bCenterX + 60, y: bCenterY - 55 },
-      cp2: { x: bCenterX + 95, y: bCenterY - 75 },
-      end: { x: bCenterX + 122, y: bCenterY - 110 },
-      maxWidth: 32,
-      minWidth: 14,
-      isTextured: true
-    },
-    // Raíz 2: Lateral Derecha (Curva cerrada en forma de Gancho)
-    {
-      start: { x: bCenterX + 40, y: bCenterY + 15 },
-      cp1: { x: bCenterX + 95, y: bCenterY + 15 },
-      cp2: { x: bCenterX + 130, y: bCenterY + 45 },
-      end: { x: bCenterX + 115, y: bCenterY + 80 },
-      maxWidth: 28,
-      minWidth: 16,
-      isTextured: false
-    },
-    // Raíz 3: Inferior Central (Zanja sinuosa vertical)
-    {
-      start: { x: bCenterX, y: bCenterY + 30 },
-      cp1: { x: bCenterX + 5, y: bCenterY + 65 },
-      cp2: { x: bCenterX - 10, y: bCenterY + 90 },
-      end: { x: bCenterX - 2, y: bCenterY + 115 },
-      maxWidth: 32,
-      minWidth: 18,
-      isMouth: true
-    },
-    // Raíz 4: Inferior Izquierda (Cueva con curva dinámica hacia abajo)
-    {
-      start: { x: bCenterX - 35, y: bCenterY + 15 },
-      cp1: { x: bCenterX - 75, y: bCenterY + 55 },
-      cp2: { x: bCenterX - 95, y: bCenterY + 75 },
-      end: { x: bCenterX - 118, y: bCenterY + 95 },
-      maxWidth: 30,
-      minWidth: 18,
-      isTunnelArch: true
-    },
-    // Raíz 5: Lateral Izquierda (Brazo robusto horizontal)
-    {
-      start: { x: bCenterX - 40, y: bCenterY - 5 },
-      cp1: { x: bCenterX - 70, y: bCenterY - 10 },
-      cp2: { x: bCenterX - 90, y: bCenterY + 2 },
-      end: { x: bCenterX - 110, y: bCenterY + 5 },
-      maxWidth: 32,
-      minWidth: 22,
-      isTextured: false
-    }
+    // Right face (depth hacia abajo-derecha)
+    ctx.fillStyle = colorRight;
+    ctx.beginPath();
+    ctx.moveTo(bx + bw, by);
+    ctx.lineTo(bx + bw + depth * 0.6, by + depth * 0.5);
+    ctx.lineTo(bx + bw + depth * 0.6, by + bh + depth * 0.5);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.closePath();
+    ctx.fill();
+
+    // Left face (depth hacia abajo-izquierda, más oscura)
+    ctx.fillStyle = colorLeft;
+    ctx.beginPath();
+    ctx.moveTo(bx, by + bh);
+    ctx.lineTo(bx + depth * 0.6, by + bh + depth * 0.5);
+    ctx.lineTo(bx + bw + depth * 0.6, by + bh + depth * 0.5);
+    ctx.lineTo(bx + bw, by + bh);
+    ctx.closePath();
+    ctx.fill();
+
+    // Borde superior sutil
+    ctx.strokeStyle = "rgba(0,0,0,0.35)";
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(bx, by, bw, bh);
+  };
+
+  // ── 3. BASE DEL MONTÍCULO (nivel 0, el más ancho) ─────────────
+  // Forma irregular usando path
+  const baseColor = "#7a5230";
+  const baseShadow = "#4a2e10";
+  const baseLight = "#9c6a3a";
+
+  // Contorno principal del montículo – forma asimétrica
+  const moundPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx - 72, cy + 48);      // esquina inf izq
+    ctx.lineTo(cx - 80, cy + 20);      // sube lado izq
+    ctx.lineTo(cx - 65, cy - 5);
+    ctx.lineTo(cx - 48, cy - 28);      // hombro izq
+    ctx.lineTo(cx - 22, cy - 52);      // nivel superior izq
+    ctx.lineTo(cx + 5, cy - 62);      // cima central
+    ctx.lineTo(cx + 30, cy - 50);      // nivel superior der
+    ctx.lineTo(cx + 52, cy - 22);      // hombro der
+    ctx.lineTo(cx + 70, cy + 0);
+    ctx.lineTo(cx + 78, cy + 22);      // sube lado der
+    ctx.lineTo(cx + 72, cy + 48);      // esquina inf der
+    ctx.closePath();
+  };
+
+  // Relleno base con gradiente de tierra
+  const earthGrad = ctx.createLinearGradient(cx - 80, cy - 62, cx + 78, cy + 48);
+  earthGrad.addColorStop(0, "#9c6a3a");
+  earthGrad.addColorStop(0.4, "#7a5230");
+  earthGrad.addColorStop(1, "#4a2e10");
+  moundPath();
+  ctx.fillStyle = earthGrad;
+  ctx.fill();
+
+  // Borde del montículo
+  moundPath();
+  ctx.strokeStyle = "#2a1500";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ── 4. TEXTURAS DE TIERRA: grietas y variación tonal ──────────
+  ctx.save();
+  moundPath();
+  ctx.clip();
+
+  // Variaciones de color internas (manchas de tierra)
+  const earthPatches = [
+    { x: cx - 55, y: cy + 10, rx: 22, ry: 12, c: "rgba(90,55,25,0.4)" },
+    { x: cx + 30, y: cy + 15, rx: 18, ry: 10, c: "rgba(130,85,45,0.35)" },
+    { x: cx - 20, y: cy - 10, rx: 25, ry: 14, c: "rgba(60,35,12,0.3)" },
+    { x: cx + 10, y: cy + 35, rx: 30, ry: 10, c: "rgba(100,65,30,0.25)" },
+    { x: cx - 45, y: cy + 38, rx: 20, ry: 8, c: "rgba(55,30,10,0.4)" },
+    { x: cx + 50, y: cy + 28, rx: 18, ry: 9, c: "rgba(80,50,20,0.35)" },
   ];
+  earthPatches.forEach(p => {
+    ctx.fillStyle = p.c;
+    ctx.beginPath();
+    ctx.ellipse(p.x, p.y, p.rx, p.ry, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  });
 
-  fixedRoots.forEach(root => {
-    const steps = 20; // Resolution of the curve
-    const sampleBezier = (t) => {
-      const u = 1 - t;
-      return {
-        x: u * u * u * root.start.x + 3 * u * u * t * root.cp1.x + 3 * u * t * t * root.cp2.x + t * t * t * root.end.x,
-        y: u * u * u * root.start.y + 3 * u * u * t * root.cp1.y + 3 * u * t * t * root.cp2.y + t * t * t * root.end.y
-      };
+  // Grietas de tierra
+  ctx.strokeStyle = "rgba(30,12,0,0.5)";
+  ctx.lineWidth = 0.8;
+  const cracks = [
+    [[cx - 60, cy + 30], [cx - 45, cy + 22], [cx - 38, cy + 28]],
+    [[cx + 40, cy + 20], [cx + 52, cy + 30], [cx + 48, cy + 40]],
+    [[cx - 10, cy + 40], [cx + 5, cy + 44]],
+    [[cx - 30, cy - 5], [cx - 18, cy + 5], [cx - 25, cy + 12]],
+  ];
+  cracks.forEach(pts => {
+    ctx.beginPath();
+    pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
+    ctx.stroke();
+  });
+
+  ctx.restore(); // fin clip mound
+
+  // ── 5. NIVELES DE PLATAFORMA (terrazas de tierra) ──────────────
+  // Nivel 1: plataforma izquierda
+  drawEarthBlock(cx - 72, cy + 12, 28, 12, 8, "#8c6235", "#5a3a18", "#4a2e10");
+  // Nivel 1: plataforma derecha
+  drawEarthBlock(cx + 44, cy + 12, 28, 12, 8, "#8c6235", "#5a3a18", "#4a2e10");
+  // Nivel 2: plataforma central superior
+  drawEarthBlock(cx - 20, cy - 38, 40, 12, 8, "#a07040", "#6a4520", "#4a2e10");
+
+  // Rampas de tierra compactada (path diagonales)
+  ctx.fillStyle = "#7a5530";
+  // Rampa izq → centro inf
+  ctx.beginPath();
+  ctx.moveTo(cx - 44, cy + 24);
+  ctx.lineTo(cx - 20, cy + 24);
+  ctx.lineTo(cx - 28, cy + 36);
+  ctx.lineTo(cx - 52, cy + 36);
+  ctx.closePath();
+  ctx.fill();
+  // Rampa der → centro inf
+  ctx.beginPath();
+  ctx.moveTo(cx + 20, cy + 24);
+  ctx.lineTo(cx + 44, cy + 24);
+  ctx.lineTo(cx + 52, cy + 36);
+  ctx.lineTo(cx + 28, cy + 36);
+  ctx.closePath();
+  ctx.fill();
+
+  // ── 6. ENTRADAS DE TÚNEL (7 bocas de túnel) ───────────────────
+  const drawTunnelMouth = (
+    tx: number, ty: number,
+    tw: number, th: number,
+    angle: number = 0,
+    isMain: boolean = false
+  ) => {
+    ctx.save();
+    ctx.translate(tx, ty);
+    ctx.rotate(angle);
+
+    // Borde exterior de tierra (marco)
+    ctx.fillStyle = isMain ? "#3a1f05" : "#2e1800";
+    ctx.beginPath();
+    ctx.ellipse(0, 0, tw + 6, th + 4, 0, Math.PI, 0, true);
+    ctx.lineTo(tw + 6, 5);
+    ctx.lineTo(-tw - 6, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Oscuridad interior del túnel
+    const tunGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, tw);
+    tunGrad.addColorStop(0, "#000000");
+    tunGrad.addColorStop(0.6, "#0a0400");
+    tunGrad.addColorStop(1, "#1a0800");
+    ctx.fillStyle = tunGrad;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, tw, th, 0, Math.PI, 0, true);
+    ctx.lineTo(tw, 5);
+    ctx.lineTo(-tw, 5);
+    ctx.closePath();
+    ctx.fill();
+
+    // Highlight superior del túnel
+    ctx.strokeStyle = "rgba(150,100,50,0.4)";
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.ellipse(0, -2, tw - 3, th - 2, 0, Math.PI, 0, true);
+    ctx.stroke();
+
+    ctx.restore();
+  };
+
+  // Entrada CENTRAL PRINCIPAL (la más grande, en el centro superior)
+  drawTunnelMouth(cx, cy - 28, 28, 18, 0, true);
+
+  // Entradas nivel superior izquierdo
+  drawTunnelMouth(cx - 48, cy - 18, 12, 8, -0.15);
+  // Entradas nivel superior derecho
+  drawTunnelMouth(cx + 48, cy - 18, 12, 8, 0.15);
+
+  // Entradas nivel medio izquierdo
+  drawTunnelMouth(cx - 62, cy + 14, 10, 7, -0.2);
+  // Entradas nivel medio derecho
+  drawTunnelMouth(cx + 62, cy + 14, 10, 7, 0.2);
+
+  // Entradas base izquierda
+  drawTunnelMouth(cx - 30, cy + 42, 14, 9, 0);
+  // Entradas base derecha
+  drawTunnelMouth(cx + 30, cy + 42, 14, 9, 0);
+
+  // ── 7. RAÍCES SECAS Y RETORCIDAS ─────────────────────────────
+  const drawRoot = (
+    pts: [number, number][],
+    baseWidth: number,
+    color: string = "#6b3d15"
+  ) => {
+    if (pts.length < 2) return;
+    for (let i = 0; i < pts.length - 1; i++) {
+      const t = i / (pts.length - 1);
+      const w = baseWidth * (1 - t * 0.55);
+
+      // Capa exterior oscura (canal de tierra)
+      ctx.strokeStyle = "#1a0800";
+      ctx.lineWidth = w + 3;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(pts[i][0], pts[i][1]);
+      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+      ctx.stroke();
+
+      // Cuerpo de madera
+      ctx.strokeStyle = color;
+      ctx.lineWidth = w;
+      ctx.beginPath();
+      ctx.moveTo(pts[i][0], pts[i][1]);
+      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+      ctx.stroke();
+
+      // Highlight superior
+      ctx.strokeStyle = lerpColor(color, "#c8853a", 0.45);
+      ctx.lineWidth = w * 0.5;
+      ctx.beginPath();
+      ctx.moveTo(pts[i][0], pts[i][1]);
+      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+      ctx.stroke();
+    }
+  };
+
+  // Raíz 1: Arco superior sobre entrada principal (izquierda)
+  drawRoot([
+    [cx - 38, cy - 18],
+    [cx - 42, cy - 35],
+    [cx - 32, cy - 50],
+    [cx - 18, cy - 58],
+    [cx - 5, cy - 62],
+  ], 9);
+
+  // Raíz 2: Arco superior sobre entrada principal (derecha)
+  drawRoot([
+    [cx + 38, cy - 18],
+    [cx + 42, cy - 35],
+    [cx + 32, cy - 50],
+    [cx + 18, cy - 58],
+    [cx + 5, cy - 62],
+  ], 9);
+
+  // Raíz 3: Lateral izquierda, baja serpenteando
+  drawRoot([
+    [cx - 52, cy - 5],
+    [cx - 70, cy + 8],
+    [cx - 75, cy + 28],
+    [cx - 68, cy + 44],
+  ], 7, "#5a3010");
+
+  // Raíz 4: Lateral derecha
+  drawRoot([
+    [cx + 52, cy - 5],
+    [cx + 70, cy + 8],
+    [cx + 72, cy + 30],
+    [cx + 62, cy + 48],
+  ], 7, "#5a3010");
+
+  // Raíz 5: Base izquierda emergiendo del suelo
+  drawRoot([
+    [cx - 35, cy + 48],
+    [cx - 55, cy + 52],
+    [cx - 72, cy + 50],
+  ], 6, "#4a2510");
+
+  // Raíz 6: Base derecha
+  drawRoot([
+    [cx + 35, cy + 48],
+    [cx + 55, cy + 52],
+    [cx + 70, cy + 50],
+  ], 6, "#4a2510");
+
+  // Raíz delgada: pequeña, entrelazada en nivel superior
+  drawRoot([
+    [cx - 15, cy - 55],
+    [cx - 8, cy - 68],
+    [cx + 8, cy - 70],
+    [cx + 15, cy - 58],
+  ], 4, "#7a4a20");
+
+  // ── 8. ROCAS EN LA BASE ───────────────────────────────────────
+  const drawRock = (rx: number, ry: number, size: number, angle: number = 0) => {
+    ctx.save();
+    ctx.translate(rx, ry);
+    ctx.rotate(angle);
+    // Cuerpo
+    ctx.fillStyle = "#7e7870";
+    ctx.strokeStyle = "#3a3530";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, size, size * 0.7, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    // Highlight
+    ctx.fillStyle = "rgba(180,170,160,0.4)";
+    ctx.beginPath();
+    ctx.ellipse(-size * 0.25, -size * 0.25, size * 0.3, size * 0.2, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  };
+
+  drawRock(cx - 62, cy + 50, 7, 0.2);
+  drawRock(cx - 48, cy + 54, 5.5, -0.3);
+  drawRock(cx - 38, cy + 56, 4.5, 0.1);
+  drawRock(cx + 60, cy + 50, 7.5, -0.2);
+  drawRock(cx + 46, cy + 54, 5, 0.4);
+  drawRock(cx + 35, cy + 56, 4, -0.1);
+  drawRock(cx - 8, cy + 58, 4.5, 0);
+  drawRock(cx + 10, cy + 57, 5, 0.2);
+
+  // ── 9. MUSGO VERDE APAGADO ────────────────────────────────────
+  const mossPatches = [
+    { x: cx - 55, y: cy + 8, rx: 12, ry: 5 },
+    { x: cx + 50, y: cy + 10, rx: 10, ry: 4 },
+    { x: cx - 18, y: cy + 20, rx: 8, ry: 3 },
+    { x: cx + 25, y: cy - 5, rx: 9, ry: 4 },
+    { x: cx - 30, y: cy - 35, rx: 7, ry: 3 },
+  ];
+  mossPatches.forEach(m => {
+    ctx.fillStyle = "rgba(65, 90, 40, 0.55)";
+    ctx.beginPath();
+    ctx.ellipse(m.x, m.y, m.rx, m.ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // ── 10. OJOS DE REPTIL ACECHANDO (3 pares, rojos/ámbar) ───────
+  const blinkPhase = (timestamp * 0.001) % 6;
+  const isBlinking = blinkPhase < 0.12 || (blinkPhase > 3 && blinkPhase < 3.08);
+
+  if (!isBlinking) {
+    const drawEye = (ex: number, ey: number, ew: number, eh: number) => {
+      // Resplandor exterior
+      ctx.save();
+      ctx.shadowColor = "#ff2200";
+      ctx.shadowBlur = 8;
+      ctx.fillStyle = "#cc1100";
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, ew + 2, eh + 1, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.restore();
+
+      // Iris rojo-naranja
+      ctx.fillStyle = "#ff4400";
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Pupila vertical (rendija de reptil)
+      ctx.fillStyle = "#000000";
+      ctx.beginPath();
+      ctx.ellipse(ex, ey, ew * 0.22, eh * 0.92, 0, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Reflejo de luz
+      ctx.fillStyle = "rgba(255,220,180,0.7)";
+      ctx.beginPath();
+      ctx.ellipse(ex - ew * 0.3, ey - eh * 0.35, ew * 0.18, eh * 0.15, -0.4, 0, Math.PI * 2);
+      ctx.fill();
     };
 
-    for (let i = 0; i < steps; i++) {
-      const t1 = i / steps;
-      const t2 = (i + 1) / steps;
-      const p1 = sampleBezier(t1);
-      const p2 = sampleBezier(t2);
-      const currentWidth = root.maxWidth - (root.maxWidth - root.minWidth) * t1;
+    // Par central (más grande, detrás de la entrada principal)
+    drawEye(cx - 10, cy - 22, 5.5, 3);
+    drawEye(cx + 10, cy - 22, 5.5, 3);
 
-      // Capa A: Canal exterior / Bordes de tierra excavada profunda
-      ctx.strokeStyle = '#180902';
-      ctx.lineWidth = currentWidth + 5;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // Par izquierdo (túnel izquierdo superior)
+    drawEye(cx - 50, cy - 13, 4, 2.5);
+    drawEye(cx - 40, cy - 12, 4, 2.5);
 
-      // Capa B: Cuerpo cilíndrico base de la madera
-      ctx.strokeStyle = '#5c3a1b';
-      ctx.lineWidth = currentWidth;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    // Par derecho (túnel derecho superior)
+    drawEye(cx + 40, cy - 12, 4, 2.5);
+    drawEye(cx + 50, cy - 13, 4, 2.5);
+  }
 
-      // Capa C: Iluminación de relieve (Brillo superior)
-      ctx.strokeStyle = '#8B5A2B';
-      ctx.lineWidth = currentWidth * 0.65;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
-
-      // Capa D: Fondo oscuro del túnel interno (Hollow channel)
-      ctx.strokeStyle = '#110500';
-      ctx.lineWidth = currentWidth * 0.38;
-      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+  // ── 11. ZZZ DURMIENTES FLOTANTES ─────────────────────────────
+  for (let i = 0; i < 3; i++) {
+    const tZ = ((timestamp * 0.00075 + i * 0.7) % 2.0);
+    const alpha = Math.max(0, 1.0 - tZ / 1.8);
+    if (alpha > 0.02) {
+      const zx = cx + 5 + Math.sin(tZ * 3.2 + i * 1.2) * 14;
+      const zy = cy - 52 - tZ * 45;
+      const fontSize = 12 + tZ * 12;
+      ctx.save();
+      ctx.globalAlpha = alpha * 0.9;
+      ctx.fillStyle = "#b8d8ff";
+      ctx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
+      ctx.textAlign = "center";
+      ctx.fillText("Z", zx, zy);
+      ctx.restore();
     }
+  }
 
-    if (root.isMouth) {
-      ctx.fillStyle = '#0a0300';
-      ctx.beginPath();
-      ctx.ellipse(root.end.x, root.end.y, root.minWidth * 0.55, root.minWidth * 0.35, 0, 0, Math.PI * 2);
-      ctx.fill();
+  // ── 12. PARTÍCULAS DE POLVO ───────────────────────────────────
+  for (let i = 0; i < 6; i++) {
+    const phase = ((timestamp * 0.0003 + i * 1.8) % 1.0);
+    const angle = i * Math.PI * 0.35 + phase * Math.PI;
+    const dist = 12 + (i * 9) % 28 + Math.sin(phase * 4) * 5;
+    const px = cx + Math.cos(angle) * dist;
+    const py = (cy - 22) + Math.sin(angle) * dist * 0.5;
+    const pa = 0.08 + Math.sin(phase * Math.PI) * 0.25;
+    ctx.fillStyle = `rgba(210,175,140,${pa})`;
+    ctx.fillRect(px, py, 1.6, 1.6);
+  }
+
+  ctx.restore(); // fin Boss Den
+}
+
+// ==========================================
+// 4. TURTLE SHRINE
+// Altar de piedra escalonado (3 niveles), columnas con runas verdes,
+// arco con escudo de tortuga, orbe pulsante verde lima, viña con setas.
+// Ocupa cuadrícula 1×2.
+// ==========================================
+function drawTurtleShrine(
+  ctx: CanvasRenderingContext2D,
+  ox: number,
+  oy: number,
+  timestamp: number,
+  escapeActive: boolean = false
+) {
+  ctx.save();
+
+  const W = TILE;       // 40px
+  const H = TILE * 2;   // 80px
+  const cx = ox + W / 2;
+  // El altar lo centramos visualmente dejando espacio para el texto
+  const baseY = oy + H - 2; // pie del altar
+
+  // Función para dibujar una losa de piedra escalonada
+  const drawStoneSlab = (
+    sx: number, sy: number,
+    sw: number, sh: number,
+    depth: number
+  ) => {
+    // Top
+    ctx.fillStyle = "#8a8275";
+    ctx.fillRect(sx, sy, sw, sh);
+    // Right side
+    ctx.fillStyle = "#5c5650";
+    ctx.beginPath();
+    ctx.moveTo(sx + sw, sy);
+    ctx.lineTo(sx + sw + depth, sy + depth * 0.5);
+    ctx.lineTo(sx + sw + depth, sy + sh + depth * 0.5);
+    ctx.lineTo(sx + sw, sy + sh);
+    ctx.closePath();
+    ctx.fill();
+    // Front face (bottom)
+    ctx.fillStyle = "#6e6760";
+    ctx.beginPath();
+    ctx.moveTo(sx, sy + sh);
+    ctx.lineTo(sx + depth, sy + sh + depth * 0.5);
+    ctx.lineTo(sx + sw + depth, sy + sh + depth * 0.5);
+    ctx.lineTo(sx + sw, sy + sh);
+    ctx.closePath();
+    ctx.fill();
+    // Outline
+    ctx.strokeStyle = "#2a2420";
+    ctx.lineWidth = 0.8;
+    ctx.strokeRect(sx, sy, sw, sh);
+    // Musgo en grietas
+    ctx.strokeStyle = "rgba(60,90,35,0.5)";
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.moveTo(sx + sw * 0.25, sy + sh);
+    ctx.lineTo(sx + sw * 0.25, sy + sh * 0.4);
+    ctx.moveTo(sx + sw * 0.6, sy + sh);
+    ctx.lineTo(sx + sw * 0.6, sy + sh * 0.6);
+    ctx.stroke();
+  };
+
+  // ── 1. TRES NIVELES DE BASE ────────────────────────────────────
+  // Nivel 3 (inferior, más ancho)
+  const n3W = 38, n3H = 7, n3D = 4;
+  const n3X = cx - n3W / 2, n3Y = baseY - n3H;
+  drawStoneSlab(n3X, n3Y, n3W, n3H, n3D);
+
+  // Nivel 2 (mediano)
+  const n2W = 30, n2H = 6, n2D = 3;
+  const n2X = cx - n2W / 2, n2Y = n3Y - n2H;
+  drawStoneSlab(n2X, n2Y, n2W, n2H, n2D);
+
+  // Nivel 1 (superior, más estrecho)
+  const n1W = 22, n1H = 5, n1D = 3;
+  const n1X = cx - n1W / 2, n1Y = n2Y - n1H;
+  drawStoneSlab(n1X, n1Y, n1W, n1H, n1D);
+
+  // ── 2. COLUMNAS CON INSCRIPCIONES RÚNICAS ─────────────────────
+  const colW = 5, colH = 22;
+  const colY = n1Y - colH;
+  const colLX = n1X + 1;         // columna izquierda
+  const colRX = n1X + n1W - colW - 1; // columna derecha
+
+  const drawColumn = (colX: number) => {
+    // Cuerpo columna
+    ctx.fillStyle = "#7a7468";
+    ctx.fillRect(colX, colY, colW, colH);
+    // Lado derecho 3D
+    ctx.fillStyle = "#4e4a44";
+    ctx.beginPath();
+    ctx.moveTo(colX + colW, colY);
+    ctx.lineTo(colX + colW + 2, colY + 1);
+    ctx.lineTo(colX + colW + 2, colY + colH + 1);
+    ctx.lineTo(colX + colW, colY + colH);
+    ctx.closePath();
+    ctx.fill();
+    // Borde
+    ctx.strokeStyle = "#252018";
+    ctx.lineWidth = 0.7;
+    ctx.strokeRect(colX, colY, colW, colH);
+    // Capitel (parte superior)
+    ctx.fillStyle = "#8c8478";
+    ctx.fillRect(colX - 1, colY, colW + 2, 3);
+    // Basa (parte inferior)
+    ctx.fillStyle = "#8c8478";
+    ctx.fillRect(colX - 1, colY + colH - 3, colW + 2, 3);
+
+    // Runas verticales en la columna (líneas horizontales cortas)
+    ctx.save();
+    if (escapeActive) {
+      ctx.shadowColor = "#50C83C";
+      ctx.shadowBlur = 3;
     }
-
-    if (root.isTunnelArch) {
-      ctx.fillStyle = '#000000';
+    ctx.strokeStyle = escapeActive ? "rgba(80,200,60,0.8)" : "#4a443a";
+    ctx.lineWidth = 0.8;
+    const runeY = [colY + 7, colY + 11, colY + 15];
+    runeY.forEach(ry => {
       ctx.beginPath();
-      ctx.ellipse(root.end.x, root.end.y, 11, 7, Math.PI / 6, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(colX + 1, ry);
+      ctx.lineTo(colX + colW - 1, ry);
+      ctx.stroke();
+    });
+    // Runa vertical (línea central)
+    ctx.beginPath();
+    ctx.moveTo(colX + colW / 2, colY + 6);
+    ctx.lineTo(colX + colW / 2, colY + colH - 5);
+    ctx.stroke();
+    ctx.restore();
+  };
+
+  drawColumn(colLX);
+  drawColumn(colRX);
+
+  // ── 3. ARCO SUPERIOR CON ESCUDO DE TORTUGA ───────────────────
+  const archY = colY - 5;
+  const archW = n1W + 2, archH = 9;
+  const archX = n1X - 1;
+
+  // Cuerpo del arco
+  ctx.fillStyle = "#7a7468";
+  ctx.beginPath();
+  ctx.moveTo(archX, archY + archH);
+  ctx.lineTo(archX, archY + archH * 0.4);
+  ctx.quadraticCurveTo(cx, archY - 4, archX + archW, archY + archH * 0.4);
+  ctx.lineTo(archX + archW, archY + archH);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.strokeStyle = "#252018";
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(archX, archY + archH);
+  ctx.lineTo(archX, archY + archH * 0.4);
+  ctx.quadraticCurveTo(cx, archY - 4, archX + archW, archY + archH * 0.4);
+  ctx.lineTo(archX + archW, archY + archH);
+  ctx.closePath();
+  ctx.stroke();
+
+  // Escudo de tortuga en el centro del arco (bajorrelieve)
+  const shieldCX = cx, shieldCY = archY + archH * 0.5 + 1;
+  // Caparazón simplificado
+  ctx.strokeStyle = "#4a6e30";
+  ctx.lineWidth = 0.7;
+  ctx.beginPath();
+  ctx.ellipse(shieldCX, shieldCY, 4, 3, 0, 0, Math.PI * 2);
+  ctx.stroke();
+  // Patrón hexagonal del caparazón (simplificado)
+  ctx.beginPath();
+  ctx.moveTo(shieldCX, shieldCY - 2);
+  ctx.lineTo(shieldCX, shieldCY + 2);
+  ctx.moveTo(shieldCX - 2, shieldCY);
+  ctx.lineTo(shieldCX + 2, shieldCY);
+  ctx.stroke();
+  // Cabeza y patas
+  ctx.fillStyle = "#4a6e30";
+  ctx.beginPath();
+  ctx.arc(shieldCX, shieldCY - 3.5, 1, 0, Math.PI * 2);
+  ctx.fill();
+
+  // ── 4. INSCRIPCIONES RÚNICAS HORIZONTALES ─────────────────────
+  // En nivel 2 (mediano)
+  ctx.save();
+  if (escapeActive) {
+    ctx.shadowColor = "#50C83C";
+    ctx.shadowBlur = 3;
+  }
+  ctx.strokeStyle = escapeActive ? "rgba(80,200,60,0.7)" : "#4a443a";
+  ctx.lineWidth = 0.7;
+  // Runa en nivel 2
+  const rune2Y = n2Y + n2H / 2;
+  [[n2X + 4, n2X + n2W - 2]].forEach(([x1, x2]) => {
+    ctx.beginPath();
+    ctx.moveTo(x1, rune2Y);
+    ctx.lineTo(x2, rune2Y);
+    ctx.stroke();
+    // Marcas verticales en la runa
+    for (let xi = x1 + 2; xi < x2 - 1; xi += 4) {
+      ctx.beginPath();
+      ctx.moveTo(xi, rune2Y - 1.5);
+      ctx.lineTo(xi, rune2Y + 1.5);
+      ctx.stroke();
     }
   });
 
+  // Runa en nivel 3 (más corta)
+  const rune3Y = n3Y + n3H / 2;
   ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY + 18, 38, 22, 0, 0, Math.PI * 2);
+  ctx.moveTo(n3X + 6, rune3Y);
+  ctx.lineTo(n3X + n3W - 4, rune3Y);
   ctx.stroke();
-
-  // Saliente protector de madera y raíces colgantes (ceja)
-  ctx.fillStyle = '#5c3a1b';
-  ctx.beginPath();
-  ctx.ellipse(bCenterX, bCenterY + 1, 38, 5, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // --- 4. Los Ojos de Reptil en la Oscuridad (6 Glowing Slit Eyes) ---
-  const isBlinking = (timestamp % 6000) < 180;
-  if (!isBlinking) {
-    ctx.save();
-    ctx.shadowBlur = 10;
-
-    const drawAlmondEye = (cx: number, cy: number, w: number, h: number) => {
-      ctx.save();
-      // Neon amber-yellow with red-orange glow
-      ctx.fillStyle = '#ffd200';
-      ctx.shadowColor = '#ff4500';
-      ctx.beginPath();
-      ctx.ellipse(cx, cy, w, h, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // vertical thin black pupil
-      ctx.fillStyle = '#000000';
-      ctx.fillRect(cx - 0.7, cy - h * 0.8, 1.4, h * 1.6);
-      ctx.restore();
-    };
-
-    // Par Central Superior (Más grande y dominante)
-    drawAlmondEye(bCenterX - 8, bCenterY + 14, 5.0, 2.5);
-    drawAlmondEye(bCenterX + 8, bCenterY + 14, 5.0, 2.5);
-
-    // Par Lateral Inferior Izquierdo (Pequeño, orientado al frente)
-    drawAlmondEye(bCenterX - 22, bCenterY + 22, 4.0, 2.0);
-    drawAlmondEye(bCenterX - 14, bCenterY + 22, 4.0, 2.0);
-
-    // Par Lateral Inferior Derecho (Pequeño, orientado al frente)
-    drawAlmondEye(bCenterX + 14, bCenterY + 22, 4.0, 2.0);
-    drawAlmondEye(bCenterX + 22, bCenterY + 22, 4.0, 2.0);
-
-    ctx.restore();
-  }
-
-  // --- 5. Rocas de Contención en la Base ---
-  const drawBaseRock = (rx: number, ry: number, rSize: number) => {
-    ctx.fillStyle = '#8e8680'; // stones gray
-    ctx.strokeStyle = '#4e4844';
-    ctx.lineWidth = 1.5;
+  for (let xi = n3X + 8; xi < n3X + n3W - 5; xi += 5) {
     ctx.beginPath();
-    ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.moveTo(xi, rune3Y - 1.5);
+    ctx.lineTo(xi, rune3Y + 1.5);
     ctx.stroke();
-
-    // Small highlight
-    ctx.fillStyle = '#ffffff';
-    ctx.beginPath();
-    ctx.arc(rx - rSize * 0.35, ry - rSize * 0.35, rSize * 0.18, 0, Math.PI * 2);
-    ctx.fill();
-  };
-
-  drawBaseRock(bCenterX - 55, bCenterY + 38, 7.5);
-  drawBaseRock(bCenterX - 45, bCenterY + 42, 6.0);
-  drawBaseRock(bCenterX - 65, bCenterY + 32, 9.0);
-  drawBaseRock(bCenterX + 45, bCenterY + 42, 6.0);
-  drawBaseRock(bCenterX + 55, bCenterY + 38, 7.5);
-  drawBaseRock(bCenterX + 65, bCenterY + 32, 9.0);
-  drawBaseRock(bCenterX - 18, bCenterY + 43, 5.0);
-  drawBaseRock(bCenterX + 18, bCenterY + 43, 5.0);
-
-  // Floating sleeping ZZZ effects (Boss Den is Dormant)
-  for (let i = 0; i < 3; i++) {
-    const tZ = (timestamp * 0.0008 + i * 0.65) % 2.0;
-    const alpha = 1.0 - (tZ / 2.0);
-    if (alpha > 0) {
-      ctx.fillStyle = `rgba(180, 220, 255, ${alpha * 0.85})`;
-      ctx.font = `bold ${8 + tZ * 10}px "Press Start 2P", monospace`;
-      const zx = bCenterX - 15 + Math.sin(tZ * 3.5 + i) * 15;
-      const zy = bCenterY - 45 - tZ * 50;
-      ctx.fillText("Z", zx, zy);
-    }
   }
-
-  // Micro dust particles floating in huddle
-  for (let i = 0; i < 8; i++) {
-    const phase = (timestamp * 0.0004 + i * 1.5) % 1.0;
-    const angle = i * Math.PI * 0.25 + phase * Math.PI * 2;
-    const rDist = 15 + ((i * 11) % 36) + Math.sin(phase * 3) * 6;
-    const px = bCenterX + Math.cos(angle) * rDist;
-    const py = bCenterY + Math.sin(angle) * rDist;
-    ctx.fillStyle = `rgba(220, 190, 160, ${0.12 + Math.sin(phase * Math.PI) * 0.3})`;
-    ctx.fillRect(px, py, 1.8, 1.8);
-  }
-
-  // Centered Label
-  ctx.save();
-  ctx.fillStyle = '#fed7aa';
-  ctx.globalAlpha = 0.55;
-  ctx.font = '7px "Press Start 2P", monospace';
-  ctx.textAlign = 'center';
-  ctx.shadowColor = '#000000';
-  ctx.shadowBlur = 4;
-  ctx.fillText('Boss Den (Dormant)', bCenterX, bCenterY + 54);
   ctx.restore();
 
-  ctx.restore(); // end Boss Den
-
-  // ==========================================
-  // 5. TURTLE SHRINE (1x2 - col 18, row 13)
-  // Pixel art isométrico de alta calidad: altar de piedra escalonado con musgo, viña frondosa y orbe verde lima brillante.
-  // Detalles: tres niveles de base de piedra, columnas con inscripciones rúnicas verdes, arco con escudo de tortuga, orbe central pulsante, viña con setas verdes brillantes, texto pixelado "Turtle Shrine Shrine" abajo.
-  // ==========================================
-  const bx = 18 * TILE;
-  const by = 13 * TILE;
-
-  // Base floor
-  ctx.fillStyle = '#C78757';
-  ctx.fillRect(bx, by, TILE, TILE);
-
-  // A. Earthen green dome mound cover (semispherical perfectly integrated to floor)
-  const domeCX = bx + 20;
-  const domeCY = by + 20;
-  const domeR = 17;
-
-  // Moss/ochre verdoso apagado gradient
-  const domeGrad = ctx.createRadialGradient(
-    domeCX - 3, domeCY - 3, 2,
-    domeCX, domeCY, domeR
-  );
-  domeGrad.addColorStop(0, '#7c9c43'); // light ocre verdoso
-  domeGrad.addColorStop(0.7, '#556b2f'); // olive green
-  domeGrad.addColorStop(1, '#3b4d1f'); // shadow dark green
-
-  ctx.fillStyle = domeGrad;
-  ctx.beginPath();
-  ctx.arc(domeCX, domeCY, domeR, 0, Math.PI * 2);
-  ctx.fill();
-
-  // B. Vegetación: tres brotes en la parte superior en forma de puntas de flecha
-  ctx.fillStyle = '#4ade80';
-  ctx.strokeStyle = '#15803d';
-  ctx.lineWidth = 0.8;
-
-  const drawSprout = (sx: number, sy: number) => {
-    ctx.beginPath();
-    ctx.moveTo(sx, sy);
-    ctx.lineTo(sx - 3, sy + 6);
-    ctx.lineTo(sx + 3, sy + 6);
-    ctx.closePath();
-    ctx.fill();
-    ctx.stroke();
-  };
-
-  drawSprout(domeCX - 5, domeCY - 16);
-  drawSprout(domeCX, domeCY - 19);
-  drawSprout(domeCX + 5, domeCY - 16);
-
-  // C. Entrada (Arco de herradura achatado perfectamente simétrico)
-  const doorWidth = 14;
-  const doorHeight = 12;
-  const doorX = domeCX - doorWidth / 2;
-  const doorY = domeCY + 2;
-
-  ctx.save();
-  ctx.beginPath();
-  // horseshoe/arch shape
-  ctx.moveTo(doorX, doorY + doorHeight);
-  ctx.lineTo(doorX, doorY + 4);
-  ctx.quadraticCurveTo(domeCX, doorY - 4, doorX + doorWidth, doorY + 4);
-  ctx.lineTo(doorX + doorWidth, doorY + doorHeight);
-  ctx.closePath();
+  // ── 5. ORB CENTRAL PULSANTE (verde lima) ──────────────────────
+  const orbCX = cx;
+  const orbCY = colY - 2;
+  const orbR = 6;
+  const pulse = Math.sin(timestamp * 0.003) * 0.5 + 0.5; // 0–1
 
   if (escapeActive) {
-    // Glowing active golden entrance
-    ctx.fillStyle = '#ffeb3b';
+    // ACTIVE STATE: Pulsing visibly, glowing bright lime green
+    // Resplandor exterior (glow) - extra bright and pulsing!
+    ctx.save();
+    // Increase size and opacity of the glow to make it "brillar un poco más"
+    const glowR = orbR + 6 + pulse * 6; // slightly larger than original (was 4 + pulse * 4)
+    const glowGrad = ctx.createRadialGradient(orbCX, orbCY, 0, orbCX, orbCY, glowR);
+    // Increase opacities (was 0.55 / 0.25)
+    glowGrad.addColorStop(0, `rgba(130,255,80,${0.75 + pulse * 0.25})`);
+    glowGrad.addColorStop(0.5, `rgba(60,230,30,${0.35 + pulse * 0.2})`);
+    glowGrad.addColorStop(1, "rgba(20,120,0,0)");
+    ctx.fillStyle = glowGrad;
+    ctx.beginPath();
+    ctx.arc(orbCX, orbCY, glowR, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+
+    // Orbe de cristal: bright, pulsing lime green, yellow, white
+    const orbGrad = ctx.createRadialGradient(
+      orbCX - orbR * 0.3, orbCY - orbR * 0.3, 0,
+      orbCX, orbCY, orbR
+    );
+    orbGrad.addColorStop(0, `rgba(220,255,140,${0.95 + pulse * 0.05})`);
+    orbGrad.addColorStop(0.4, `rgba(90,240,40,${0.9})`);
+    orbGrad.addColorStop(0.8, `rgba(40,180,0,0.95)`);
+    orbGrad.addColorStop(1, "rgba(10,100,0,0.95)");
+    ctx.fillStyle = orbGrad;
+    ctx.beginPath();
+    ctx.arc(orbCX, orbCY, orbR, 0, Math.PI * 2);
     ctx.fill();
 
-    const goldPulse = Math.sin(timestamp * 0.005) * 5 + 8;
-    ctx.strokeStyle = `rgba(255, 215, 0, ${0.5 + Math.sin(timestamp * 0.005) * 0.25})`;
-    ctx.lineWidth = 2.0;
-    ctx.shadowColor = '#ffd700';
-    ctx.shadowBlur = goldPulse;
-    ctx.stroke();
-  } else {
-    // Flat grey/dark brown shadow dormant entrance
-    ctx.fillStyle = '#3e2f25';
-    ctx.fill();
-    ctx.strokeStyle = '#271b14';
-    ctx.lineWidth = 1.5;
-    ctx.stroke();
-  }
-  ctx.restore();
-
-  // D. Runas/Inscripciones talladas directamente encima del arco
-  ctx.strokeStyle = '#3e1f0a';
-  ctx.lineWidth = 1.0;
-  ctx.beginPath();
-  // Central square/face shape
-  ctx.strokeRect(domeCX - 1.5, doorY - 6.5, 3, 2.5);
-  // Left abstract line
-  ctx.moveTo(domeCX - 5, doorY - 5);
-  ctx.lineTo(domeCX - 3, doorY - 6);
-  // Right abstract line
-  ctx.moveTo(domeCX + 5, doorY - 5);
-  ctx.lineTo(domeCX + 3, doorY - 6);
-  ctx.stroke();
-
-  // E. Piedras de Soporte (Muro de contención de rocas grises ordenadas de mayor a menor)
-  const drawRiverStone = (rx: number, ry: number, size: number) => {
-    ctx.fillStyle = '#8e8680'; // River gray
-    ctx.strokeStyle = '#4e4844';
+    // Borde del orbe
+    ctx.strokeStyle = `rgba(150,255,90,${0.8 + pulse * 0.2})`;
     ctx.lineWidth = 0.8;
     ctx.beginPath();
-    ctx.arc(rx, ry, size, 0, Math.PI * 2);
-    ctx.fill();
+    ctx.arc(orbCX, orbCY, orbR, 0, Math.PI * 2);
     ctx.stroke();
+
+    // Tortuga interior del orbe (bajorrelieve brillante)
+    ctx.strokeStyle = `rgba(240,255,200,${0.85 + pulse * 0.15})`;
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(orbCX, orbCY, 3.5, 2.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(orbCX, orbCY - 1.5);
+    ctx.lineTo(orbCX, orbCY + 1.5);
+    ctx.moveTo(orbCX - 1.5, orbCY);
+    ctx.lineTo(orbCX + 1.5, orbCY);
+    ctx.stroke();
+
+    // Reflejo interno del orbe
+    ctx.fillStyle = "rgba(255,255,255,0.45)";
+    ctx.beginPath();
+    ctx.ellipse(orbCX - 2, orbCY - 2, 2, 1.2, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  } else {
+    // INACTIVE/DORMANT STATE: completely off and dark, no glow at all.
+    // Orbe de cristal apagado/oscuro (dark grey-green stone/glass look)
+    const orbGrad = ctx.createRadialGradient(
+      orbCX - orbR * 0.3, orbCY - orbR * 0.3, 0,
+      orbCX, orbCY, orbR
+    );
+    orbGrad.addColorStop(0, "#4ca039ff");
+    orbGrad.addColorStop(0.5, "#50C83C");
+    orbGrad.addColorStop(1, "#2F5A1F");
+    ctx.fillStyle = orbGrad;
+    ctx.beginPath();
+    ctx.arc(orbCX, orbCY, orbR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Borde del orbe apagado (dull dark stroke)
+    ctx.strokeStyle = "rgba(45, 50, 40, 0.7)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    ctx.arc(orbCX, orbCY, orbR, 0, Math.PI * 2);
+    ctx.stroke();
+
+    // Tortuga interior del orbe apagada (very sutil/faint and dark)
+    ctx.strokeStyle = "rgba(15, 20, 10, 0.4)";
+    ctx.lineWidth = 0.6;
+    ctx.beginPath();
+    ctx.ellipse(orbCX, orbCY, 3.5, 2.5, 0, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(orbCX, orbCY - 1.5);
+    ctx.lineTo(orbCX, orbCY + 1.5);
+    ctx.moveTo(orbCX - 1.5, orbCY);
+    ctx.lineTo(orbCX + 1.5, orbCY);
+    ctx.stroke();
+
+    // Reflejo sutil (opaque glass reflection, very dim)
+    ctx.fillStyle = "rgba(255,255,255,0.12)";
+    ctx.beginPath();
+    ctx.ellipse(orbCX - 2, orbCY - 2, 1.8, 1.0, -0.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // ── 6. VIÑA CON HOJAS Y SETAS ─────────────────────────────────
+  // La viña sube por los lados del altar
+  const drawVine = (startX: number, startY: number, side: -1 | 1) => {
+    // Tallo principal
+    ctx.strokeStyle = "#2d6b20";
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    ctx.moveTo(startX, startY);
+    let vx = startX, vy = startY;
+    const steps = 6;
+    for (let i = 0; i < steps; i++) {
+      const dy = -8;
+      const dx = side * (Math.sin(i * 1.5) * 3);
+      const nx = vx + dx, ny = vy + dy;
+      ctx.quadraticCurveTo(vx + side * 2, vy + dy / 2, nx, ny);
+      vx = nx; vy = ny;
+    }
+    ctx.stroke();
+
+    // Hojas a lo largo de la viña
+    const leafPositions = [
+      { x: startX + side * 3, y: startY - 12 },
+      { x: startX + side * 5, y: startY - 25 },
+      { x: startX + side * 2, y: startY - 38 },
+      { x: startX + side * 4, y: startY - 50 },
+    ];
+
+    leafPositions.forEach((lp, idx) => {
+      const la = side * (0.3 + idx * 0.15);
+      ctx.save();
+      ctx.translate(lp.x, lp.y);
+      ctx.rotate(la);
+      ctx.fillStyle = "#3a8c28";
+      ctx.strokeStyle = "#1e5015";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(0, 0, 3.5, 2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      // Nervio de la hoja
+      ctx.beginPath();
+      ctx.moveTo(-3.5, 0);
+      ctx.lineTo(3.5, 0);
+      ctx.strokeStyle = "#1e5015";
+      ctx.lineWidth = 0.4;
+      ctx.stroke();
+      ctx.restore();
+    });
+
+    // Setas brillantes (grupos)
+    const mushroomGroups = [
+      { x: startX + side * 1, y: startY - 8 },
+      { x: startX + side * 3, y: startY - 28 },
+      { x: startX + side * 1, y: startY - 48 },
+    ];
+
+    mushroomGroups.forEach(mg => {
+      for (let m = 0; m < 2; m++) {
+        const mx = mg.x + m * side * 4;
+        const my = mg.y + m * 2;
+        const mPulse = Math.sin(timestamp * 0.004 + mx * 0.1) * 0.3 + 0.7;
+
+        // Tallo seta
+        ctx.fillStyle = "rgba(160,200,100,0.7)";
+        ctx.fillRect(mx - 0.5, my, 1, 4);
+
+        // Sombrero seta
+        ctx.save();
+        ctx.shadowColor = `rgba(120,255,60,${mPulse * 0.8})`;
+        ctx.shadowBlur = 4;
+        ctx.fillStyle = `rgba(${80 + m * 20},${200 + m * 30},${60},${mPulse})`;
+        ctx.beginPath();
+        ctx.ellipse(mx, my, 2.5, 1.5, 0, Math.PI, 0, true);
+        ctx.fill();
+        ctx.restore();
+      }
+    });
   };
 
-  // Left stack (largest to smallest)
-  drawRiverStone(bx + 7, by + 30, 4.0);
-  drawRiverStone(bx + 9, by + 23, 3.0);
-  drawRiverStone(bx + 11, by + 17, 2.0);
+  // Viña izquierda (sube desde la base izquierda)
+  drawVine(n3X + 3, n3Y + n3H, -1);
+  // Viña derecha
+  drawVine(n3X + n3W - 1, n3Y + n3H, 1);
 
-  // Right stack (largest to smallest)
-  drawRiverStone(bx + 33, by + 30, 4.0);
-  drawRiverStone(bx + 31, by + 23, 3.0);
-  drawRiverStone(bx + 29, by + 17, 2.0);
-
-  // F. Cell outer boundary frame
-  ctx.strokeStyle = '#2d1a0a'; // firm outline
-  ctx.lineWidth = 2.0;
-  ctx.strokeRect(bx, by, TILE, TILE);
-};
+  ctx.restore(); // fin Turtle Shrine
+}
