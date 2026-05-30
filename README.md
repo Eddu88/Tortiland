@@ -24,7 +24,7 @@ los lobos, serpientes y cocodrilos la atrapen.
   con inteligencia usando pathfinding BFS.
 - **Lobo Fantasma:** Semitransparente, puede atravesar 
   arbustos. El más difícil de bloquear.
-- **Serpientes y Cocodrilos:** Próximamente en Tortiland v2.
+- **Serpientes y Cocodrilos:** Próximamente en Tortiland v10.
 
 ## 🏆 Objetivo
 Fase 1 — Come todos los 🍅 tomates.  

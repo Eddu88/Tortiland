@@ -145,7 +145,7 @@ export default function App() {
                 {gameState === 'menu' && (
                   <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
                     <span className="px-3 py-1 rounded-md text-[9px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
-                      V5.1 TORTILAND
+                      V6.0 TORTILAND
                     </span>
                     <h2 className="font-press-start text-base md:text-lg text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       TORTILAND
