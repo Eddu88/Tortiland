@@ -4,8 +4,8 @@
  */
 
 import React, { useEffect } from 'react';
-import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos } from '../types';
-import { T_EMPTY, T_BUSH } from '../constants';
+import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos, LevelConfig } from '../types';
+import { T_EMPTY, T_BUSH, LEVELS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 
 interface UseGameLoopProps {
@@ -28,7 +28,7 @@ interface UseGameLoopProps {
   updatePlayer: () => void;
   updateEnemy: (e: Enemy) => void;
   checkCollisions: () => void;
-  respawnEntities: () => void;
+  respawnEntities: (config?: LevelConfig) => void;
   checkGoldenBroccoliSpawn: (currentLives: number) => void;
   spawnParticles: (col: number, row: number, color: string, dir?: { x: number; y: number }, isDirt?: boolean) => void;
   detectMapChanges: () => void;
@@ -36,6 +36,7 @@ interface UseGameLoopProps {
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
   tileReadyRef: React.MutableRefObject<number[][]>;
   onRender: (ctx: CanvasRenderingContext2D, timestamp: number) => void;
+  currentLevelIndex: number;
 }
 
 export const useGameLoop = ({
@@ -64,6 +65,7 @@ export const useGameLoop = ({
   scheduledPlantsRef,
   tileReadyRef,
   onRender,
+  currentLevelIndex,
 }: UseGameLoopProps) => {
 
   // Frame Request Gameloop Execution
@@ -100,10 +102,10 @@ export const useGameLoop = ({
         }
 
         // Escape active particles
-        const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
+        const escapeActive = fruitsRef.current.filter(f => f.type !== 5).length === 0;
         if (escapeActive && frameCountRef.current % 30 === 0) {
-          const randomCol = 16 + Math.floor(Math.random() * 3);
-          const randomRow = 11 + Math.floor(Math.random() * 3);
+          const randomCol = 17 + Math.floor(Math.random() * 3);
+          const randomRow = 12 + Math.floor(Math.random() * 3);
           spawnParticles(randomCol, randomRow, '#5ec263', { x: 0, y: -1 });
         }
 
@@ -164,7 +166,8 @@ export const useGameLoop = ({
                 SoundEffects.playGameOver();
               } else {
                 player.invincible = 120; // 2 seconds protection
-                respawnEntities();
+                const levelConfig = LEVELS[currentLevelIndex];
+                respawnEntities(levelConfig);
                 checkGoldenBroccoliSpawn(updated);
               }
               return updated;

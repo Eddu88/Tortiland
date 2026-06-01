@@ -57,7 +57,7 @@ export interface Enemy {
 export interface Fruit {
   col: number;
   row: number;
-  type: number; // 0: Wild Herb, 1: Broccoli, 2: Cabbage, 3: Tomato, 4: Carrot, 5: Golden Broccoli
+  type: number; // 0: Wild Herb, 1: Broccoli, 2: Cabbage, 3: Tomato, 4: Carrot, 5: Golden Broccoli, 6: Beetroot (Beterraga)
   anim: number; // offset animation factor
 }
 
@@ -71,8 +71,8 @@ export interface Particle {
   color: string;
 }
 
-export type GameState = 'menu' | 'playing' | 'paused' | 'dead' | 'gameover' | 'win';
-export type LevelPhase = 'tomatoes' | 'carrots';
+export type GameState = 'menu' | 'level_select' | 'playing' | 'paused' | 'dead' | 'gameover' | 'win' | 'level_complete';
+export type LevelPhase = 'tomatoes' | 'carrots' | 'beets';
 
 export interface HighScore {
   name: string;
@@ -80,3 +80,23 @@ export interface HighScore {
   time: number;
   date: string;
 }
+
+export interface EnemyConfig {
+  id: string;
+  type: EnemyType;
+  col: number;
+  row: number;
+  speed: number;
+}
+
+export interface LevelConfig {
+  number: number;
+  name: string;
+  description: string;
+  playerStartCol: number;
+  playerStartRow: number;
+  innerWalls: [number, number][];
+  initialBushes: [number, number][];
+  enemies: EnemyConfig[];
+}
+

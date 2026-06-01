@@ -4,7 +4,7 @@
  */
 
 import { TileType } from '../types';
-import { COLS, ROWS, T_EMPTY, T_WALL, T_BUSH, T_BURROW, INNER_WALLS } from '../constants';
+import { COLS, ROWS, T_EMPTY, T_WALL, T_BUSH, T_BURROW } from '../constants';
 
 /**
  * Format seconds into elegant MM:SS
@@ -18,7 +18,10 @@ export function formatTime(seconds: number): string {
 /**
  * Generate the initial playfield map design
  */
-export function buildBaseMap(grassAges?: Record<string, { createdAt: number }>): TileType[][] {
+export function buildBaseMap(
+  innerWalls: [number, number][],
+  grassAges?: Record<string, { createdAt: number }>
+): TileType[][] {
   const m: TileType[][] = [];
   for (let r = 0; r < ROWS; r++) {
     m.push([]);
@@ -32,7 +35,7 @@ export function buildBaseMap(grassAges?: Record<string, { createdAt: number }>):
       }
     }
   }
-  INNER_WALLS.forEach(([r, c]) => {
+  innerWalls.forEach(([r, c]) => {
     const isBossBurrow = r >= 5 && r <= 8 && c >= 8 && c <= 11;
     if (r > 0 && r < ROWS - 1 && c > 0 && c < COLS - 1 && !isBossBurrow) {
       m[r][c] = T_BUSH;
@@ -101,7 +104,9 @@ export function findRandomEmptyCell(
   map: TileType[][],
   playerCol: number,
   playerRow: number,
-  fruits: { col: number; row: number }[]
+  fruits: { col: number; row: number }[],
+  burrowCol = 18,
+  burrowRow = 13
 ): { col: number; row: number } | null {
   let tries = 0;
   while (tries++ < 500) {
@@ -109,8 +114,8 @@ export function findRandomEmptyCell(
     const r = 1 + Math.floor(Math.random() * (ROWS - 2));
     if (map[r]?.[c] !== T_EMPTY) continue;
 
-    // Exclude Torti's Burrow (col 18, row 13)
-    if (c === 18 && r === 13) continue;
+    // Exclude Torti's Burrow
+    if (c === burrowCol && r === burrowRow) continue;
 
     // Exclude Boss Burrow (4x4)
     if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;

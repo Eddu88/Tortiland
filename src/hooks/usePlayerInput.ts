@@ -10,7 +10,7 @@ import { isWall, isBush, isEmpty } from '../utils/map';
 
 interface UsePlayerInputProps {
   gameState: GameState;
-  score: number;
+  levelScore: number;
   levelPhase: LevelPhase;
   playerRef: React.MutableRefObject<Player>;
   enemiesRef: React.MutableRefObject<Enemy[]>;
@@ -21,11 +21,12 @@ interface UsePlayerInputProps {
   frameCountRef: React.MutableRefObject<number>;
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
   tileReadyRef: React.MutableRefObject<number[][]>;
+  setGameState?: (s: GameState) => void;
 }
 
 export const usePlayerInput = ({
   gameState,
-  score,
+  levelScore,
   levelPhase,
   playerRef,
   enemiesRef,
@@ -36,6 +37,7 @@ export const usePlayerInput = ({
   frameCountRef,
   scheduledPlantsRef,
   tileReadyRef,
+  setGameState,
 }: UsePlayerInputProps) => {
   const keysRef = useRef<{ [code: string]: boolean }>({});
   const keysPressTimeRef = useRef<{ [code: string]: number }>({});
@@ -46,7 +48,7 @@ export const usePlayerInput = ({
     if (playerRef.current.goldenBroccoliTimer > 0) {
       return 10;
     }
-    return Math.min(10, score + 1);
+    return Math.min(10, levelScore + 1);
   };
 
 
@@ -174,9 +176,22 @@ export const usePlayerInput = ({
   // Keyboard Input Hook
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      const code = e.code;
+
+      if (code === 'Escape') {
+        if (gameState === 'playing') {
+          e.preventDefault();
+          setGameState?.('paused');
+          return;
+        } else if (gameState === 'paused') {
+          e.preventDefault();
+          setGameState?.('playing');
+          return;
+        }
+      }
+
       if (gameState !== 'playing') return;
 
-      const code = e.code;
       const prev = keysRef.current[code];
       keysRef.current[code] = true;
 
@@ -235,7 +250,7 @@ export const usePlayerInput = ({
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [gameState, score, levelPhase]);
+  }, [gameState, levelScore, levelPhase]);
 
   return {
     keysRef,

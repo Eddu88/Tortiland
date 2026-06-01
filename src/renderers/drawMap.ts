@@ -203,7 +203,9 @@ export const drawMap = (
   playerBreakingAnimTimer: number,
   escapeActive = false,
   timestamp = 0,
-  dyingBushes: { col: number; row: number; alpha: number; variant: number }[] = []
+  dyingBushes: { col: number; row: number; alpha: number; variant: number }[] = [],
+  burrowCol = 18,
+  burrowRow = 13
 ) => {
   ctx.shadowBlur = 0;
 
@@ -460,8 +462,8 @@ export const drawMap = (
   // ─ Boss Den: columnas 8–11, filas 5–8 (4×4) ─
   drawBossDen(ctx, 8 * TILE, 5 * TILE, timestamp);
 
-  // ─ Turtle Shrine: columna 18, fila 13 (1×2) ─
-  drawTurtleShrine(ctx, 18 * TILE, 12 * TILE, timestamp, escapeActive);
+  // ─ Turtle Shrine: (1×2 structure extending upwards from burrowRow) ─
+  drawTurtleShrine(ctx, burrowCol * TILE, (burrowRow - 1) * TILE, timestamp, escapeActive);
 };
 
 // ─── Utility helpers ─────────────────────────────────────────────

@@ -16,7 +16,7 @@ import {
   GridPos
 } from '../types';
 import { SoundEffects } from './SoundEffects';
-import { W, H, TILE } from '../constants';
+import { W, H, TILE, LEVELS } from '../constants';
 import { usePlayerInput } from '../hooks/usePlayerInput';
 import { useGameEntities } from '../hooks/useGameEntities';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -34,6 +34,8 @@ interface GameCanvasProps {
   setGameState: (s: GameState) => void;
   score: number;
   setScore: React.Dispatch<React.SetStateAction<number>>;
+  levelScore: number;
+  setLevelScore: React.Dispatch<React.SetStateAction<number>>;
   lives: number;
   setLives: React.Dispatch<React.SetStateAction<number>>;
   levelPhase: LevelPhase;
@@ -48,6 +50,7 @@ interface GameCanvasProps {
   soundOn: boolean;
   virtualCommand: string | null;
   clearVirtualCommand: () => void;
+  currentLevelIndex: number;
 }
 
 export const GameCanvas: React.FC<GameCanvasProps> = ({
@@ -55,6 +58,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   setGameState,
   score,
   setScore,
+  levelScore,
+  setLevelScore,
   lives,
   setLives,
   levelPhase,
@@ -69,8 +74,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   soundOn,
   virtualCommand,
   clearVirtualCommand,
+  currentLevelIndex,
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const levelConfig = LEVELS[currentLevelIndex];
 
   // References to keep high-frequency loops extremely fast without component re-renders
   const mapRef = useRef<TileType[][]>([]);
@@ -83,7 +90,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 1.5,
+    speed: 1.3,
     animFrame: 0,
     animTimer: 0,
     invincible: 0,
@@ -107,6 +114,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const tileReadyRef = useRef<number[][]>([]);
   const awaitingBurrowRef = useRef<boolean>(false);
   const dyingBushesRef = useRef<{ col: number; row: number; alpha: number; variant: number }[]>([]);
+  const goldenBroccoliUsedRef = useRef<boolean>(false);
 
   // Sounds active state tracker (to sync with prop without closures stale)
   const soundOnRef = useRef<boolean>(soundOn);
@@ -137,7 +145,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     getPowerCount,
   } = usePlayerInput({
     gameState,
-    score,
+    levelScore,
     levelPhase,
     playerRef,
     enemiesRef,
@@ -148,6 +156,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     frameCountRef,
     scheduledPlantsRef,
     tileReadyRef,
+    setGameState,
   });
 
   // Initialize Game Entity simulation methods
@@ -177,6 +186,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     gameState,
     score,
     setScore,
+    levelScore,
+    setLevelScore,
     setFruitsLeft,
     setGoldenBroccoliTimer,
     setGameState,
@@ -185,6 +196,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     scheduledPlantsRef,
     frameCountRef,
     awaitingBurrowRef,
+    currentLevelIndex,
+    goldenBroccoliUsedRef,
   });
 
   // Decoupled unified rendering callback function
@@ -210,10 +223,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.translate(shakeX, shakeY);
     }
 
-    const escapeActive = levelPhase === 'carrots' && fruitsRef.current.filter(f => f.type === 4).length === 0;
+    const escapeActive = fruitsRef.current.filter(f => f.type !== 5).length === 0;
 
     // Render game layers using pure functions from the Capa de Render
-    drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, player.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current);
+    drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, player.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current, 18, 13);
     drawParticles(ctx, particlesRef.current);
     drawFruits(ctx, fruitsRef.current, mapRef.current, timestamp);
 
@@ -229,9 +242,14 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.globalAlpha = alpha;
 
       const isGolden = player.goldenBroccoliTimer > 0;
+      const isFlickering = player.goldenBroccoliTimer <= 180 && isGolden;
+      const flickerOn = isFlickering ? Math.floor(player.goldenBroccoliTimer / 8) % 2 === 0 : true;
 
       if (isGolden) {
         ctx.save();
+        if (!flickerOn) {
+          ctx.globalAlpha = ctx.globalAlpha * 0.3;
+        }
         ctx.strokeStyle = 'rgba(250, 204, 21, 0.45)';
         ctx.lineWidth = 3.5;
         ctx.shadowBlur = 15;
@@ -249,7 +267,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         player.dir,
         player.animFrame,
         timestamp,
-        isGolden,
+        player.goldenBroccoliTimer,
         player.moving,
         player.plantingAnimTimer,
         player.breakingAnimTimer,
@@ -308,6 +326,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     scheduledPlantsRef,
     tileReadyRef,
     onRender,
+    currentLevelIndex,
   });
 
   // Handle layout loading and reset trigger bounds
@@ -319,7 +338,22 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Hook Virtual Pad inputs in preview iframe
   useEffect(() => {
-    if (!virtualCommand || gameState !== 'playing') return;
+    if (!virtualCommand) return;
+
+    if (virtualCommand === 'PAUSE') {
+      if (gameState === 'playing') {
+        setGameState('paused');
+      } else if (gameState === 'paused') {
+        setGameState('playing');
+      }
+      clearVirtualCommand();
+      return;
+    }
+
+    if (gameState !== 'playing') {
+      clearVirtualCommand();
+      return;
+    }
 
     if (virtualCommand.endsWith('_START')) {
       const dirStr = virtualCommand.replace('_START', '');
@@ -389,7 +423,16 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ref={canvasRef}
         width={W}
         height={H}
-        className="block w-full h-full max-w-full max-h-full rounded-lg bg-[#160d07] object-contain touch-none"
+        onClick={(e) => {
+          if (gameState === 'playing') {
+            const nativeEvt = e.nativeEvent;
+            if ('pointerType' in nativeEvt && (nativeEvt as any).pointerType !== 'mouse') {
+              return;
+            }
+            setGameState('paused');
+          }
+        }}
+        className={`block w-full h-full max-w-full max-h-full rounded-lg bg-[#160d07] object-contain touch-none ${gameState === 'playing' ? 'cursor-pointer' : ''}`}
       />
     </div>
   );

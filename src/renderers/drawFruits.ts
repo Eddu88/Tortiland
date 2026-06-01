@@ -310,6 +310,73 @@ export const drawFruits = (
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(px - 2, yBob - 3, 1.5, 1.5);
       ctx.fillRect(px + 2, yBob - 5, 1.5, 1.5);
+
+    } else if (f.type === 6) {
+      // 🍠 Beetroot (Beterraga) - bulbous magenta root with green leaves
+      ctx.save();
+      ctx.translate(px, yBob);
+      ctx.rotate(Math.PI / 12); // subtle organic rotation
+
+      // Deep magenta radial/linear gradient
+      const beetGrad = ctx.createRadialGradient(-2, -2, 1, 0, 1, 9.5);
+      beetGrad.addColorStop(0, '#fda4af'); // light rose glint
+      beetGrad.addColorStop(0.3, '#be123c'); // rose red body
+      beetGrad.addColorStop(1, '#4c0519'); // deep magenta shadow
+
+      ctx.fillStyle = beetGrad;
+      ctx.strokeStyle = '#881337';
+      ctx.lineWidth = 1.5;
+      ctx.lineJoin = 'round';
+
+      // 1. Draw tapered bulbous root body
+      ctx.beginPath();
+      ctx.moveTo(-8, -3);
+      ctx.bezierCurveTo(-10, -9, 10, -9, 8, -3);
+      ctx.bezierCurveTo(8, 4, 3, 8, 0, 11); // sharp point downwards
+      ctx.bezierCurveTo(-3, 8, -8, 4, -8, -3);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // 2. Leaf stalks/stems extending upwards
+      ctx.strokeStyle = '#be123c'; // red stems
+      ctx.lineWidth = 1.6;
+      ctx.beginPath();
+      // Center stem
+      ctx.moveTo(0, -7); ctx.lineTo(0, -12);
+      // Left stem
+      ctx.moveTo(-2, -7); ctx.quadraticCurveTo(-4, -9, -5, -11);
+      // Right stem
+      ctx.moveTo(2, -7); ctx.quadraticCurveTo(4, -9, 5, -11);
+      ctx.stroke();
+
+      // 3. Green leaves on top of stems
+      ctx.fillStyle = '#15803d'; // dark green
+      ctx.strokeStyle = '#166534';
+      ctx.lineWidth = 0.8;
+
+      // Center leaf
+      ctx.beginPath();
+      ctx.ellipse(0, -14, 2.5, 4, 0, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // Left leaf
+      ctx.beginPath();
+      ctx.ellipse(-7, -13, 2, 3.5, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // Right leaf
+      ctx.beginPath();
+      ctx.ellipse(7, -13, 2, 3.5, Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // Highlight glint reflection
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
+      ctx.beginPath();
+      ctx.ellipse(-3, -3, 2.5, 1.2, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.restore();
     }
 
     ctx.restore();

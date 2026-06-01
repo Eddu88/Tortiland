@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position } from '../types';
-import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, INNER_WALLS } from '../constants';
+import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, LEVELS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 import {
   buildBaseMap,
@@ -28,6 +28,8 @@ interface UseGameEntitiesProps {
   gameState: GameState;
   score: number;
   setScore: React.Dispatch<React.SetStateAction<number>>;
+  levelScore: number;
+  setLevelScore: React.Dispatch<React.SetStateAction<number>>;
   setFruitsLeft: (n: number) => void;
   setGoldenBroccoliTimer: (t: number) => void;
   setGameState: (s: GameState) => void;
@@ -36,6 +38,8 @@ interface UseGameEntitiesProps {
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
   frameCountRef: React.MutableRefObject<number>;
   awaitingBurrowRef: React.MutableRefObject<boolean>;
+  currentLevelIndex: number;
+  goldenBroccoliUsedRef: React.MutableRefObject<boolean>;
 }
 
 export const useGameEntities = ({
@@ -55,6 +59,8 @@ export const useGameEntities = ({
   gameState,
   score,
   setScore,
+  levelScore,
+  setLevelScore,
   setFruitsLeft,
   setGoldenBroccoliTimer,
   setGameState,
@@ -63,18 +69,29 @@ export const useGameEntities = ({
   scheduledPlantsRef,
   frameCountRef,
   awaitingBurrowRef,
+  currentLevelIndex,
+  goldenBroccoliUsedRef,
 }: UseGameEntitiesProps) => {
+
+  const levelConfig = LEVELS[currentLevelIndex];
 
   const getPowerCount = () => {
     if (playerRef.current.goldenBroccoliTimer > 0) {
       return 10;
     }
-    return Math.min(10, score + 1);
+    return Math.min(10, levelScore + 1);
   };
 
 
   const spawnFruitInMap = (type: number) => {
-    const pos = findRandomEmptyCell(mapRef.current, playerRef.current.col, playerRef.current.row, fruitsRef.current);
+    const pos = findRandomEmptyCell(
+      mapRef.current,
+      playerRef.current.col,
+      playerRef.current.row,
+      fruitsRef.current,
+      18,
+      13
+    );
     if (pos) {
       fruitsRef.current.push({
         col: pos.col,
@@ -85,18 +102,52 @@ export const useGameEntities = ({
     }
   };
 
-  const checkGoldenBroccoliSpawn = (currentLives: number) => {
-    if (currentLives === 1) {
-      const hasGolden = fruitsRef.current.some(f => f.type === 5);
-      if (!hasGolden) {
-        spawnFruitInMap(5);
+  const findCellNearPlayer = (): { col: number; row: number } | null => {
+    const player = playerRef.current;
+    const candidates: { col: number; row: number; dist: number }[] = [];
+    for (let c = 1; c < COLS - 1; c++) {
+      for (let r = 1; r < ROWS - 1; r++) {
+        const dist = Math.abs(c - player.col) + Math.abs(r - player.row);
+        if (dist < 3 || dist > 5) continue;
+        if (mapRef.current[r][c] !== T_EMPTY) continue;
+        if (fruitsRef.current.some(f => f.col === c && f.row === r)) continue;
+        if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
+        if (c === 18 && r === 13) continue;
+        candidates.push({ col: c, row: r, dist });
       }
-    } else {
-      // Remove golden broccoli if lives increased
-      fruitsRef.current = fruitsRef.current.filter(f => f.type !== 5);
     }
-    // Update local react state representation
-    const freshCount = fruitsRef.current.filter(f => f.type === (levelPhase === 'tomatoes' ? 3 : 4)).length;
+    if (candidates.length === 0) {
+      return findRandomEmptyCell(mapRef.current, player.col, player.row, fruitsRef.current, 18, 13);
+    }
+    candidates.sort((a, b) => a.dist - b.dist);
+    return candidates[Math.floor(Math.random() * Math.min(5, candidates.length))];
+  };
+
+  const checkGoldenBroccoliSpawn = (currentLives: number) => {
+    // Solo permitido si: 1 vida Y no se ha usado ya en este nivel
+    if (currentLives !== 1) return;
+    if (goldenBroccoliUsedRef.current) return;
+
+    const hasGolden = fruitsRef.current.some(f => f.type === 5);
+    if (hasGolden) return;
+
+    const pos = findCellNearPlayer();
+    if (pos) {
+      fruitsRef.current.push({
+        col: pos.col,
+        row: pos.row,
+        type: 5,
+        anim: Math.random() * Math.PI * 2,
+      });
+    } else {
+      spawnFruitInMap(5);
+    }
+
+    goldenBroccoliUsedRef.current = true; // Marcar como usado para este nivel
+
+    // Sync fruits left
+    const targetType = levelPhase === 'tomatoes' ? 3 : levelPhase === 'carrots' ? 4 : 6;
+    const freshCount = fruitsRef.current.filter(f => f.type === targetType).length;
     setFruitsLeft(freshCount);
   };
 
@@ -156,19 +207,17 @@ export const useGameEntities = ({
   };
 
   const initLevel = (currentLives: number) => {
+    goldenBroccoliUsedRef.current = false; // ← agregar esta línea al inicio
     awaitingBurrowRef.current = false;
     grassAgesRef.current = {};
-    mapRef.current = buildBaseMap(grassAgesRef.current);
+    mapRef.current = buildBaseMap(levelConfig.innerWalls, grassAgesRef.current);
     tileReadyRef.current = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-    // Initialize Torti's House (T_BURROW) in cell col 18, row 13
+    // Initialize Torti's House (T_BURROW)
     mapRef.current[13][18] = T_BURROW;
 
     // Initial bush blocks (distributed in free cells)
-    const bushPositions = [
-      [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11], [13, 18]
-    ];
-    bushPositions.forEach(([r, c]) => {
+    levelConfig.initialBushes.forEach(([r, c]) => {
       if (mapRef.current[r]?.[c] === T_EMPTY) {
         mapRef.current[r][c] = T_BUSH;
         const key = `${r}_${c}`;
@@ -178,12 +227,12 @@ export const useGameEntities = ({
 
     // Reset player parameters safely
     playerRef.current = {
-      col: 1, row: 1,
-      x: 1 * TILE + TILE / 2, y: 1 * TILE + TILE / 2,
-      targetCol: 1, targetRow: 1,
+      col: levelConfig.playerStartCol, row: levelConfig.playerStartRow,
+      x: levelConfig.playerStartCol * TILE + TILE / 2, y: levelConfig.playerStartRow * TILE + TILE / 2,
+      targetCol: levelConfig.playerStartCol, targetRow: levelConfig.playerStartRow,
       moving: false,
       dir: { x: 1, y: 0 },
-      speed: 1.5, // Calibrated speed for comfortable, delay-free tapping
+      speed: 1.3, // Velocidad fija para todos los niveles
       animFrame: 0, animTimer: 0,
       invincible: 60, // 1 sec protection on load
       goldenBroccoliTimer: 0,
@@ -193,7 +242,7 @@ export const useGameEntities = ({
       deathAnimTimer: 0,
     };
 
-    // Spawn core fruits (5 tomatoes initially)
+    // Spawn core fruits (tomatoes initially)
     fruitsRef.current = [];
     setLevelPhase('tomatoes');
     for (let i = 0; i < 5; i++) {
@@ -202,52 +251,22 @@ export const useGameEntities = ({
     checkGoldenBroccoliSpawn(currentLives);
 
     // Load Enemies
-    enemiesRef.current = [ // TODO: serpientes, cocodrilos
-      {
-        id: '1', type: 'patrol',
-        col: 18, row: 10,
-        x: 18 * TILE + TILE / 2, y: 10 * TILE + TILE / 2,
-        targetCol: 18, targetRow: 10,
-        moving: false,
-        dir: { x: 0, y: -1 },
-        speed: 0.7,
-        chaseTimer: 1,
-        animFrame: 0, animTimer: 0,
-      },
-      {
-        id: '2', type: 'patrol',
-        col: 18, row: 1,
-        x: 18 * TILE + TILE / 2, y: 1 * TILE + TILE / 2,
-        targetCol: 18, targetRow: 1,
-        moving: false,
-        dir: { x: -1, y: 0 },
-        speed: 0.7,
-        chaseTimer: 1,
-        animFrame: 0, animTimer: 0,
-      },
-      {
-        id: '3', type: 'chaser',
-        col: 10, row: 13,
-        x: 10 * TILE + TILE / 2, y: 13 * TILE + TILE / 2,
-        targetCol: 10, targetRow: 13,
-        moving: false,
-        dir: { x: -1, y: 0 },
-        speed: 0.9,
-        chaseTimer: 1,
-        animFrame: 0, animTimer: 0,
-      },
-      {
-        id: '4', type: 'ghost',
-        col: 1, row: 13,
-        x: 1 * TILE + TILE / 2, y: 13 * TILE + TILE / 2,
-        targetCol: 1, targetRow: 13,
-        moving: false,
-        dir: { x: 0, y: -1 },
-        speed: 0.6,
-        chaseTimer: 1,
-        animFrame: 0, animTimer: 0,
-      },
-    ];
+    enemiesRef.current = levelConfig.enemies.map(e => ({
+      id: e.id,
+      type: e.type,
+      col: e.col,
+      row: e.row,
+      x: e.col * TILE + TILE / 2,
+      y: e.row * TILE + TILE / 2,
+      targetCol: e.col,
+      targetRow: e.row,
+      moving: false,
+      dir: e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 },
+      speed: e.speed,
+      chaseTimer: 1,
+      animFrame: 0,
+      animTimer: 0,
+    }));
 
     particlesRef.current = [];
     prevMapRef.current = mapRef.current.map(r => [...r]);
@@ -271,17 +290,19 @@ export const useGameEntities = ({
         // Golden Broccoli power up consumed!
         player.goldenBroccoliTimer = 600; // 10 seconds of grass-piercing glory
         setGoldenBroccoliTimer(10);
+        goldenBroccoliUsedRef.current = true; // ← confirmar consumo
         SoundEffects.playPowerUp();
         spawnParticles(player.col, player.row, '#ffd700');
       } else {
         // Safe standard fruits
         setScore(prev => prev + 1);
+        setLevelScore(prev => prev + 1);
         SoundEffects.playCollect();
         spawnParticles(player.col, player.row, '#ffffff');
       }
 
       // Check state advancement
-      const targetFruitsCount = currentFruits.filter(f => f.type === (levelPhase === 'tomatoes' ? 3 : 4)).length;
+      const targetFruitsCount = currentFruits.filter(f => f.type === (levelPhase === 'tomatoes' ? 3 : (levelPhase === 'carrots' ? 4 : 6))).length;
       setFruitsLeft(targetFruitsCount);
 
       if (targetFruitsCount === 0) {
@@ -294,9 +315,27 @@ export const useGameEntities = ({
             spawnFruitInMap(4);
           }
           checkGoldenBroccoliSpawn(lives);
-        } else {
-          // Carrots phase complete! The escape house is now active.
-          awaitingBurrowRef.current = true;
+        } else if (levelPhase === 'carrots') {
+          if (currentLevelIndex >= 3) {
+            // Switch to Beets phase (Level 4, 5, 6)
+            setLevelPhase('beets');
+            fruitsRef.current = fruitsRef.current.filter(f => f.type !== 5); // Flush active golden broccoli
+            // Spawn beets
+            for (let i = 0; i < 5; i++) {
+              spawnFruitInMap(6);
+            }
+            checkGoldenBroccoliSpawn(lives);
+          } else {
+            // Carrots phase complete! The escape house is now active.
+            if (fruitsRef.current.filter(f => f.type !== 5).length === 0) {
+              awaitingBurrowRef.current = true;
+            }
+          }
+        } else if (levelPhase === 'beets') {
+          // Beets phase complete! The escape house is now active.
+          if (fruitsRef.current.filter(f => f.type !== 5).length === 0) {
+            awaitingBurrowRef.current = true;
+          }
         }
       }
     }
@@ -476,8 +515,13 @@ export const useGameEntities = ({
 
           // Check escape victory condition when Torti enters the house cell and escape is active
           if (player.col === 18 && player.row === 13 && awaitingBurrowRef.current) {
-            setGameState('win');
-            SoundEffects.playVictory();
+            if (currentLevelIndex < LEVELS.length - 1) {
+              setGameState('level_complete');
+              SoundEffects.playVictory();
+            } else {
+              setGameState('win');
+              SoundEffects.playVictory();
+            }
           }
         } else {
           player.x += (dx / dist) * player.speed;
@@ -567,7 +611,7 @@ export const useGameEntities = ({
 
   const checkCollisions = () => {
     const player = playerRef.current;
-    if (player.invincible > 0 || player.deathAnimTimer > 0) return;
+    if (player.invincible > 0 || player.deathAnimTimer > 0 || player.goldenBroccoliTimer > 0) return;
 
     for (const e of enemiesRef.current) {
       const dx = player.x - e.x;
@@ -583,33 +627,35 @@ export const useGameEntities = ({
     }
   };
 
-  const respawnEntities = () => {
+  const respawnEntities = (config = levelConfig) => {
     const player = playerRef.current;
-    player.col = 1;
-    player.row = 1;
-    player.x = 1 * TILE + TILE / 2;
-    player.y = 1 * TILE + TILE / 2;
-    player.targetCol = 1;
-    player.targetRow = 1;
+    player.col = config.playerStartCol;
+    player.row = config.playerStartRow;
+    player.x = config.playerStartCol * TILE + TILE / 2;
+    player.y = config.playerStartRow * TILE + TILE / 2;
+    player.targetCol = config.playerStartCol;
+    player.targetRow = config.playerStartRow;
     player.moving = false;
 
-    if (enemiesRef.current.length >= 4) {
-      const e0 = enemiesRef.current[0];
-      e0.col = 18; e0.row = 10; e0.x = 18 * TILE + TILE / 2; e0.y = 10 * TILE + TILE / 2;
-      e0.moving = false; e0.chaseTimer = 1;
-
-      const e1 = enemiesRef.current[1];
-      e1.col = 18; e1.row = 1; e1.x = 18 * TILE + TILE / 2; e1.y = 1 * TILE + TILE / 2;
-      e1.moving = false; e1.chaseTimer = 1;
-
-      const e2 = enemiesRef.current[2];
-      e2.col = 10; e2.row = 13; e2.x = 10 * TILE + TILE / 2; e2.y = 13 * TILE + TILE / 2;
-      e2.moving = false; e2.chaseTimer = 1;
-
-      const e3 = enemiesRef.current[3];
-      e3.col = 1; e3.row = 13; e3.x = 1 * TILE + TILE / 2; e3.y = 13 * TILE + TILE / 2;
-      e3.moving = false; e3.chaseTimer = 1;
-    }
+    enemiesRef.current = config.enemies.map((e, idx) => {
+      const existing = enemiesRef.current[idx];
+      return {
+        id: e.id,
+        type: e.type,
+        col: e.col,
+        row: e.row,
+        x: e.col * TILE + TILE / 2,
+        y: e.row * TILE + TILE / 2,
+        targetCol: e.col,
+        targetRow: e.row,
+        moving: false,
+        dir: existing?.dir || (e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 }),
+        speed: e.speed,
+        chaseTimer: 1,
+        animFrame: existing?.animFrame || 0,
+        animTimer: existing?.animTimer || 0,
+      };
+    });
   };
 
   const detectMapChanges = () => {

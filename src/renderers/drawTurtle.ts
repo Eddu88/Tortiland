@@ -13,12 +13,13 @@ export const drawGardenTurtle = (
   dir: Position,
   frame: number,
   t: number,
-  isGolden: boolean,
+  goldenBroccoliTimer: number,
   playerIsMoving: boolean,
   plantingAnimTimer: number = 0,
   breakingAnimTimer: number = 0,
   deathAnimTimer: number = 0
 ) => {
+  const isGolden = goldenBroccoliTimer > 0;
   ctx.save();
 
   // Scale factor: Torti is pleasantly robust, tall, and chunky.
@@ -26,7 +27,7 @@ export const drawGardenTurtle = (
   let breakScale = 1.0;
   let breakOffsetX = 0;
   let breakOffsetY = 0;
-  
+
   // Death animation properties (shock, hide, roll falling and ghost parpadeo)
   let deathJumpY = 0;
   let deathAngle = 0;
@@ -60,7 +61,7 @@ export const drawGardenTurtle = (
       isShocked = true;
       tuckProgress = (146 - deathAnimTimer) / 35; // smoothly tuck limbs and body
       isTuckedDeath = tuckProgress >= 0.5;
-      
+
       const shakeAngle = Math.sin(t * 0.25) * 0.09;
       ctx.translate(px, cy);
       ctx.rotate(shakeAngle);
@@ -78,6 +79,13 @@ export const drawGardenTurtle = (
 
   cy += deathJumpY + deathFallY;
   ctx.globalAlpha = ctx.globalAlpha * deathOpacity;
+
+  const isFlickering = goldenBroccoliTimer <= 180 && isGolden;
+  const flickerOn = isFlickering ? Math.floor(goldenBroccoliTimer / 8) % 2 === 0 : true;
+
+  if (isGolden && !flickerOn) {
+    ctx.globalAlpha = ctx.globalAlpha * 0.3;
+  }
 
   if (breakingAnimTimer > 0) {
     if (breakingAnimTimer >= 60) {
@@ -246,17 +254,22 @@ export const drawGardenTurtle = (
     legScaleY = 0;
   }
 
-  // If moving left, flip horizontally around Torti's center point
-  if (dir.x < 0) {
-    ctx.translate(finalPx, 0);
+  // Directional orientation
+  const facing: 'right' | 'left' | 'up' | 'down' =
+    dir.x > 0 ? 'right' :
+      dir.x < 0 ? 'left' :
+        dir.y < 0 ? 'up' : 'down';
+
+  if (facing === 'left') {
+    ctx.translate(finalPx, finalCy);
     ctx.scale(-1, 1);
-    ctx.translate(-finalPx, 0);
+    ctx.translate(-finalPx, -finalCy);
   }
 
   // Helper to draw chubby legs
   const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number, isFront: boolean) => {
     if (legScaleY === 0 || limbsScale === 0 || tuckProgress >= 1.0) return; // Skip drawing when tucked in shell
-    
+
     ctx.save();
     let scaleY = legScaleY * (1 - tuckProgress);
     let scaleX = (1 - tuckProgress);
@@ -290,7 +303,7 @@ export const drawGardenTurtle = (
           offY = dir.y * pushAmount;
         }
       }
-      
+
       // Propagate bodyOffsetY for synchronized movement during the jump
       offY += bodyOffsetY;
     }
@@ -349,38 +362,12 @@ export const drawGardenTurtle = (
     ctx.restore();
   }
 
-  // If naked, draw the exposed pink/light-green textured back of Torti behind shell
-  if (isNaked) {
-    ctx.save();
-    const nakedCx = finalPx - s * 0.32;
-    const nakedCy = finalCy + s * 0.06 + bodyOffsetY;
-    ctx.translate(nakedCx, nakedCy);
-
-    // Draw the naked body oval
-    ctx.fillStyle = '#e8a7a1'; // soft pink naked skin color
-    ctx.strokeStyle = skinOutline;
-    ctx.lineWidth = 2.2;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, s * 0.35, s * 0.40, Math.PI * 0.04, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-
-    // Draw spine lines/wrinkles
-    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-    ctx.lineWidth = 1.8;
-    ctx.beginPath();
-    ctx.moveTo(0, -s * 0.2);
-    ctx.lineTo(0, s * 0.2);
-    ctx.stroke();
-
-    ctx.restore();
-  }
 
   // Draw shell behind body (with independent translation, rotation, and squash/stretch scale)
   ctx.save();
-  const currentShellOffset = - s * 0.32 * (1 - tuckProgress);
+  const currentShellOffset = (facing === 'up' || facing === 'down') ? 0 : -s * 0.32 * (1 - tuckProgress);
   const shellCx = finalPx + currentShellOffset + localOffsetX;
-  const shellCy = finalCy + s * 0.06 + bodyOffsetY + localOffsetY;
+  const shellCy = finalCy + s * 0.05 + bodyOffsetY + localOffsetY;
   ctx.translate(shellCx, shellCy);
   ctx.rotate(shellRotation);
   ctx.scale(shellScaleX, shellScaleY);
@@ -398,8 +385,8 @@ export const drawGardenTurtle = (
   ctx.beginPath();
   ctx.arc(-s * 0.16, -s * 0.30, s * 0.11, 0, Math.PI * 2);
   ctx.arc(-s * 0.22, -s * 0.04, s * 0.13, 0, Math.PI * 2);
-  ctx.arc(-s * 0.10,  s * 0.20, s * 0.11, 0, Math.PI * 2);
-  ctx.arc( s * 0.08, -s * 0.22, s * 0.08, 0, Math.PI * 2);
+  ctx.arc(-s * 0.10, s * 0.20, s * 0.11, 0, Math.PI * 2);
+  ctx.arc(s * 0.08, -s * 0.22, s * 0.08, 0, Math.PI * 2);
   ctx.fill();
 
   ctx.restore();
@@ -408,7 +395,7 @@ export const drawGardenTurtle = (
   drawChubbyLeg(finalPx - s * 0.20, finalCy + s * 0.40, walkOffset, false);
 
   // Draw torso and cream/tan belly (plastron)
-  if (tuckProgress < 1.0) {
+  if (tuckProgress < 1.0 && (facing !== 'up' || isNaked)) {
     ctx.save();
     const bellyScale = 1 - tuckProgress;
     ctx.translate(finalPx - s * 0.04, finalCy + s * 0.1 + bodyOffsetY);
@@ -447,7 +434,9 @@ export const drawGardenTurtle = (
       rArmScale = 0.5 * (1 - tuckProgress);
     }
     rArmScale *= limbsScale;
-    ctx.translate(finalPx - s * 0.40, finalCy + s * 0.08 + bodyOffsetY);
+    const armX = facing === 'up' ? finalPx - s * 0.52 : finalPx - s * 0.40;
+    const armY = facing === 'up' ? finalCy + s * 0.05 + bodyOffsetY : finalCy + s * 0.08 + bodyOffsetY;
+    ctx.translate(armX, armY);
     ctx.scale(rArmScale, rArmScale);
     ctx.fillStyle = skinColor;
     ctx.strokeStyle = skinOutline;
@@ -460,7 +449,7 @@ export const drawGardenTurtle = (
   }
 
   // Draw neck
-  if (headScale > 0 && limbsScale > 0 && tuckProgress < 1.0) {
+  if (headScale > 0 && limbsScale > 0 && tuckProgress < 1.0 && facing !== 'up') {
     ctx.save();
     ctx.translate(finalPx + s * 0.08 + headOffsetX, finalCy - s * 0.18 + headOffsetY);
     ctx.scale(headScale * limbsScale * (1 - tuckProgress), headScale * limbsScale * (1 - tuckProgress));
@@ -476,8 +465,13 @@ export const drawGardenTurtle = (
 
   // Draw head (big rounded cute green head)
   if (headScale > 0 && limbsScale > 0 && tuckProgress < 1.0) {
-    const hx = finalPx + s * 0.12 + headOffsetX;
-    const hy = finalCy - s * 0.35 + headOffsetY;
+    const hx = facing === 'down' ? finalPx - s * 0.04
+      : facing === 'up' ? finalPx
+        : finalPx + s * 0.12 + headOffsetX;
+
+    const hy = facing === 'down' ? finalCy - s * 0.50 + headOffsetY
+      : facing === 'up' ? finalCy - s * 0.48 + headOffsetY  // nuca asomando arriba
+        : finalCy - s * 0.35 + headOffsetY;
     ctx.save();
     ctx.translate(hx, hy);
     ctx.scale(headScale * limbsScale * (1 - tuckProgress), headScale * limbsScale * (1 - tuckProgress));
@@ -547,7 +541,7 @@ export const drawGardenTurtle = (
           ctx.shadowColor = '#ffd700';
           const len = s * 0.08;
           // 4 trazos en ángulos 0°, 45°, 90°, 135° (dibujados desde el centro hacia afuera)
-          [[1,0],[-1,0],[0,1],[0,-1],[0.7,0.7],[-0.7,-0.7],[0.7,-0.7],[-0.7,0.7]].forEach(([dx,dy]) => {
+          [[1, 0], [-1, 0], [0, 1], [0, -1], [0.7, 0.7], [-0.7, -0.7], [0.7, -0.7], [-0.7, 0.7]].forEach(([dx, dy]) => {
             ctx.beginPath();
             ctx.moveTo(ex, ey);
             ctx.lineTo(ex + dx * len, ey + dy * len);
@@ -579,34 +573,43 @@ export const drawGardenTurtle = (
       }
     };
 
-    drawCuteEye(-s * 0.08, -s * 0.02);
-    drawCuteEye(s * 0.20, -s * 0.02);
+    if (facing === 'down') {
+      drawCuteEye(-s * 0.14, -s * 0.02);
+      drawCuteEye(s * 0.14, -s * 0.02);
+    } else if (facing !== 'up') {
+      drawCuteEye(-s * 0.08, -s * 0.02);
+      drawCuteEye(s * 0.20, -s * 0.02);
+    }
 
     // Draw blush cheeks (only if not shocked)
-    if (!isShocked) {
+    if (!isShocked && facing !== 'up') {
+      const blushOffL = facing === 'down' ? -s * 0.22 : -s * 0.18;
+      const blushOffR = facing === 'down' ? s * 0.22 : s * 0.25;
       ctx.fillStyle = blushColor;
       ctx.beginPath();
-      ctx.ellipse(-s * 0.18, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
-      ctx.ellipse(s * 0.25, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+      ctx.ellipse(blushOffL, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
+      ctx.ellipse(blushOffR, s * 0.1, s * 0.09, s * 0.06, 0, 0, Math.PI * 2);
       ctx.fill();
     }
 
     // Draw mouth
-    ctx.strokeStyle = mouthColor;
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.beginPath();
-    if (isShocked) {
-      // Big shocked circle mouth!
-      ctx.fillStyle = mouthColor;
-      ctx.arc(s * 0.06, s * 0.12, s * 0.06, 0, Math.PI * 2);
-      ctx.fill();
-    } else {
-      ctx.moveTo(s * 0.02, s * 0.08);
-      ctx.lineTo(s * 0.06, s * 0.13);
-      ctx.lineTo(s * 0.10, s * 0.08);
-      ctx.stroke();
+    if (facing !== 'up') {
+      ctx.strokeStyle = mouthColor;
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.beginPath();
+      if (isShocked) {
+        // Big shocked circle mouth!
+        ctx.fillStyle = mouthColor;
+        ctx.arc(s * 0.06, s * 0.12, s * 0.06, 0, Math.PI * 2);
+        ctx.fill();
+      } else {
+        ctx.moveTo(s * 0.02, s * 0.08);
+        ctx.lineTo(s * 0.06, s * 0.13);
+        ctx.lineTo(s * 0.10, s * 0.08);
+        ctx.stroke();
+      }
     }
 
     ctx.restore();
@@ -624,7 +627,9 @@ export const drawGardenTurtle = (
       }
     }
     fArmScale *= limbsScale;
-    ctx.translate(finalPx + s * 0.30, finalCy + s * 0.10 + bodyOffsetY);
+    const armX = facing === 'up' ? finalPx + s * 0.52 : finalPx + s * 0.30;
+    const armY = facing === 'up' ? finalCy + s * 0.05 + bodyOffsetY : finalCy + s * 0.10 + bodyOffsetY;
+    ctx.translate(armX, armY);
     ctx.scale(fArmScale, fArmScale);
     ctx.fillStyle = skinColor;
     ctx.strokeStyle = skinOutline;

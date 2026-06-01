@@ -6,7 +6,7 @@
 import React, { useState, useEffect } from 'react';
 import { GameState, HighScore, LevelPhase } from '../types';
 import { formatTime } from '../utils/map';
-import { Volume2, VolumeX, Star } from 'lucide-react';
+import { Volume2, VolumeX, Star, Pause, Play } from 'lucide-react';
 
 interface GameControlsProps {
   score: number;
@@ -87,13 +87,22 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <div className="h-3 w-px bg-[#5c3a21] mx-1.5"></div>
             <span className="font-press-start text-[8px] tracking-widest text-[#fef08a]">CONSOLA TORTILAND</span>
           </div>
-          <button
-            onClick={() => setSoundOn(!soundOn)}
-            className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4a2e19] hover:bg-[#5c3a21] border border-[#a1622e] text-[#fef08a] transition-all cursor-pointer shadow-md"
-            title="Toggle Sound"
-          >
-            {soundOn ? <Volume2 size={14} className="text-[#86efac] animate-pulse" /> : <VolumeX size={14} className="text-[#fca5a5]" />}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => triggerVirtualCommand('PAUSE')}
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4a2e19] hover:bg-[#5c3a21] border border-[#a1622e] text-[#fef08a] transition-all cursor-pointer shadow-md"
+              title="Pause/Resume Game"
+            >
+              {gameState === 'paused' ? <Play size={11} fill="currentColor" className="text-[#86efac] animate-pulse" /> : <Pause size={11} fill="currentColor" className="text-[#fde047]" />}
+            </button>
+            <button
+              onClick={() => setSoundOn(!soundOn)}
+              className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4a2e19] hover:bg-[#5c3a21] border border-[#a1622e] text-[#fef08a] transition-all cursor-pointer shadow-md"
+              title="Toggle Sound"
+            >
+              {soundOn ? <Volume2 size={14} className="text-[#86efac] animate-pulse" /> : <VolumeX size={14} className="text-[#fca5a5]" />}
+            </button>
+          </div>
         </div>
 
         {/* DPAD Controller Design in Carved Wood styling */}
