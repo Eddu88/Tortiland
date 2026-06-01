@@ -259,9 +259,9 @@ export default function App() {
                 )}
 
                 {gameState === 'menu' && (
-                   <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
+                  <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
                     <span className="px-3 py-1 rounded-md text-[9px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
-                      V6.0 TORTILAND
+                      V7.1 TORTILAND
                     </span>
                     <h2 className="font-press-start text-base md:text-lg text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       TORTILAND
@@ -329,7 +329,7 @@ export default function App() {
                               onClick={() => setSelectedLevelIndex(idx)}
                               className={`
                                 relative aspect-square flex flex-col items-center justify-center rounded-xl transition-all duration-200 select-none border-2
-                                ${isComingSoon || !isUnlocked 
+                                ${isComingSoon || !isUnlocked
                                   ? 'bg-[#160d07]/60 border-[#5c3a21]/30 text-stone-600 opacity-45 cursor-not-allowed'
                                   : isSelected
                                     ? 'bg-[#5c3a21] border-[#eab308] text-[#fde047] shadow-[0_0_12px_#eab308] scale-[1.05] cursor-pointer animate-pulse'
@@ -498,11 +498,11 @@ export default function App() {
                     <div className="h-12 w-12 rounded-full bg-[#854d0e]/20 border-2 border-[#eab308] flex items-center justify-center text-[#eab308] animate-bounce text-lg">
                       🌿
                     </div>
-                    
+
                     <span className="px-3 py-1 rounded-md text-[8px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
                       ¡NIVEL COMPLETADO!
                     </span>
-                    
+
                     <h2 className="font-press-start text-xs text-[#facc15] tracking-widest mt-1 uppercase text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       {LEVELS[currentLevelIndex]?.name}
                     </h2>
