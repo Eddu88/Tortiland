@@ -43,8 +43,14 @@ export default function App() {
       if (nextLevel > maxUnlocked && nextLevel <= 6) {
         localStorage.setItem('tortiland_max_level', String(nextLevel));
       }
+
+      // Guardar las estrellas obtenidas en el nivel completado
+      const stars = goldenBroccoliTimer > 0 ? 0 : lives >= 2 ? 2 : 1;
+      const levelNum = currentLevelIndex + 1;
+      const prev = parseInt(localStorage.getItem(`tortiland_stars_${levelNum}`) || '0', 10);
+      if (stars > prev) localStorage.setItem(`tortiland_stars_${levelNum}`, String(stars));
     }
-  }, [gameState, currentLevelIndex]);
+  }, [gameState, currentLevelIndex, lives, goldenBroccoliTimer]);
 
   const launchLevel = (levelIdx: number, isNewGame: boolean) => {
     if (isNewGame) {
@@ -240,7 +246,7 @@ export default function App() {
                         PAUSA
                       </h2>
 
-                      <p className="text-[#fed7aa]/80 text-[11px] leading-relaxed text-center font-mono max-w-xs">
+                      <p className="text-[#fed7aa]/80 text-sm leading-relaxed text-center font-mono max-w-sm">
                         El juego se encuentra pausado. Tus vidas y marcador están a salvo.
                       </p>
 
@@ -264,25 +270,31 @@ export default function App() {
                 )}
 
                 {gameState === 'menu' && (
-                  <div className="flex flex-col items-center gap-4 max-w-md animate-fade-in w-full text-[#e2f1e4]">
+                  <div className="flex flex-col items-center gap-6 max-w-3xl animate-fade-in w-full text-[#e2f1e4]">
                     <span className="px-3 py-1 rounded-md text-[9px] font-press-start text-[#4ade80] bg-[#14532d]/40 border border-[#22c55e]/30 tracking-wider">
-                      V7.1 TORTILAND
+                      V8.1 TORTILAND
                     </span>
-                    <h2 className="font-press-start text-base md:text-lg text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
+                    <h2 className="font-press-start text-2xl text-[#facc15] tracking-widest mt-1 uppercase drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       TORTILAND
                     </h2>
 
-                    <p className="text-[#86efac]/70 text-xs leading-relaxed font-sans max-w-sm">
+                    <p className="text-[#86efac]/70 text-sm leading-relaxed font-sans max-w-2xl text-center">
                       Maneja a nuestra carismática tortuga para sembrar y remover tupidas barreras de arbustos mágicos. ¡Come todas las verduras silvestres antes de que los zorros te atrapen!
                     </p>
 
-                    <div className="rounded-xl bg-[#0f2413] border border-[#224d27] p-4 text-left w-full text-xs text-[#86efac]/80 flex flex-col gap-2 shadow-inner">
+                    <div className="rounded-xl bg-[#0f2413] border border-[#224d27] p-5 text-left w-full text-sm text-[#86efac]/80 flex flex-col gap-2.5 shadow-inner">
                       <div className="flex items-center gap-1.5 text-[#facc15] font-bold uppercase tracking-wider">
                         CRÓNICA DE UN JARDÍN MÁGICO
                       </div>
                       <p>🎮 <span className="text-white font-semibold">Flechas:</span> Mueve a la tortuga por el laberinto.</p>
                       <p>⚡ <span className="text-[#facc15] font-semibold">Espacio / F:</span> Siembra en celda vacía o Poda(Quita) el arbusto mágico.</p>
                       <p>🥦 Al quedar con <span className="text-[#facc15] font-semibold">1 sola vida</span>... ¡Busca el <span className="text-[#facc15] font-semibold">Brócoli Dorado</span> para atravesar arbustos libremente y crear más arbustos!</p>
+                      <div className="flex flex-col gap-1.5 mt-2 border-t border-[#224d27]/40 pt-2">
+                        <p className="text-[#facc15] font-semibold">Sistema de estrellas:</p>
+                        <p>2 ⭐ — Terminas el nivel con <span className="text-white font-semibold">2 vidas</span></p>
+                        <p>1 ⭐ — Terminas el nivel con <span className="text-white font-semibold">1 vida</span>, sin usar el Brócoli Dorado</p>
+                        <p>0 ⭐ — Usaste el <span className="text-[#facc15] font-semibold">Brócoli Dorado </span> 🥦, con una vida</p>
+                      </div>
                     </div>
 
                     <button
@@ -292,9 +304,9 @@ export default function App() {
                         setPreviousScreen('menu');
                         setGameState('level_select');
                       }}
-                      className="flex items-center gap-2 rounded-xl bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] hover:shadow-lg hover:shadow-amber-950/50 shadow-md shadow-amber-950/40 px-8 py-3.5 font-press-start text-[10px] tracking-wider cursor-pointer transform hover:scale-[1.02] active:scale-95 transition-all font-bold mt-2"
+                      className="flex items-center gap-2 rounded-xl bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] hover:shadow-lg hover:shadow-amber-950/50 shadow-md shadow-amber-950/40 px-8 py-4 font-press-start text-sm tracking-wider cursor-pointer transform hover:scale-[1.02] active:scale-95 transition-all font-bold mt-2"
                     >
-                      <Play size={12} fill="currentColor" />
+                      <Play size={14} fill="currentColor" />
                       EMPEZAR AVENTURA
                     </button>
                   </div>
@@ -383,7 +395,7 @@ export default function App() {
                     </div>
 
                     {/* Details & Play Panel */}
-                    <div className="w-full bg-[#160d07] border-2 border-[#5c3a21] rounded-xl p-3 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-inner">
+                    <div className="w-full bg-[#160d07] border-2 border-[#5c3a21] rounded-xl p-5 flex flex-col sm:flex-row items-center justify-between gap-5 shadow-inner">
                       <div className="flex-1 text-left w-full">
                         {(() => {
                           const levelNum = selectedLevelIndex + 1;
@@ -391,10 +403,10 @@ export default function App() {
                           if (isComingSoon) {
                             return (
                               <>
-                                <h3 className="font-press-start text-[8px] md:text-[9px] text-stone-500 uppercase tracking-wider mb-1">
+                                <h3 className="font-press-start text-xs md:text-sm text-stone-500 uppercase tracking-wider mb-1">
                                   NIVEL {levelNum}: PRÓXIMAMENTE
                                 </h3>
-                                <p className="text-stone-600 text-[10px] md:text-[11px] leading-relaxed font-sans font-semibold">
+                                <p className="text-stone-600 text-xs md:text-sm leading-relaxed font-sans font-semibold">
                                   Contenido reservado para futuras aventuras en Tortiland.
                                 </p>
                               </>
@@ -406,7 +418,7 @@ export default function App() {
                             return (
                               <>
                                 <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  <h3 className="font-press-start text-[8px] md:text-[9px] text-[#facc15] uppercase tracking-wider">
+                                  <h3 className="font-press-start text-xs md:text-sm text-[#facc15] uppercase tracking-wider">
                                     NIVEL {levelNum}: {config?.name}
                                   </h3>
                                   {isCompleted && (
@@ -415,7 +427,7 @@ export default function App() {
                                     </span>
                                   )}
                                 </div>
-                                <p className="text-[#fed7aa]/80 text-[10px] md:text-[11px] leading-normal font-sans">
+                                <p className="text-[#fed7aa]/80 text-xs md:text-sm leading-normal font-sans">
                                   {config?.description}
                                 </p>
                               </>
@@ -436,7 +448,7 @@ export default function App() {
                           }
                         }}
                         className={`
-                          shrink-0 font-press-start text-[9px] tracking-wider px-6 py-3.5 rounded-xl transition-all duration-150 transform font-bold w-full sm:w-auto text-center
+                          shrink-0 font-press-start text-xs tracking-wider px-8 py-4 rounded-xl transition-all duration-150 transform font-bold w-full sm:w-auto text-center
                           ${selectedLevelIndex >= 6
                             ? 'bg-[#2d1a10] border-2 border-[#5c3a21] text-stone-600 opacity-50 cursor-not-allowed'
                             : 'bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] cursor-pointer hover:scale-[1.02] active:scale-95 shadow-md shadow-amber-950/40'
