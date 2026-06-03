@@ -91,7 +91,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 130, // px/s (era 120)
+    speed: 120, // px/s (era 120)
     animFrame: 0,
     animTimer: 0,
     invincible: 0,
@@ -109,7 +109,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const grassAgesRef = useRef<{ [key: string]: { createdAt: number } }>({});
   const breakingTilesRef = useRef<GridPos[]>([]);
   const plantingTilesRef = useRef<GridPos[]>([]);
-  const triggerActionRef = useRef<() => void>(() => {});
+  const triggerActionRef = useRef<() => void>(() => { });
   const frameCountRef = useRef<number>(0);
   const scheduledPlantsRef = useRef<{ col: number; row: number; triggerAt: number }[]>([]);
   const scheduledBreaksRef = useRef<ScheduledBreak[]>([]);
@@ -218,7 +218,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     const isPlantShake = player.plantingAnimTimer >= 517 && player.plantingAnimTimer <= 620;
 
     ctx.save();
-    
+
     if (isBreakShake) {
       const shakeX = (Math.random() * 2 - 1) * 2.5;
       const shakeY = (Math.random() * 2 - 1) * 2.5;
@@ -404,9 +404,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         keysRef.current[code] = false;
 
         const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
-                               keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
-                               keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
-                               keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+          keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+          keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+          keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
         if (!hasMovementKey) {
           turnBlockedRef.current = false;
           lastDirRef.current = null;

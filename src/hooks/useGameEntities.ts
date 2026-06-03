@@ -239,7 +239,7 @@ export const useGameEntities = ({
       targetCol: levelConfig.playerStartCol, targetRow: levelConfig.playerStartRow,
       moving: false,
       dir: { x: 1, y: 0 },
-      speed: 130, // Velocidad fija en px/s (era 120)
+      speed: 120, // Velocidad fija en px/s (era 120)
       animFrame: 0, animTimer: 0,
       invincible: 0, // no protection on load
       goldenBroccoliTimer: 0,
