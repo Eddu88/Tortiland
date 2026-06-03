@@ -146,6 +146,10 @@ export const usePlayerInput = ({
         player.plantingAnimTimer = 620; // 37 frames * 16.67ms = 620ms
       }
     }
+
+    if (actionExecuted) {
+      console.log(`[POWER] action=${action} tiles=${action === 'create' ? plantingTilesRef.current.length : breakingTilesRef.current.length} cooldown=${player.powerCooldown}`);
+    }
   };
 
   const triggerAction = () => {
@@ -163,7 +167,9 @@ export const usePlayerInput = ({
     const dir = player.dir;
     const targetCol = player.col + dir.x;
     const targetRow = player.row + dir.y;
-
+ 
+    console.log(`[ACTION] dir=${JSON.stringify(player.dir)} targetCol=${targetCol} targetRow=${targetRow} isBush=${isBush(targetCol, targetRow, mapRef.current)}`);
+ 
     if (targetCol <= 0 || targetCol >= COLS - 1 || targetRow <= 0 || targetRow >= ROWS - 1) return;
     if (isWall(targetCol, targetRow, mapRef.current)) return;
 

@@ -117,17 +117,15 @@ export const useGameLoop = ({
 
         // Process scheduled plants
         scheduledPlantsRef.current.forEach(plant => {
-          if (plant.triggerAt > 0) {
-            plant.triggerAt -= deltaMs;
-            if (plant.triggerAt <= 0) {
-              plant.triggerAt = 0;
-              mapRef.current[plant.row][plant.col] = T_BUSH;
-              const key = `${plant.row}_${plant.col}`;
-              grassAgesRef.current[key] = { createdAt: Date.now() };
-              // Spawn brown dirt particles!
-              spawnParticles(plant.col, plant.row, '#8B5E3C', undefined, true);
-              SoundEffects.playBuild();
-            }
+          plant.triggerAt -= deltaMs;
+          if (plant.triggerAt <= 0) {
+            console.log(`[PLANT EJECUTADO] col=${plant.col} row=${plant.row}`);
+            mapRef.current[plant.row][plant.col] = T_BUSH;
+            const key = `${plant.row}_${plant.col}`;
+            grassAgesRef.current[key] = { createdAt: Date.now() };
+            // Spawn brown dirt particles!
+            spawnParticles(plant.col, plant.row, '#8B5E3C', undefined, true);
+            SoundEffects.playBuild();
           }
         });
 
@@ -136,27 +134,44 @@ export const useGameLoop = ({
 
         // Process scheduled breaks
         scheduledBreaksRef.current.forEach(b => {
-          if (b.triggerAt > 0) {
-            b.triggerAt -= deltaMs;
-            if (b.triggerAt <= 0) {
-              b.triggerAt = 0;
-              mapRef.current[b.row][b.col] = T_EMPTY;
-              const hashVal = Math.abs(Math.sin(b.row * 12.9898 + b.col * 78.233)) * 43758.5453;
-              const variant = Math.floor(hashVal % 3);
-              dyingBushesRef.current.push({ col: b.col, row: b.row, alpha: 1.0, variant });
-              // Directional leaf particles!
-              spawnParticles(b.col, b.row, '#4caf50', b.dir);
-              spawnParticles(b.col, b.row, '#2e7d32', b.dir);
-              SoundEffects.playBreak();
-            }
+          b.triggerAt -= deltaMs;
+          if (b.triggerAt <= 0) {
+            console.log(`[BREAK EJECUTADO] col=${b.col} row=${b.row}`);
+            mapRef.current[b.row][b.col] = T_EMPTY;
+            const hashVal = Math.abs(Math.sin(b.row * 12.9898 + b.col * 78.233)) * 43758.5453;
+            const variant = Math.floor(hashVal % 3);
+            dyingBushesRef.current.push({ col: b.col, row: b.row, alpha: 1.0, variant });
+            // Directional leaf particles!
+            spawnParticles(b.col, b.row, '#4caf50', b.dir);
+            spawnParticles(b.col, b.row, '#2e7d32', b.dir);
+            SoundEffects.playBreak();
           }
         });
 
         // Filter active scheduled breaks
         scheduledBreaksRef.current = scheduledBreaksRef.current.filter(b => b.triggerAt > 0);
 
-        // Trigger Break action at start of tick 48 (Impact) - recalculated for 620ms timer
-        if (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 398 && breakingTilesRef.current.length > 0) {
+        const prevBreak = player.breakingAnimTimer + deltaMs;
+        const prevPlant = player.plantingAnimTimer + deltaMs;
+
+        // Reset the trigger flags when animations are inactive
+        if (player.breakingAnimTimer <= 0) {
+          player.breakTriggerFired = false;
+        }
+        if (player.plantingAnimTimer <= 0) {
+          player.plantTriggerFired = false;
+        }
+
+        if (player.breakingAnimTimer > 0) {
+          console.log(`[BREAK TRIGGER CHECK] timer=${player.breakingAnimTimer.toFixed(1)} prev=${prevBreak.toFixed(1)} tilesEnRef=${breakingTilesRef.current.length} fired=${player.breakTriggerFired}`);
+        }
+        if (player.plantingAnimTimer > 0) {
+          console.log(`[PLANT TRIGGER CHECK] timer=${player.plantingAnimTimer.toFixed(1)} prev=${prevPlant.toFixed(1)} tilesEnRef=${plantingTilesRef.current.length} fired=${player.plantTriggerFired}`);
+        }
+ 
+        // Trigger Break action when breakingAnimTimer <= 415ms
+        if (!player.breakTriggerFired && player.breakingAnimTimer > 0 && player.breakingAnimTimer <= 415 && breakingTilesRef.current.length > 0) {
+          player.breakTriggerFired = true;
           breakingTilesRef.current.forEach(({ col, row }, index) => {
             const delay = index * 54; // 54ms delay
             scheduledBreaksRef.current.push({
@@ -169,8 +184,9 @@ export const useGameLoop = ({
           breakingTilesRef.current = [];
         }
 
-        // Trigger Plant action at start of tick 48 (Lanzamiento) - recalculated for 620ms timer
-        if (player.plantingAnimTimer <= 415 && player.plantingAnimTimer > 398 && plantingTilesRef.current.length > 0) {
+        // Trigger Plant action when plantingAnimTimer <= 415ms
+        if (!player.plantTriggerFired && player.plantingAnimTimer > 0 && player.plantingAnimTimer <= 415 && plantingTilesRef.current.length > 0) {
+          player.plantTriggerFired = true;
           plantingTilesRef.current.forEach(({ col, row }, index) => {
             const delay = index * 54; // 54ms delay
             const triggerOffset = 155 + delay; // 155ms trigger offset
@@ -201,7 +217,10 @@ export const useGameLoop = ({
               return updated;
             });
           }
-        } else if (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 382) {
+        } else if (player.breakingAnimTimer > 0 && (
+          (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 382) ||
+          (prevBreak > 415 && player.breakingAnimTimer <= 382)
+        )) {
           // Freeze frame: bypass updates/collisions, manually decrement breakingAnimTimer
           player.breakingAnimTimer -= deltaMs;
           if (player.breakingAnimTimer < 0) player.breakingAnimTimer = 0;

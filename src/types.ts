@@ -35,6 +35,8 @@ export interface Player {
   plantingAnimTimer: number; // ms
   breakingAnimTimer: number; // ms
   deathAnimTimer: number; // ms
+  breakTriggerFired?: boolean;
+  plantTriggerFired?: boolean;
 }
 
 export interface Enemy {

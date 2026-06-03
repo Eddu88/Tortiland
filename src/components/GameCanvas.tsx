@@ -91,7 +91,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 156, // px/s (era 120)
+    speed: 130, // px/s (era 120)
     animFrame: 0,
     animTimer: 0,
     invincible: 0,
