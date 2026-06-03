@@ -28,13 +28,13 @@ export interface Player {
   dir: Position; // direction vector (x: -1..1, y: -1..1)
   speed: number;
   animFrame: number;
-  animTimer: number;
-  invincible: number; // frames left
-  goldenBroccoliTimer: number; // frames left
-  powerCooldown: number; // frames left
-  plantingAnimTimer: number; // frames left for planting animation
-  breakingAnimTimer: number; // frames left for breaking animation
-  deathAnimTimer: number; // frames left for death animation
+  animTimer: number; // ms
+  invincible: number; // ms (era frames)
+  goldenBroccoliTimer: number; // ms
+  powerCooldown: number; // ms
+  plantingAnimTimer: number; // ms
+  breakingAnimTimer: number; // ms
+  deathAnimTimer: number; // ms
 }
 
 export interface Enemy {
@@ -49,7 +49,7 @@ export interface Enemy {
   moving: boolean;
   dir: Position;
   speed: number;
-  chaseTimer: number;
+  chaseTimer: number; // ms
   animFrame: number;
   animTimer: number;
 }

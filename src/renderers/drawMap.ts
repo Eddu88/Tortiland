@@ -326,7 +326,7 @@ export const drawMap = (
         // 2. LUSH ORGANIC 2.5D CONNECTED SHRUB HEDGES (PASTO/HIERBA)
         // ==========================================
 
-        const isShaking = breakingTiles.some(tile => tile.col === c && tile.row === r) && playerBreakingAnimTimer >= 13;
+        const isShaking = breakingTiles.some(tile => tile.col === c && tile.row === r) && playerBreakingAnimTimer >= 112;
         if (isShaking) {
           x += Math.sin(Date.now() * 0.09) * 3.5;
         }

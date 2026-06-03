@@ -5,7 +5,7 @@
 
 import React, { useEffect } from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos, LevelConfig, ScheduledBreak } from '../types';
-import { T_EMPTY, T_BUSH, LEVELS } from '../constants';
+import { T_EMPTY, T_BUSH, LEVELS, FRAME_MS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 
 interface UseGameLoopProps {
@@ -25,8 +25,8 @@ interface UseGameLoopProps {
   plantingTilesRef: React.MutableRefObject<GridPos[]>;
   grassAgesRef: React.MutableRefObject<{ [key: string]: { createdAt: number } }>;
   dyingBushesRef: React.MutableRefObject<{ col: number; row: number; alpha: number; variant: number }[]>;
-  updatePlayer: () => void;
-  updateEnemy: (e: Enemy) => void;
+  updatePlayer: (deltaMs: number) => void;
+  updateEnemy: (e: Enemy, deltaMs: number) => void;
   checkCollisions: () => void;
   respawnEntities: (config?: LevelConfig) => void;
   checkGoldenBroccoliSpawn: (currentLives: number) => void;
@@ -73,6 +73,7 @@ export const useGameLoop = ({
   // Frame Request Gameloop Execution
   useEffect(() => {
     let isSubscribed = true;
+    let lastTime = 0;
 
     const renderLoop = (timestamp: number) => {
       if (!isSubscribed) return;
@@ -89,7 +90,10 @@ export const useGameLoop = ({
         return;
       }
 
-      frameCountRef.current++;
+      const deltaMs = lastTime === 0 ? FRAME_MS : Math.min(timestamp - lastTime, 50);
+      lastTime = timestamp;
+
+      frameCountRef.current += deltaMs;
 
       if (gameState === 'playing') {
         const player = playerRef.current;
@@ -97,7 +101,7 @@ export const useGameLoop = ({
         // Update dying bushes alpha
         const db = dyingBushesRef.current;
         for (let i = db.length - 1; i >= 0; i--) {
-          db[i].alpha -= 0.2;
+          db[i].alpha -= (0.06 * deltaMs) / FRAME_MS;
           if (db[i].alpha <= 0) {
             db.splice(i, 1);
           }
@@ -105,7 +109,7 @@ export const useGameLoop = ({
 
         // Escape active particles
         const escapeActive = fruitsRef.current.filter(f => f.type !== 5).length === 0;
-        if (escapeActive && frameCountRef.current % 30 === 0) {
+        if (escapeActive && Math.floor(frameCountRef.current / 500) !== Math.floor((frameCountRef.current - deltaMs) / 500)) {
           const randomCol = 17 + Math.floor(Math.random() * 3);
           const randomRow = 12 + Math.floor(Math.random() * 3);
           spawnParticles(randomCol, randomRow, '#5ec263', { x: 0, y: -1 });
@@ -114,8 +118,9 @@ export const useGameLoop = ({
         // Process scheduled plants
         scheduledPlantsRef.current.forEach(plant => {
           if (plant.triggerAt > 0) {
-            plant.triggerAt--;
-            if (plant.triggerAt === 0) {
+            plant.triggerAt -= deltaMs;
+            if (plant.triggerAt <= 0) {
+              plant.triggerAt = 0;
               mapRef.current[plant.row][plant.col] = T_BUSH;
               const key = `${plant.row}_${plant.col}`;
               grassAgesRef.current[key] = { createdAt: Date.now() };
@@ -132,8 +137,9 @@ export const useGameLoop = ({
         // Process scheduled breaks
         scheduledBreaksRef.current.forEach(b => {
           if (b.triggerAt > 0) {
-            b.triggerAt--;
-            if (b.triggerAt === 0) {
+            b.triggerAt -= deltaMs;
+            if (b.triggerAt <= 0) {
+              b.triggerAt = 0;
               mapRef.current[b.row][b.col] = T_EMPTY;
               const hashVal = Math.abs(Math.sin(b.row * 12.9898 + b.col * 78.233)) * 43758.5453;
               const variant = Math.floor(hashVal % 3);
@@ -149,25 +155,25 @@ export const useGameLoop = ({
         // Filter active scheduled breaks
         scheduledBreaksRef.current = scheduledBreaksRef.current.filter(b => b.triggerAt > 0);
 
-        // Trigger Break action at start of tick 48 (Impact)
-        if (player.breakingAnimTimer === 48 && breakingTilesRef.current.length > 0) {
+        // Trigger Break action at start of tick 48 (Impact) - recalculated for 620ms timer
+        if (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 398 && breakingTilesRef.current.length > 0) {
           breakingTilesRef.current.forEach(({ col, row }, index) => {
-            const delay = index * 8; // 8 frames delay between breaks
+            const delay = index * 54; // 54ms delay
             scheduledBreaksRef.current.push({
               col,
               row,
-              triggerAt: 1 + delay, // Start at 1 to ensure loop processes it
+              triggerAt: 16 + delay, // 1 frame en ms + delay
               dir: { ...player.dir }
             });
           });
           breakingTilesRef.current = [];
         }
 
-        // Trigger Plant action at start of tick 48 (Lanzamiento)
-        if (player.plantingAnimTimer === 48 && plantingTilesRef.current.length > 0) {
+        // Trigger Plant action at start of tick 48 (Lanzamiento) - recalculated for 620ms timer
+        if (player.plantingAnimTimer <= 415 && player.plantingAnimTimer > 398 && plantingTilesRef.current.length > 0) {
           plantingTilesRef.current.forEach(({ col, row }, index) => {
-            const delay = index * 8; // 8 frames delay between shrubs
-            const triggerOffset = 72 - 48 + delay;
+            const delay = index * 54; // 54ms delay
+            const triggerOffset = 155 + delay; // 155ms trigger offset
             scheduledPlantsRef.current.push({ col, row, triggerAt: triggerOffset });
 
             // Set individual ready frame
@@ -177,8 +183,9 @@ export const useGameLoop = ({
         }
 
         if (player.deathAnimTimer > 0) {
-          player.deathAnimTimer--;
-          if (player.deathAnimTimer === 0) {
+          player.deathAnimTimer -= deltaMs;
+          if (player.deathAnimTimer <= 0) {
+            player.deathAnimTimer = 0;
             // Death animation completed! Handle life reduction and respawn/gameover
             setLives((prev: number) => {
               const updated = prev - 1;
@@ -186,7 +193,7 @@ export const useGameLoop = ({
                 setGameState('gameover');
                 SoundEffects.playGameOver();
               } else {
-                player.invincible = 120; // 2 seconds protection
+                player.invincible = 2000; // 2 seconds protection (ms)
                 const levelConfig = LEVELS[currentLevelIndex];
                 respawnEntities(levelConfig);
                 checkGoldenBroccoliSpawn(updated);
@@ -194,12 +201,13 @@ export const useGameLoop = ({
               return updated;
             });
           }
-        } else if (player.breakingAnimTimer === 48 || player.breakingAnimTimer === 47) {
+        } else if (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 382) {
           // Freeze frame: bypass updates/collisions, manually decrement breakingAnimTimer
-          player.breakingAnimTimer--;
+          player.breakingAnimTimer -= deltaMs;
+          if (player.breakingAnimTimer < 0) player.breakingAnimTimer = 0;
         } else {
-          updatePlayer();
-          enemiesRef.current.forEach(e => updateEnemy(e));
+          updatePlayer(deltaMs);
+          enemiesRef.current.forEach(e => updateEnemy(e, deltaMs));
           checkCollisions();
           detectMapChanges();
         }

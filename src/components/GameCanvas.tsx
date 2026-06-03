@@ -91,7 +91,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 1.3,
+    speed: 156, // px/s (era 120)
     animFrame: 0,
     animTimer: 0,
     invincible: 0,
@@ -213,9 +213,9 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     const player = playerRef.current;
 
-    // Screen shake calculation: 3-5 frames during breaking impact (ticks 48-40) and planting huddle (ticks 72-60)
-    const isBreakShake = player.breakingAnimTimer >= 40 && player.breakingAnimTimer <= 48;
-    const isPlantShake = player.plantingAnimTimer >= 60 && player.plantingAnimTimer <= 72;
+    // Screen shake calculation: proportional for new 620ms duration
+    const isBreakShake = player.breakingAnimTimer >= 344 && player.breakingAnimTimer <= 415;
+    const isPlantShake = player.plantingAnimTimer >= 517 && player.plantingAnimTimer <= 620;
 
     ctx.save();
     
@@ -248,8 +248,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       ctx.globalAlpha = alpha;
 
       const isGolden = player.goldenBroccoliTimer > 0;
-      const isFlickering = player.goldenBroccoliTimer <= 180 && isGolden;
-      const flickerOn = isFlickering ? Math.floor(player.goldenBroccoliTimer / 8) % 2 === 0 : true;
+      const isFlickering = player.goldenBroccoliTimer <= 3000 && isGolden;
+      const flickerOn = isFlickering ? Math.floor(player.goldenBroccoliTimer / 133) % 2 === 0 : true;
 
       if (isGolden) {
         ctx.save();

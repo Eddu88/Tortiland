@@ -239,9 +239,9 @@ export const useGameEntities = ({
       targetCol: levelConfig.playerStartCol, targetRow: levelConfig.playerStartRow,
       moving: false,
       dir: { x: 1, y: 0 },
-      speed: 1.3, // Velocidad fija para todos los niveles
+      speed: 156, // Velocidad fija en px/s (era 120)
       animFrame: 0, animTimer: 0,
-      invincible: 60, // 1 sec protection on load
+      invincible: 0, // no protection on load
       goldenBroccoliTimer: 0,
       powerCooldown: 0,
       plantingAnimTimer: 0,
@@ -270,7 +270,7 @@ export const useGameEntities = ({
       moving: false,
       dir: e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 },
       speed: e.speed,
-      chaseTimer: 1,
+      chaseTimer: 16, // 1 frame en ms
       animFrame: 0,
       animTimer: 0,
     }));
@@ -295,7 +295,7 @@ export const useGameEntities = ({
 
       if (pickedType === 5) {
         // Golden Broccoli power up consumed!
-        player.goldenBroccoliTimer = 600; // 10 seconds of grass-piercing glory
+        player.goldenBroccoliTimer = 10000; // 10 seconds of grass-piercing glory (ms)
         setGoldenBroccoliTimer(10);
         usedGoldenBroccoliRef.current = true; // ← confirmar consumo
         SoundEffects.playPowerUp();
@@ -419,20 +419,33 @@ export const useGameEntities = ({
     return e.dir;
   };
 
-  const updatePlayer = () => {
+  const updatePlayer = (deltaMs: number) => {
     const player = playerRef.current;
-    if (player.invincible > 0) player.invincible--;
+    if (player.invincible > 0) {
+      player.invincible -= deltaMs;
+      if (player.invincible < 0) player.invincible = 0;
+    }
 
     if (player.goldenBroccoliTimer > 0) {
-      player.goldenBroccoliTimer--;
-      setGoldenBroccoliTimer(Math.ceil(player.goldenBroccoliTimer / 60));
+      player.goldenBroccoliTimer -= deltaMs;
+      if (player.goldenBroccoliTimer < 0) player.goldenBroccoliTimer = 0;
+      setGoldenBroccoliTimer(Math.ceil(player.goldenBroccoliTimer / 1000));
     } else {
       setGoldenBroccoliTimer(0);
     }
 
-    if (player.powerCooldown > 0) player.powerCooldown--;
-    if (player.plantingAnimTimer > 0) player.plantingAnimTimer--;
-    if (player.breakingAnimTimer > 0) player.breakingAnimTimer--;
+    if (player.powerCooldown > 0) {
+      player.powerCooldown -= deltaMs;
+      if (player.powerCooldown < 0) player.powerCooldown = 0;
+    }
+    if (player.plantingAnimTimer > 0) {
+      player.plantingAnimTimer -= deltaMs;
+      if (player.plantingAnimTimer < 0) player.plantingAnimTimer = 0;
+    }
+    if (player.breakingAnimTimer > 0) {
+      player.breakingAnimTimer -= deltaMs;
+      if (player.breakingAnimTimer < 0) player.breakingAnimTimer = 0;
+    }
 
     if (turnBlockedRef.current) {
       // Evaluate if user is holding down the key in player.dir for > 100ms
@@ -511,7 +524,9 @@ export const useGameEntities = ({
         const dy = ty - player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist <= player.speed) {
+        const step = (player.speed * deltaMs) / 1000;
+
+        if (dist <= step) {
           player.x = tx;
           player.y = ty;
           player.col = player.targetCol;
@@ -551,35 +566,35 @@ export const useGameEntities = ({
             }
           }
         } else {
-          player.x += (dx / dist) * player.speed;
-          player.y += (dy / dist) * player.speed;
+          player.x += (dx / dist) * step;
+          player.y += (dy / dist) * step;
         }
       }
     }
 
     // Animate sprite frames
-    player.animTimer++;
-    if (player.animTimer > 8) {
+    player.animTimer += deltaMs;
+    if (player.animTimer > 133) { // 8 frames * 16.67ms ≈ 133ms
       player.animTimer = 0;
       player.animFrame = (player.animFrame + 1) % 4;
     }
   };
 
-  const updateEnemy = (e: Enemy) => {
+  const updateEnemy = (e: Enemy, deltaMs: number) => {
     const ghost = e.type === 'ghost';
 
     if (!e.moving) {
-      e.chaseTimer--;
+      e.chaseTimer -= deltaMs;
       let newDir;
 
       if (e.chaseTimer <= 0) {
         newDir = findChaseDirection(e, ghost);
         if (e.type === 'patrol') {
-          e.chaseTimer = 4 + Math.floor(Math.random() * 4);
+          e.chaseTimer = 67 + Math.floor(Math.random() * 67); // patrol=4~8 frames → 67~133ms
         } else if (e.type === 'chaser') {
-          e.chaseTimer = 1;
+          e.chaseTimer = 16; // chaser=1 frame → 16ms
         } else {
-          e.chaseTimer = 3;
+          e.chaseTimer = 50; // ghost=3 frames → 50ms
         }
       } else {
         newDir = e.dir;
@@ -589,7 +604,7 @@ export const useGameEntities = ({
       const nr0 = e.row + newDir.y;
       if (isSolid(nc0, nr0, mapRef.current, ghost)) {
         newDir = findChaseDirection(e, ghost);
-        e.chaseTimer = 1;
+        e.chaseTimer = 16; // 1 frame en ms
       }
 
       e.dir = newDir;
@@ -616,21 +631,23 @@ export const useGameEntities = ({
         const dy = ty - e.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist <= e.speed) {
+        const step = (e.speed * deltaMs) / 1000;
+
+        if (dist <= step) {
           e.x = tx;
           e.y = ty;
           e.col = e.targetCol;
           e.row = e.targetRow;
           e.moving = false;
         } else {
-          e.x += (dx / dist) * e.speed;
-          e.y += (dy / dist) * e.speed;
+          e.x += (dx / dist) * step;
+          e.y += (dy / dist) * step;
         }
       }
     }
 
-    e.animTimer++;
-    if (e.animTimer > 9) {
+    e.animTimer += deltaMs;
+    if (e.animTimer > 150) { // 9 frames * 16.67ms ≈ 150ms
       e.animTimer = 0;
       e.animFrame = (e.animFrame + 1) % 4;
     }
@@ -648,7 +665,7 @@ export const useGameEntities = ({
       if (dist < TILE * 0.72) {
         // Trigger arcade death sequence!
         SoundEffects.playHurt();
-        player.deathAnimTimer = 180; // 180 frames (3s) of cartoon shock, shell refuge, and fall-out
+        player.deathAnimTimer = 3000; // 3000ms (3s) of cartoon shock, shell refuge, and fall-out
         return;
       }
     }
@@ -678,7 +695,7 @@ export const useGameEntities = ({
         moving: false,
         dir: existing?.dir || (e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 }),
         speed: e.speed,
-        chaseTimer: 1,
+        chaseTimer: 16, // 1 frame en ms
         animFrame: existing?.animFrame || 0,
         animTimer: existing?.animTimer || 0,
       };

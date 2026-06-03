@@ -51,15 +51,15 @@ export const drawGardenTurtle = (
   let cy = py + bob;
 
   if (deathAnimTimer > 0) {
-    if (deathAnimTimer >= 147) {
-      // Fase 1 — Shock / Surprise Jump (ticks 180-147, 34 frames)
+    if (deathAnimTimer >= 2450) {
+      // Fase 1 — Shock / Surprise Jump (ticks 180-147, 34 frames) (ms)
       isShocked = true;
-      const tNorm = (180 - deathAnimTimer) / 33;
+      const tNorm = (3000 - deathAnimTimer) / 550;
       deathJumpY = -TILE * 0.9 * Math.sin(tNorm * Math.PI);
-    } else if (deathAnimTimer >= 111) {
-      // Fase 2 — Hide in shell & panic shake (ticks 146-111, 36 frames)
+    } else if (deathAnimTimer >= 1850) {
+      // Fase 2 — Hide in shell & panic shake (ticks 146-111, 36 frames) (ms)
       isShocked = true;
-      tuckProgress = (146 - deathAnimTimer) / 35; // smoothly tuck limbs and body
+      tuckProgress = (2450 - deathAnimTimer) / 600; // smoothly tuck limbs and body
       isTuckedDeath = tuckProgress >= 0.5;
 
       const shakeAngle = Math.sin(t * 0.25) * 0.09;
@@ -67,10 +67,10 @@ export const drawGardenTurtle = (
       ctx.rotate(shakeAngle);
       ctx.translate(-px, -cy);
     } else {
-      // Fase 3 — Shell falling, rolling and ghost fade out (ticks 110-1, 110 frames)
+      // Fase 3 — Shell falling, rolling and ghost fade out (ticks 110-1, 110 frames) (ms)
       isTuckedDeath = true;
       tuckProgress = 1.0; // fully tucked inside shell
-      const progress = (110 - deathAnimTimer) / 109;
+      const progress = (1850 - deathAnimTimer) / 1850;
       deathFallY = progress * TILE * 0.6; // smoothly fall down Y
       shellRotation = progress * Math.PI * 4; // spin locally 2 full loops for perfect roll!
       deathOpacity = Math.max(0, 1.0 - progress);
@@ -80,28 +80,28 @@ export const drawGardenTurtle = (
   cy += deathJumpY + deathFallY;
   ctx.globalAlpha = ctx.globalAlpha * deathOpacity;
 
-  const isFlickering = goldenBroccoliTimer <= 180 && isGolden;
-  const flickerOn = isFlickering ? Math.floor(goldenBroccoliTimer / 8) % 2 === 0 : true;
+  const isFlickering = goldenBroccoliTimer <= 3000 && isGolden;
+  const flickerOn = isFlickering ? Math.floor(goldenBroccoliTimer / 133) % 2 === 0 : true;
 
   if (isGolden && !flickerOn) {
     ctx.globalAlpha = ctx.globalAlpha * 0.3;
   }
 
   if (breakingAnimTimer > 0) {
-    if (breakingAnimTimer >= 60) {
-      // Fase 1 — Ocultamiento (Ticks 72-60)
+    if (breakingAnimTimer >= 517) {
+      // Fase 1 — Ocultamiento (ms)
       limbsScale = 0;
       isNaked = false;
       breakScale = 0.9;
-    } else if (breakingAnimTimer >= 32) {
-      // Fase 2 — Lanzamiento e Impacto (Ticks 59-32)
+    } else if (breakingAnimTimer >= 276) {
+      // Fase 2 — Lanzamiento e Impacto (ms)
       limbsScale = 1.0;
       isNaked = true;
       isShocked = true;
 
       let vueloOffset = 0;
-      if (breakingAnimTimer >= 48) {
-        const tVuelo = (59 - breakingAnimTimer) / 11;
+      if (breakingAnimTimer >= 415) {
+        const tVuelo = (517 - breakingAnimTimer) / 102;
         vueloOffset = tVuelo * TILE;
       } else {
         vueloOffset = TILE;
@@ -110,40 +110,40 @@ export const drawGardenTurtle = (
       localOffsetX = Math.abs(dir.x) * vueloOffset;
       localOffsetY = dir.y * vueloOffset;
 
-      shellRotation = (59 - breakingAnimTimer) * 0.38;
+      shellRotation = (517 - breakingAnimTimer) * 0.043;
 
-      if (breakingAnimTimer === 48 || breakingAnimTimer === 47) {
+      if (breakingAnimTimer <= 415 && breakingAnimTimer > 382) {
         shellScaleX = 0.8;
         shellScaleY = 1.15;
       } else {
         shellScaleX = 1.15;
         shellScaleY = 0.85;
       }
-    } else if (breakingAnimTimer >= 16) {
-      // Fase 3 — El Regreso (Ticks 31-16)
+    } else if (breakingAnimTimer >= 138) {
+      // Fase 3 — El Regreso (ms)
       limbsScale = 1.0;
       isNaked = true;
       isShocked = true;
 
-      const tReturn = (breakingAnimTimer - 16) / 15;
+      const tReturn = (breakingAnimTimer - 138) / 138;
       const vueloOffset = tReturn * TILE;
 
       localOffsetX = Math.abs(dir.x) * vueloOffset;
       localOffsetY = dir.y * vueloOffset;
 
-      shellRotation = breakingAnimTimer * 0.18;
+      shellRotation = breakingAnimTimer * 0.0139;
     } else {
-      // Fase 4 — Reasentamiento (Ticks 15-1)
+      // Fase 4 — Reasentamiento (ms)
       limbsScale = 1.0;
       isNaked = false;
-      const progress = breakingAnimTimer / 15;
+      const progress = breakingAnimTimer / 138;
       breakScale = 0.85 + (1 - progress) * 0.15;
     }
   }
 
-  // Adjust breakScale before s calculation for stomp impact squash (ticks 39 and 38)
+  // Adjust breakScale before s calculation for stomp impact squash (ticks 39 and 38) (ms)
   if (plantingAnimTimer > 0) {
-    if (plantingAnimTimer === 39 || plantingAnimTimer === 38) {
+    if (plantingAnimTimer <= 336 && plantingAnimTimer > 318) {
       breakScale = 0.85;
     }
   }
@@ -153,8 +153,8 @@ export const drawGardenTurtle = (
 
   const s = TILE * 0.58 * breakScale;
 
-  // Draw motion lines during impact frames (ticks 48 and 47 of breakingAnimTimer)
-  if (breakingAnimTimer === 48 || breakingAnimTimer === 47) {
+  // Draw motion lines during impact frames (recalculated for 620ms duration)
+  if (breakingAnimTimer <= 415 && breakingAnimTimer > 382) {
     ctx.save();
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.7)';
     ctx.lineWidth = 2.5;
@@ -215,16 +215,16 @@ export const drawGardenTurtle = (
   let tailScale = 1.0;
 
   if (isPlanting) {
-    if (plantingAnimTimer >= 60) {
-      // Fase 1 — Agacharse para tomar impulso (cuerpo y cabeza bajan, patas se comprimen)
+    if (plantingAnimTimer >= 517) {
+      // Fase 1 — Agacharse para tomar impulso (cuerpo y cabeza bajan, patas se comprimen) (ms)
       bodyOffsetY = s * 0.1;
       legScaleY = 0.7;
       headOffsetY = s * 0.08;
       headScale = 1.0;
       tailScale = 1.0;
-    } else if (plantingAnimTimer >= 20) {
-      // Fase 2 — Lanzamiento y Salto (cuerpo sube y luego cae fuertemente)
-      if (plantingAnimTimer >= 40) {
+    } else if (plantingAnimTimer >= 172) {
+      // Fase 2 — Lanzamiento y Salto (cuerpo sube y luego cae fuertemente) (ms)
+      if (plantingAnimTimer >= 344) {
         // Levantamiento: cuerpo y cabeza suben visiblemente junto a las patas
         bodyOffsetY = -s * 0.4;
         headOffsetY = -s * 0.15;
@@ -235,14 +235,14 @@ export const drawGardenTurtle = (
         bodyOffsetY = s * 0.15;
         headOffsetY = s * 0.05;
         headScale = 1.0;
-        if (plantingAnimTimer === 39 || plantingAnimTimer === 38) {
+        if (plantingAnimTimer <= 336 && plantingAnimTimer > 318) {
           // breakScale ya se ajustó al inicio a 0.85
           bodyScaleY = 0.75; // Squash horizontal para el impacto
         }
       }
     } else {
-      // Fase 3 — Retorno (Ticks 19-1)
-      const progress = plantingAnimTimer / 19;
+      // Fase 3 — Retorno (ms)
+      const progress = plantingAnimTimer / 172;
       headOffsetX = Math.sin(t * 0.3) * 3 * progress;
     }
   }
@@ -277,25 +277,25 @@ export const drawGardenTurtle = (
     let offX = 0;
 
     if (isPlanting) {
-      if (plantingAnimTimer >= 60) {
+      if (plantingAnimTimer >= 517) {
         scaleY = 0.7;
         offY = -s * 0.08;
-      } else if (plantingAnimTimer >= 20) {
-        // Fase 2 — Pisotón vertical en ambas patas (Ticks 59-20)
-        if (plantingAnimTimer >= 40) {
+      } else if (plantingAnimTimer >= 172) {
+        // Fase 2 — Pisotón vertical en ambas patas (ms)
+        if (plantingAnimTimer >= 344) {
           // Levantamiento
           offY = -s * 0.5;
         } else {
           // Golpe de impacto
           offY = s * 0.25;
-          if (plantingAnimTimer === 39 || plantingAnimTimer === 38) {
+          if (plantingAnimTimer <= 336 && plantingAnimTimer > 318) {
             scaleY = 0.7;
             scaleX = 1.3;
           }
         }
       } else {
         // Fase 3 — Retorno
-        const progress = plantingAnimTimer / 19;
+        const progress = plantingAnimTimer / 172;
         const pushAmount = s * 0.1 * progress;
         if (dir.x !== 0) {
           offX = pushAmount;
@@ -430,7 +430,7 @@ export const drawGardenTurtle = (
   if (!isTuckedDeath && limbsScale > 0 && tuckProgress < 1.0) {
     ctx.save();
     let rArmScale = 1.0 * (1 - tuckProgress);
-    if (plantingAnimTimer >= 60) {
+    if (plantingAnimTimer >= 517) {
       rArmScale = 0.5 * (1 - tuckProgress);
     }
     rArmScale *= limbsScale;
@@ -504,18 +504,18 @@ export const drawGardenTurtle = (
         ctx.fill();
       }
       // 2. Active Planting Expression (Concentration, Gold Star or Satisfaction)
-      else if (isPlanting && plantingAnimTimer >= 20) {
+      else if (isPlanting && plantingAnimTimer >= 172) {
         const r = s * 0.09;
-
-        if (plantingAnimTimer >= 40) {
-          // Ticks 72-40 — Concentración / Esfuerzo: semicírculo invertido
+ 
+        if (plantingAnimTimer >= 344) {
+          // Ticks 72-40 — Concentración / Esfuerzo: Semicírculo invertido
           ctx.strokeStyle = '#000000';
           ctx.lineWidth = 2.5;
           ctx.lineCap = 'round';
           ctx.beginPath();
           ctx.arc(ex, ey, r, Math.PI, 0, true);
           ctx.stroke();
-
+ 
           // Cejas (dos líneas cortas inclinadas hacia el centro)
           ctx.save();
           ctx.lineWidth = 2.0;
@@ -531,7 +531,7 @@ export const drawGardenTurtle = (
           }
           ctx.stroke();
           ctx.restore();
-        } else if (plantingAnimTimer === 39 || plantingAnimTimer === 38) {
+        } else if (plantingAnimTimer <= 336 && plantingAnimTimer > 318) {
           // Ticks 39-38 — Estrella dorada con brillo
           ctx.save();
           ctx.strokeStyle = '#ffd700';
@@ -620,9 +620,9 @@ export const drawGardenTurtle = (
     ctx.save();
     let fArmScale = 1.0 * (1 - tuckProgress);
     if (isPlanting) {
-      if (plantingAnimTimer >= 60) {
+      if (plantingAnimTimer >= 517) {
         fArmScale = 0.5 * (1 - tuckProgress); // Carga
-      } else if (plantingAnimTimer >= 20) {
+      } else if (plantingAnimTimer >= 172) {
         fArmScale = 0.8 * (1 - tuckProgress); // ligeramente retraído
       }
     }

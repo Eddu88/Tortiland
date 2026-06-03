@@ -99,8 +99,8 @@ export const usePlayerInput = ({
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        player.powerCooldown = 72; // 72 frames cooldown (matches animation)
-        player.breakingAnimTimer = 72; // 72 frames of break animation
+        player.powerCooldown = 620; // 37 frames * 16.67ms = 620ms
+        player.breakingAnimTimer = 620; // 37 frames * 16.67ms = 620ms
       }
     } else if (action === 'create') {
       plantingTilesRef.current = [];
@@ -142,8 +142,8 @@ export const usePlayerInput = ({
         currentCr += dir.y;
       }
       if (actionExecuted) {
-        player.powerCooldown = 72; // 72 frames cooldown (matches animation)
-        player.plantingAnimTimer = 72; // 72 ticks duration for planting animation
+        player.powerCooldown = 620; // 37 frames * 16.67ms = 620ms
+        player.plantingAnimTimer = 620; // 37 frames * 16.67ms = 620ms
       }
     }
   };
