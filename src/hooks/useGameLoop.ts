@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect } from 'react';
-import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos, LevelConfig } from '../types';
+import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, GridPos, LevelConfig, ScheduledBreak } from '../types';
 import { T_EMPTY, T_BUSH, LEVELS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 
@@ -34,6 +34,7 @@ interface UseGameLoopProps {
   detectMapChanges: () => void;
   frameCountRef: React.MutableRefObject<number>;
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
+  scheduledBreaksRef: React.MutableRefObject<ScheduledBreak[]>;
   tileReadyRef: React.MutableRefObject<number[][]>;
   onRender: (ctx: CanvasRenderingContext2D, timestamp: number) => void;
   currentLevelIndex: number;
@@ -63,6 +64,7 @@ export const useGameLoop = ({
   detectMapChanges,
   frameCountRef,
   scheduledPlantsRef,
+  scheduledBreaksRef,
   tileReadyRef,
   onRender,
   currentLevelIndex,
@@ -95,7 +97,7 @@ export const useGameLoop = ({
         // Update dying bushes alpha
         const db = dyingBushesRef.current;
         for (let i = db.length - 1; i >= 0; i--) {
-          db[i].alpha -= 0.06;
+          db[i].alpha -= 0.2;
           if (db[i].alpha <= 0) {
             db.splice(i, 1);
           }
@@ -126,29 +128,48 @@ export const useGameLoop = ({
 
         // Filter active schedules
         scheduledPlantsRef.current = scheduledPlantsRef.current.filter(p => p.triggerAt > 0);
-        
+
+        // Process scheduled breaks
+        scheduledBreaksRef.current.forEach(b => {
+          if (b.triggerAt > 0) {
+            b.triggerAt--;
+            if (b.triggerAt === 0) {
+              mapRef.current[b.row][b.col] = T_EMPTY;
+              const hashVal = Math.abs(Math.sin(b.row * 12.9898 + b.col * 78.233)) * 43758.5453;
+              const variant = Math.floor(hashVal % 3);
+              dyingBushesRef.current.push({ col: b.col, row: b.row, alpha: 1.0, variant });
+              // Directional leaf particles!
+              spawnParticles(b.col, b.row, '#4caf50', b.dir);
+              spawnParticles(b.col, b.row, '#2e7d32', b.dir);
+              SoundEffects.playBreak();
+            }
+          }
+        });
+
+        // Filter active scheduled breaks
+        scheduledBreaksRef.current = scheduledBreaksRef.current.filter(b => b.triggerAt > 0);
+
         // Trigger Break action at start of tick 48 (Impact)
         if (player.breakingAnimTimer === 48 && breakingTilesRef.current.length > 0) {
-          breakingTilesRef.current.forEach(({ col, row }) => {
-            mapRef.current[row][col] = T_EMPTY;
-            const hashVal = Math.abs(Math.sin(row * 12.9898 + col * 78.233)) * 43758.5453;
-            const variant = Math.floor(hashVal % 3);
-            dyingBushesRef.current.push({ col, row, alpha: 1.0, variant });
-            // Directional leaf particles!
-            spawnParticles(col, row, '#4caf50', player.dir);
-            spawnParticles(col, row, '#2e7d32', player.dir);
+          breakingTilesRef.current.forEach(({ col, row }, index) => {
+            const delay = index * 8; // 8 frames delay between breaks
+            scheduledBreaksRef.current.push({
+              col,
+              row,
+              triggerAt: 1 + delay, // Start at 1 to ensure loop processes it
+              dir: { ...player.dir }
+            });
           });
-          SoundEffects.playBreak();
           breakingTilesRef.current = [];
         }
-        
+
         // Trigger Plant action at start of tick 48 (Lanzamiento)
         if (player.plantingAnimTimer === 48 && plantingTilesRef.current.length > 0) {
           plantingTilesRef.current.forEach(({ col, row }, index) => {
             const delay = index * 8; // 8 frames delay between shrubs
             const triggerOffset = 72 - 48 + delay;
             scheduledPlantsRef.current.push({ col, row, triggerAt: triggerOffset });
-            
+
             // Set individual ready frame
             tileReadyRef.current[row][col] = frameCountRef.current + triggerOffset;
           });

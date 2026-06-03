@@ -13,7 +13,8 @@ import {
   GameState,
   LevelPhase,
   Position,
-  GridPos
+  GridPos,
+  ScheduledBreak
 } from '../types';
 import { SoundEffects } from './SoundEffects';
 import { W, H, TILE, LEVELS } from '../constants';
@@ -111,10 +112,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   const triggerActionRef = useRef<() => void>(() => {});
   const frameCountRef = useRef<number>(0);
   const scheduledPlantsRef = useRef<{ col: number; row: number; triggerAt: number }[]>([]);
+  const scheduledBreaksRef = useRef<ScheduledBreak[]>([]);
   const tileReadyRef = useRef<number[][]>([]);
   const awaitingBurrowRef = useRef<boolean>(false);
   const dyingBushesRef = useRef<{ col: number; row: number; alpha: number; variant: number }[]>([]);
   const goldenBroccoliUsedRef = useRef<boolean>(false);
+  const usedGoldenBroccoliRef = useRef<boolean>(false);
 
   // Sounds active state tracker (to sync with prop without closures stale)
   const soundOnRef = useRef<boolean>(soundOn);
@@ -155,6 +158,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     triggerActionRef,
     frameCountRef,
     scheduledPlantsRef,
+    scheduledBreaksRef,
     tileReadyRef,
     setGameState,
   });
@@ -194,10 +198,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     setLevelPhase,
     tileReadyRef,
     scheduledPlantsRef,
+    scheduledBreaksRef,
     frameCountRef,
     awaitingBurrowRef,
     currentLevelIndex,
     goldenBroccoliUsedRef,
+    usedGoldenBroccoliRef,
   });
 
   // Decoupled unified rendering callback function
@@ -324,6 +330,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     detectMapChanges,
     frameCountRef,
     scheduledPlantsRef,
+    scheduledBreaksRef,
     tileReadyRef,
     onRender,
     currentLevelIndex,

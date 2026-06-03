@@ -100,3 +100,11 @@ export interface LevelConfig {
   enemies: EnemyConfig[];
 }
 
+export interface ScheduledBreak {
+  col: number;
+  row: number;
+  triggerAt: number;
+  dir: Position;
+}
+
+

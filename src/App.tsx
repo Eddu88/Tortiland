@@ -8,6 +8,7 @@ import { LEVELS } from './constants';
 
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('menu');
+  const [previousScreen, setPreviousScreen] = useState<'menu' | 'gameover' | 'pause'>('menu');
   const [score, setScore] = useState<number>(0);
   const [levelScore, setLevelScore] = useState<number>(0);
   const [lives, setLives] = useState<number>(2);
@@ -210,6 +211,7 @@ export default function App() {
                         <button
                           onClick={() => {
                             setShowAbandonConfirm(false);
+                            setPreviousScreen('pause');
                             setGameState('level_select');
                           }}
                           className="w-full flex items-center justify-center gap-2 rounded-xl bg-red-800 hover:bg-red-700 active:bg-red-900 border-2 border-red-500 text-white px-6 py-3 font-press-start text-[9px] tracking-wider cursor-pointer transform hover:scale-[1.02] active:scale-95 transition-all font-bold shadow-md shadow-red-950/30"
@@ -227,8 +229,11 @@ export default function App() {
                     </div>
                   ) : (
                     <div className="flex flex-col items-center gap-5 max-w-sm w-full rounded-2xl border-4 border-[#5c3a21] bg-gradient-to-b from-[#2d1a10] to-[#1a0e05] p-6 shadow-2xl shadow-black/80 select-none animate-fade-in text-[#e2f1e4]">
-                      <div className="h-12 w-12 rounded-full bg-[#854d0e]/20 border-2 border-[#eab308] flex items-center justify-center text-[#eab308] animate-pulse text-lg">
-                        ⏸️
+                      <div className="h-14 w-14 flex items-center justify-center animate-pulse">
+                        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="filter drop-shadow-[0_3px_5px_rgba(0,0,0,0.8)]">
+                          <rect x="5" y="3" width="5" height="18" rx="1.5" fill="#eab308" stroke="#5c3a21" strokeWidth="2" />
+                          <rect x="14" y="3" width="5" height="18" rx="1.5" fill="#eab308" stroke="#5c3a21" strokeWidth="2" />
+                        </svg>
                       </div>
 
                       <h2 className="font-press-start text-sm text-[#fef08a] tracking-widest mt-1 uppercase text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
@@ -284,6 +289,7 @@ export default function App() {
                       onClick={() => {
                         const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
                         setSelectedLevelIndex(Math.min(5, maxUnlocked - 1));
+                        setPreviousScreen('menu');
                         setGameState('level_select');
                       }}
                       className="flex items-center gap-2 rounded-xl bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] hover:shadow-lg hover:shadow-amber-950/50 shadow-md shadow-amber-950/40 px-8 py-3.5 font-press-start text-[10px] tracking-wider cursor-pointer transform hover:scale-[1.02] active:scale-95 transition-all font-bold mt-2"
@@ -299,7 +305,15 @@ export default function App() {
                     {/* Header */}
                     <div className="flex items-center justify-between border-b border-[#5c3a21] pb-3 mb-3 w-full">
                       <button
-                        onClick={() => setGameState('menu')}
+                        onClick={() => {
+                          if (previousScreen === 'gameover') {
+                            setGameState('gameover');
+                          } else if (previousScreen === 'pause') {
+                            setGameState('paused');
+                          } else {
+                            setGameState('menu');
+                          }
+                        }}
                         className="flex items-center gap-1 text-[#facc15] hover:text-[#fde047] font-press-start text-[8px] cursor-pointer bg-transparent border-none active:scale-95 transition-all"
                       >
                         <ChevronLeft size={10} />
@@ -319,8 +333,8 @@ export default function App() {
                           const isComingSoon = levelNum >= 7;
                           const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
                           const isUnlocked = !isComingSoon && levelNum <= maxUnlocked;
-                          const isCompleted = !isComingSoon && levelNum < maxUnlocked;
                           const isSelected = selectedLevelIndex === idx;
+                          const stars = isUnlocked ? parseInt(localStorage.getItem(`tortiland_stars_${levelNum}`) || '0', 10) : 0;
 
                           return (
                             <button
@@ -337,7 +351,21 @@ export default function App() {
                                 }
                               `}
                             >
-                              <span className="font-press-start text-[10px] md:text-xs font-bold leading-none">
+                              {/* Display stars obtained at the top of the level card */}
+                              {isUnlocked && !isComingSoon && (
+                                <div className="absolute top-1 flex gap-0.5 justify-center">
+                                  {Array.from({ length: 2 }).map((_, i) => (
+                                    <Star
+                                      key={i}
+                                      size={8}
+                                      fill={i < stars ? '#eab308' : 'none'}
+                                      className={i < stars ? 'text-[#eab308]' : 'text-stone-600/40'}
+                                    />
+                                  ))}
+                                </div>
+                              )}
+
+                              <span className="font-press-start text-[10px] md:text-xs font-bold leading-none mt-1.5">
                                 {levelNum}
                               </span>
 
@@ -345,11 +373,9 @@ export default function App() {
                                 <span className="absolute bottom-1 text-[6px] font-mono opacity-80 text-stone-500 uppercase tracking-tighter">PRÓX</span>
                               ) : !isUnlocked ? (
                                 <Lock size={10} className="absolute bottom-1 text-[#5c3a21]" />
-                              ) : isCompleted ? (
-                                <Star size={10} fill="#eab308" className="absolute bottom-1 text-[#eab308] drop-shadow-[0_0_2px_rgba(234,179,8,0.5)]" />
-                              ) : (
+                              ) : levelNum === maxUnlocked ? (
                                 <span className="absolute bottom-1.5 w-1.5 h-1.5 rounded-full bg-[#4ade80] animate-pulse" />
-                              )}
+                              ) : null}
                             </button>
                           );
                         })}
@@ -401,7 +427,7 @@ export default function App() {
                       <button
                         disabled={selectedLevelIndex >= 6}
                         onClick={() => {
-                          const isGameInProgress = score > 0 || currentLevelIndex > 0 || lives < 2;
+                          const isGameInProgress = previousScreen === 'pause';
                           if (isGameInProgress) {
                             setPendingLevelIndex(selectedLevelIndex);
                             setShowLevelSelectConfirm(true);
@@ -481,8 +507,8 @@ export default function App() {
                     {/* Botón: Elegir nivel */}
                     <button
                       onClick={() => {
-                        const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
-                        setSelectedLevelIndex(Math.min(5, maxUnlocked - 1));
+                        setSelectedLevelIndex(currentLevelIndex);
+                        setPreviousScreen('gameover');
                         setGameState('level_select');
                       }}
                       className="w-full flex items-center justify-center gap-2 rounded-xl bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] px-6 py-3.5 font-press-start text-[9px] tracking-wider cursor-pointer active:scale-95 transition-all font-bold shadow-md shadow-amber-950/40"
@@ -506,6 +532,23 @@ export default function App() {
                     <h2 className="font-press-start text-xs text-[#facc15] tracking-widest mt-1 uppercase text-center drop-shadow-[0_2px_4px_rgba(0,0,0,0.5)]">
                       {LEVELS[currentLevelIndex]?.name}
                     </h2>
+
+                    {(() => {
+                      const levelNum = currentLevelIndex + 1;
+                      const stars = parseInt(localStorage.getItem(`tortiland_stars_${levelNum}`) || '0', 10);
+                      return (
+                        <div className="flex items-center gap-2 justify-center my-1">
+                          {Array.from({ length: 2 }).map((_, i) => (
+                            <Star
+                              key={i}
+                              size={20}
+                              fill={i < stars ? '#eab308' : 'none'}
+                              className={i < stars ? 'text-[#eab308] drop-shadow-[0_0_4px_rgba(234,179,8,0.6)] animate-pulse' : 'text-stone-600'}
+                            />
+                          ))}
+                        </div>
+                      );
+                    })()}
 
                     <p className="text-[#fed7aa]/80 text-[11px] leading-relaxed text-center font-mono max-w-xs">
                       ¡Excelente! Has recolectado los consumibles silvestres de esta zona. Prepárate para el siguiente reto en el laberinto.
@@ -533,13 +576,28 @@ export default function App() {
                 )}
 
                 {gameState === 'win' && (
-                  <div className="flex flex-col items-center gap-4 max-w-md">
-                    <div className="h-12 w-12 rounded-full bg-[#facc15]/10 border border-[#facc15] flex items-center justify-center text-[#facc15] animate-bounce text-lg font-bold">
-                      🏆
+                  <div className="flex flex-col items-center gap-4 max-w-md select-none">
+                    <div className="flex flex-col items-center gap-2">
+                      <svg width="64" height="64" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" className="animate-bounce filter drop-shadow-[0_4px_6px_rgba(0,0,0,0.8)]">
+                        <defs>
+                          <linearGradient id="gold-grad-victory" x1="0%" y1="0%" x2="100%" y2="100%">
+                            <stop offset="0%" stopColor="#fef08a" />
+                            <stop offset="50%" stopColor="#eab308" />
+                            <stop offset="100%" stopColor="#ca8a04" />
+                          </linearGradient>
+                        </defs>
+                        <path
+                          d="M12 .587l3.668 7.431 8.2 1.192-5.934 5.787 1.4 8.168L12 18.896l-7.334 3.857 1.4-8.168L.132 9.21l8.2-1.192z"
+                          fill="url(#gold-grad-victory)"
+                          stroke="#5c3a21"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                      </svg>
+                      <h2 className="font-press-start text-sm text-[#facc15] tracking-wider uppercase">
+                        ¡VICTORIA!
+                      </h2>
                     </div>
-                    <h2 className="font-press-start text-sm text-[#facc15] tracking-wider uppercase">
-                      ¡TORTI SALVADO!
-                    </h2>
                     <p className="text-[#86efac]/70 text-xs">
                       ¡Magnífico! Has recolectado todos los consumibles silvestres con agilidad y completado toda la aventura.
                     </p>
@@ -549,7 +607,10 @@ export default function App() {
                       <span className="flex justify-between">VIDAS EXTRA: <strong className="text-[#f43f5e]">+{lives * 200}</strong></span>
                     </div>
                     <button
-                      onClick={() => setGameState('level_select')}
+                      onClick={() => {
+                        setPreviousScreen('menu');
+                        setGameState('level_select');
+                      }}
                       className="flex items-center gap-2 rounded-xl bg-[#16a34a] hover:bg-[#15803d] border-2 border-[#22c55e] text-white px-6 py-3.5 font-press-start text-[9px] tracking-wider cursor-pointer active:scale-95 transition-all mt-2 font-bold shadow-md shadow-emerald-950/30"
                     >
                       <RotateCcw size={12} />

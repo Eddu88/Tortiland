@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useRef } from 'react';
-import { GameState, LevelPhase, Player, Enemy, TileType, GridPos, Position } from '../types';
+import { GameState, LevelPhase, Player, Enemy, TileType, GridPos, Position, ScheduledBreak } from '../types';
 import { COLS, ROWS, TILE } from '../constants';
 import { isWall, isBush, isEmpty } from '../utils/map';
 
@@ -20,6 +20,7 @@ interface UsePlayerInputProps {
   triggerActionRef: React.MutableRefObject<() => void>;
   frameCountRef: React.MutableRefObject<number>;
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
+  scheduledBreaksRef: React.MutableRefObject<ScheduledBreak[]>;
   tileReadyRef: React.MutableRefObject<number[][]>;
   setGameState?: (s: GameState) => void;
 }
@@ -36,6 +37,7 @@ export const usePlayerInput = ({
   triggerActionRef,
   frameCountRef,
   scheduledPlantsRef,
+  scheduledBreaksRef,
   tileReadyRef,
   setGameState,
 }: UsePlayerInputProps) => {
@@ -72,6 +74,10 @@ export const usePlayerInput = ({
 
     if (action === 'break') {
       breakingTilesRef.current = [];
+      // Limpiar entradas residuales antes de evaluar
+      scheduledBreaksRef.current = scheduledBreaksRef.current.filter(
+        b => isBush(b.col, b.row, mapRef.current)
+      );
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
         if (isWall(currentCc, currentCr, mapRef.current)) break;
@@ -79,14 +85,15 @@ export const usePlayerInput = ({
         if (isBush(currentCc, currentCr, mapRef.current)) {
           // Check ready frame for individual tiles
           const readyFrame = tileReadyRef.current[currentCr]?.[currentCc] ?? 0;
-          if (readyFrame <= frameCountRef.current) {
+          const isScheduledBreak = scheduledBreaksRef.current.some(b => b.col === currentCc && b.row === currentCr);
+
+          if (readyFrame <= frameCountRef.current && !isScheduledBreak) {
             breakingTilesRef.current.push({ col: currentCc, row: currentCr });
             actionExecuted = true;
-          } else {
-            break; // Stop immediately upon meeting unready tile
           }
+          // Si no está listo o ya está en cola, simplemente continúa al siguiente
         } else {
-          break; // Stop immediately upon meeting space / gaps
+          break; // Solo para si no es arbusto (es espacio vacío o pared)
         }
         currentCc += dir.x;
         currentCr += dir.y;
@@ -102,8 +109,8 @@ export const usePlayerInput = ({
 
         const hasPlayer = (player.col === currentCc && player.row === currentCr) ||
           (player.targetCol === currentCc && player.targetRow === currentCr);
-        
-        const enemyAtCurrent = enemiesRef.current.some(e => 
+
+        const enemyAtCurrent = enemiesRef.current.some(e =>
           (e.col === currentCc && e.row === currentCr) ||
           (e.targetCol === currentCc && e.targetRow === currentCr)
         );
@@ -117,7 +124,7 @@ export const usePlayerInput = ({
 
         const nextCc = currentCc + dir.x;
         const nextCr = currentCr + dir.y;
-        const enemyAtNext = enemiesRef.current.some(e => 
+        const enemyAtNext = enemiesRef.current.some(e =>
           (e.col === nextCc && e.row === nextCr) ||
           (e.targetCol === nextCc && e.targetRow === nextCr)
         );
@@ -229,9 +236,9 @@ export const usePlayerInput = ({
 
       // Recalculate last direction with actively pressed keys
       const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
-                             keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
-                             keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
-                             keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+        keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+        keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+        keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
       if (!hasMovementKey) {
         turnBlockedRef.current = false;
         lastDirRef.current = null;

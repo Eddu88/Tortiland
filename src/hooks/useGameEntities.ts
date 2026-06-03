@@ -1,5 +1,5 @@
 import React from 'react';
-import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position } from '../types';
+import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position, ScheduledBreak } from '../types';
 import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, LEVELS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 import {
@@ -36,10 +36,12 @@ interface UseGameEntitiesProps {
   setLevelPhase: (p: LevelPhase) => void;
   tileReadyRef: React.MutableRefObject<number[][]>;
   scheduledPlantsRef: React.MutableRefObject<{ col: number; row: number; triggerAt: number }[]>;
+  scheduledBreaksRef: React.MutableRefObject<ScheduledBreak[]>;
   frameCountRef: React.MutableRefObject<number>;
   awaitingBurrowRef: React.MutableRefObject<boolean>;
   currentLevelIndex: number;
   goldenBroccoliUsedRef: React.MutableRefObject<boolean>;
+  usedGoldenBroccoliRef: React.MutableRefObject<boolean>;
 }
 
 export const useGameEntities = ({
@@ -67,10 +69,12 @@ export const useGameEntities = ({
   setLevelPhase,
   tileReadyRef,
   scheduledPlantsRef,
+  scheduledBreaksRef,
   frameCountRef,
   awaitingBurrowRef,
   currentLevelIndex,
   goldenBroccoliUsedRef,
+  usedGoldenBroccoliRef,
 }: UseGameEntitiesProps) => {
 
   const levelConfig = LEVELS[currentLevelIndex];
@@ -208,8 +212,11 @@ export const useGameEntities = ({
 
   const initLevel = (currentLives: number) => {
     goldenBroccoliUsedRef.current = false; // ← agregar esta línea al inicio
+    usedGoldenBroccoliRef.current = false;
     awaitingBurrowRef.current = false;
     grassAgesRef.current = {};
+    scheduledPlantsRef.current = [];
+    scheduledBreaksRef.current = [];
     mapRef.current = buildBaseMap(levelConfig.innerWalls, grassAgesRef.current);
     tileReadyRef.current = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
@@ -290,7 +297,7 @@ export const useGameEntities = ({
         // Golden Broccoli power up consumed!
         player.goldenBroccoliTimer = 600; // 10 seconds of grass-piercing glory
         setGoldenBroccoliTimer(10);
-        goldenBroccoliUsedRef.current = true; // ← confirmar consumo
+        usedGoldenBroccoliRef.current = true; // ← confirmar consumo
         SoundEffects.playPowerUp();
         spawnParticles(player.col, player.row, '#ffd700');
       } else {
@@ -515,6 +522,26 @@ export const useGameEntities = ({
 
           // Check escape victory condition when Torti enters the house cell and escape is active
           if (player.col === 18 && player.row === 13 && awaitingBurrowRef.current) {
+            // Calculate stars:
+            // 0 stars: consumed golden broccoli during level
+            // 1 star: finished with 1 life, no golden broccoli
+            // 2 stars: finished with 2 lives, no golden broccoli
+            const stars = usedGoldenBroccoliRef.current ? 0 : (lives === 1 ? 1 : lives === 2 ? 2 : 0);
+            const levelNum = currentLevelIndex + 1;
+
+            // Save to localStorage
+            const prevStars = parseInt(localStorage.getItem(`tortiland_stars_${levelNum}`) || '0', 10);
+            if (stars > prevStars) {
+              localStorage.setItem(`tortiland_stars_${levelNum}`, String(stars));
+            }
+
+            // Sync max unlocked level
+            const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
+            const nextLevel = currentLevelIndex + 2; // currentLevelIndex is 0-based
+            if (nextLevel > maxUnlocked && nextLevel <= 6) {
+              localStorage.setItem('tortiland_max_level', String(nextLevel));
+            }
+
             if (currentLevelIndex < LEVELS.length - 1) {
               setGameState('level_complete');
               SoundEffects.playVictory();

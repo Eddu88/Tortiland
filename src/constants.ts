@@ -144,7 +144,7 @@ export const LEVELS: LevelConfig[] = [
       { id: '5_1', type: 'patrol', col: 18, row: 10, speed: 0.6 },
       { id: '5_2', type: 'patrol', col: 18, row: 1, speed: 0.6 },
       { id: '5_3', type: 'chaser', col: 10, row: 13, speed: 0.75 },
-      { id: '5_4', type: 'ghost', col: 1, row: 13, speed: 0.5 }
+      { id: '5_4', type: 'ghost', col: 1, row: 1, speed: 0.5 }
     ]
   },
   {
@@ -167,7 +167,7 @@ export const LEVELS: LevelConfig[] = [
     enemies: [
       { id: '6_1', type: 'chaser', col: 10, row: 13, speed: 0.75 },
       { id: '6_2', type: 'chaser', col: 1, row: 13, speed: 0.75 },
-      { id: '6_3', type: 'ghost', col: 18, row: 1, speed: 0.5 },
+      { id: '6_3', type: 'ghost', col: 1, row: 1, speed: 0.5 },
       { id: '6_4', type: 'ghost', col: 18, row: 10, speed: 0.5 }
     ]
   }
