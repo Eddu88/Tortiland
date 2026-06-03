@@ -6,6 +6,28 @@ import { formatTime } from './utils/map';
 import { Shield, Sparkles, Heart, Play, RotateCcw, HelpCircle, Gamepad2, Lock, Star, ChevronLeft } from 'lucide-react';
 import { LEVELS } from './constants';
 
+const BeetrootIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="inline-block align-middle">
+    {/* Stems */}
+    <path d="M12 11V6M9.5 11.5C9 9 7.5 8 6.5 7M14.5 11.5C15 9 16.5 8 17.5 7" stroke="#be123c" strokeWidth="1.5" strokeLinecap="round" />
+    {/* Leaves */}
+    <ellipse cx="12" cy="4.5" rx="2" ry="3.2" fill="#15803d" stroke="#166534" strokeWidth="0.5" />
+    <ellipse cx="5.5" cy="6" rx="1.5" ry="2.5" transform="rotate(-30 5.5 6)" fill="#15803d" stroke="#166534" strokeWidth="0.5" />
+    <ellipse cx="18.5" cy="6" rx="1.5" ry="2.5" transform="rotate(30 18.5 6)" fill="#15803d" stroke="#166534" strokeWidth="0.5" />
+    {/* Bulbous Body */}
+    <path d="M5.5 12C3.5 9 20.5 9 18.5 12C18 15 14 17.5 12 19C10 17.5 6 15 5.5 12Z" fill="url(#beetGradHUD)" stroke="#881337" strokeWidth="1.2" strokeLinejoin="round" />
+    {/* Highlight Glint */}
+    <ellipse cx="9" cy="12.5" rx="2" ry="0.9" transform="rotate(-30 9 12.5)" fill="white" fillOpacity="0.4" />
+    <defs>
+      <radialGradient id="beetGradHUD" cx="40%" cy="30%" r="60%">
+        <stop offset="0%" stopColor="#fda4af" />
+        <stop offset="35%" stopColor="#be123c" />
+        <stop offset="100%" stopColor="#4c0519" />
+      </radialGradient>
+    </defs>
+  </svg>
+);
+
 export default function App() {
   const [gameState, setGameState] = useState<GameState>('menu');
   const [previousScreen, setPreviousScreen] = useState<'menu' | 'gameover' | 'pause'>('menu');
@@ -86,9 +108,8 @@ export default function App() {
     setVirtualCommand(null);
   };
 
-  // Render the fruit progress dynamically based on levelPhase (matches updateAppleProgress)
+  // Render the fruit progress dynamically based on levelPhase
   const renderFruitProgressEmojis = () => {
-    const emoji = levelPhase === 'tomatoes' ? '🍅' : (levelPhase === 'carrots' ? '🥕' : '🍠');
     const label = levelPhase === 'tomatoes' ? 'Tomates' : (levelPhase === 'carrots' ? 'Zanahorias' : 'Beterragas');
 
     if (fruitsLeft === 0) {
@@ -98,9 +119,19 @@ export default function App() {
     }
 
     return (
-      <span className="flex items-center gap-1 text-[13px] tracking-wide text-amber-300">
+      <span className="flex items-center gap-1.5 text-[13px] tracking-wide text-amber-300">
         <span className="opacity-90">{label}:</span>
-        <span className="animate-pulse">{Array(fruitsLeft).fill(emoji).join(' ')}</span>
+        {levelPhase === 'tomatoes' || levelPhase === 'carrots' ? (
+          <span className="animate-pulse">
+            {Array(fruitsLeft).fill(levelPhase === 'tomatoes' ? '🍅' : '🥕').join(' ')}
+          </span>
+        ) : (
+          <span className="flex items-center gap-1 animate-pulse">
+            {Array.from({ length: fruitsLeft }).map((_, i) => (
+              <span key={i} className="inline-flex items-center"><BeetrootIcon /></span>
+            ))}
+          </span>
+        )}
       </span>
     );
   };

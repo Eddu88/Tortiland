@@ -318,7 +318,7 @@ export const drawFruits = (
       ctx.rotate(Math.PI / 12); // subtle organic rotation
 
       // Deep magenta radial/linear gradient
-      const beetGrad = ctx.createRadialGradient(-2, -2, 1, 0, 1, 9.5);
+      const beetGrad = ctx.createRadialGradient(-2, -2, 1, 0, 1, 11.5);
       beetGrad.addColorStop(0, '#fda4af'); // light rose glint
       beetGrad.addColorStop(0.3, '#be123c'); // rose red body
       beetGrad.addColorStop(1, '#4c0519'); // deep magenta shadow
@@ -328,12 +328,12 @@ export const drawFruits = (
       ctx.lineWidth = 1.5;
       ctx.lineJoin = 'round';
 
-      // 1. Draw tapered bulbous root body
+      // 1. Draw tapered bulbous root body (wider and less elongated)
       ctx.beginPath();
-      ctx.moveTo(-8, -3);
-      ctx.bezierCurveTo(-10, -9, 10, -9, 8, -3);
-      ctx.bezierCurveTo(8, 4, 3, 8, 0, 11); // sharp point downwards
-      ctx.bezierCurveTo(-3, 8, -8, 4, -8, -3);
+      ctx.moveTo(-11, -3);
+      ctx.bezierCurveTo(-13, -9, 13, -9, 11, -3);
+      ctx.bezierCurveTo(11, 3, 4, 7, 0, 9); // less elongated tip
+      ctx.bezierCurveTo(-4, 7, -11, 3, -11, -3);
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
@@ -370,10 +370,10 @@ export const drawFruits = (
       ctx.ellipse(7, -13, 2, 3.5, Math.PI / 4, 0, Math.PI * 2);
       ctx.fill(); ctx.stroke();
 
-      // Highlight glint reflection
+      // Highlight glint reflection (adjusted to match new width)
       ctx.fillStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.beginPath();
-      ctx.ellipse(-3, -3, 2.5, 1.2, -Math.PI / 4, 0, Math.PI * 2);
+      ctx.ellipse(-4, -3, 3.2, 1.4, -Math.PI / 4, 0, Math.PI * 2);
       ctx.fill();
 
       ctx.restore();
