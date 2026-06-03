@@ -50,8 +50,8 @@ export const LEVELS: LevelConfig[] = [
       [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11]
     ],
     enemies: [
-      { id: '1_1', type: 'patrol', col: 18, row: 10, speed: 78 },
-      { id: '1_2', type: 'patrol', col: 18, row: 1, speed: 78 }
+      { id: '1_1', type: 'patrol', col: 18, row: 10, speed: 82 },
+      { id: '1_2', type: 'patrol', col: 18, row: 1, speed: 82 }
     ]
   },
   {
@@ -75,11 +75,11 @@ export const LEVELS: LevelConfig[] = [
       [3, 1], [3, 18], [6, 6], [8, 13], [11, 2], [11, 17], [13, 5], [13, 14]
     ],
     enemies: [
-      { id: '2_1', type: 'patrol', col: 1, row: 2, speed: 78 },
-      { id: '2_2', type: 'patrol', col: 18, row: 10, speed: 78 },
-      { id: '2_3', type: 'patrol', col: 1, row: 12, speed: 78 },
-      { id: '2_4', type: 'patrol', col: 13, row: 1, speed: 78 },
-      { id: '2_5', type: 'patrol', col: 11, row: 13, speed: 78 }
+      { id: '2_1', type: 'patrol', col: 1, row: 2, speed: 82 },
+      { id: '2_2', type: 'patrol', col: 18, row: 10, speed: 82 },
+      { id: '2_3', type: 'patrol', col: 1, row: 12, speed: 82 },
+      { id: '2_4', type: 'patrol', col: 13, row: 1, speed: 82 },
+      { id: '2_5', type: 'patrol', col: 11, row: 13, speed: 82 }
     ]
   },
   {
@@ -98,10 +98,10 @@ export const LEVELS: LevelConfig[] = [
       [4, 2], [4, 17], [10, 2], [10, 17], [13, 3], [13, 15]
     ],
     enemies: [
-      { id: '3_1', type: 'patrol', col: 18, row: 1, speed: 78 },
-      { id: '3_2', type: 'patrol', col: 18, row: 10, speed: 78 },
-      { id: '3_3', type: 'patrol', col: 2, row: 12, speed: 78 },
-      { id: '3_4', type: 'chaser', col: 10, row: 13, speed: 98 }
+      { id: '3_1', type: 'patrol', col: 18, row: 1, speed: 82 },
+      { id: '3_2', type: 'patrol', col: 18, row: 10, speed: 82 },
+      { id: '3_3', type: 'patrol', col: 2, row: 12, speed: 82 },
+      { id: '3_4', type: 'chaser', col: 10, row: 13, speed: 92 }
     ]
   },
   {
@@ -120,10 +120,10 @@ export const LEVELS: LevelConfig[] = [
       [1, 5], [1, 14], [7, 2], [7, 17], [13, 2], [13, 16]
     ],
     enemies: [
-      { id: '4_1', type: 'patrol', col: 18, row: 10, speed: 78 },
-      { id: '4_2', type: 'patrol', col: 2, row: 1, speed: 78 },
-      { id: '4_3', type: 'chaser', col: 10, row: 13, speed: 98 },
-      { id: '4_4', type: 'chaser', col: 1, row: 13, speed: 98 }
+      { id: '4_1', type: 'patrol', col: 18, row: 10, speed: 82 },
+      { id: '4_2', type: 'patrol', col: 2, row: 1, speed: 82 },
+      { id: '4_3', type: 'chaser', col: 10, row: 13, speed: 92 },
+      { id: '4_4', type: 'chaser', col: 1, row: 13, speed: 92 }
     ]
   },
   {
@@ -144,10 +144,10 @@ export const LEVELS: LevelConfig[] = [
       [1, 8], [1, 11], [7, 3], [7, 16], [13, 8], [13, 11]
     ],
     enemies: [
-      { id: '5_1', type: 'patrol', col: 18, row: 10, speed: 78 },
-      { id: '5_2', type: 'patrol', col: 18, row: 1, speed: 78 },
-      { id: '5_3', type: 'chaser', col: 10, row: 13, speed: 98 },
-      { id: '5_4', type: 'ghost', col: 1, row: 1, speed: 65 }
+      { id: '5_1', type: 'patrol', col: 18, row: 10, speed: 82 },
+      { id: '5_2', type: 'patrol', col: 18, row: 1, speed: 82 },
+      { id: '5_3', type: 'chaser', col: 10, row: 13, speed: 92 },
+      { id: '5_4', type: 'ghost', col: 1, row: 1, speed: 70 }
     ]
   },
   {
@@ -168,10 +168,10 @@ export const LEVELS: LevelConfig[] = [
       [3, 2], [3, 17], [5, 5], [5, 14], [9, 5], [9, 14], [11, 2], [11, 17]
     ],
     enemies: [
-      { id: '6_1', type: 'chaser', col: 10, row: 13, speed: 98 },
-      { id: '6_2', type: 'chaser', col: 1, row: 13, speed: 98 },
-      { id: '6_3', type: 'ghost', col: 1, row: 1, speed: 65 },
-      { id: '6_4', type: 'ghost', col: 18, row: 10, speed: 65 }
+      { id: '6_1', type: 'chaser', col: 10, row: 13, speed: 92 },
+      { id: '6_2', type: 'chaser', col: 1, row: 13, speed: 92 },
+      { id: '6_3', type: 'ghost', col: 1, row: 1, speed: 70 },
+      { id: '6_4', type: 'ghost', col: 18, row: 10, speed: 70 }
     ]
   }
 ];
