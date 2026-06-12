@@ -402,7 +402,7 @@ export const drawMap = (
           const ry = y + 8 + ((hashVal * 9) % 20);
           const rSize = 2.5 + (hashVal % 3.0); // size 2.5 to 5.5px
           const mossy = (hashVal % 10 > 7.0); // 30% of stones are mossy
-          
+
           ctx.save();
           // Draw subtle shadow
           ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
@@ -513,7 +513,7 @@ function lerpColor(a: string, b: string, t: number): string {
 // de túnel, 3 pares de ojos acechando, ZZZ durmientes.
 // ==========================================
 function mulberry32(a: number) {
-  return function() {
+  return function () {
     let t = a += 0x6D2B79F5;
     t = Math.imul(t ^ (t >>> 15), t | 1);
     t ^= t + Math.imul(t ^ (t >>> 7), t | 61);

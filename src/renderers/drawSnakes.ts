@@ -19,21 +19,13 @@ export const drawSnake = (
   type: EnemyType,
   t: number
 ) => {
-  // Ajuste de escala para la serpiente
-  const s = TILE * 0.55;
-
-  // Animación de respiración / flotación (bobbing)
-  const bobOffset = Math.sin(t * 0.007) * 4;
-  const cy = py + bobOffset;
-
-  // Sombra base en el suelo
-  ctx.fillStyle = 'rgba(0, 0, 0, 0.35)';
-  ctx.beginPath();
-  ctx.ellipse(px, py + s * 0.6, s * 0.8, s * 0.25, 0, 0, Math.PI * 2);
-  ctx.fill();
+  // sway calculation: slight horizontal sway of the head
+  const sway = Math.sin(t * 0.01);
+  const headX = -5 + sway * 1.8;
+  const headY = -8;
 
   ctx.save();
-  ctx.translate(px, cy);
+  ctx.translate(px, py);
 
   // Inversión horizontal si se mueve a la derecha (por defecto mira a la izquierda)
   const flipH = dir.x > 0;
@@ -41,117 +33,142 @@ export const drawSnake = (
     ctx.scale(-1, 1);
   }
 
-  // Paleta de colores consistente con el estilo del gorila
+  // Paleta de colores retro pixel art (4 colores por tipo de enemigo)
   const isPatrol = type === 'snake_patrol';
-  const cDark = isPatrol ? '#064e3b' : '#09090b';   // Contornos (Verde oscuro / Negro)
-  const cBase = isPatrol ? '#059669' : '#27272a';   // Cuerpo base (Esmeralda / Gris oscuro)
-  const cLight = isPatrol ? '#10b981' : '#f97316';  // Brillos/Detalles (Menta / Naranja)
-  const cTongue = isPatrol ? '#ef4444' : '#dc2626'; // Lengua (Rojo vivo / Rojo profundo)
+  const highlight = isPatrol ? "#9BE04F" : "#FF9A3C";
+  const base      = isPatrol ? "#5E9C36" : "#D25400";
+  const shadow    = isPatrol ? "#35561D" : "#6E2200";
+  const outline   = isPatrol ? "#1D2F12" : "#3B0E00";
 
-  ctx.strokeStyle = cDark;
-  ctx.lineWidth = 2.5;
+  // Sombra base en el suelo (plana y retro)
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.25)';
+  ctx.fillRect(-14, 11, 28, 4);
 
-  // 1. CUERPO ENROSCADO (Anillos inferiores de la espiral)
-  // Anillo exterior trasero
-  ctx.fillStyle = cDark;
+  // 1. CUERPO ENROSCADO (espiral usando bloques redondeados roundRect)
+  // Anillo exterior trasero (inferior)
+  ctx.fillStyle = outline;
   ctx.beginPath();
-  ctx.ellipse(s * 0.1, s * 0.4, s * 0.7, s * 0.25, 0, 0, Math.PI * 2);
+  ctx.roundRect(-16, 2, 32, 11, 3);
   ctx.fill();
 
-  // Anillo principal base
-  ctx.fillStyle = cBase;
+  ctx.fillStyle = shadow;
   ctx.beginPath();
-  ctx.ellipse(0, s * 0.35, s * 0.65, s * 0.22, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // Brillo del anillo inferior
-  ctx.fillStyle = cLight;
-  ctx.beginPath();
-  ctx.ellipse(0, s * 0.42, s * 0.45, s * 0.08, 0, 0, Math.PI * 2);
+  ctx.roundRect(-15, 3, 30, 9, 2);
   ctx.fill();
 
-  // Anillo interno (da el efecto de rosca/espiral)
-  ctx.fillStyle = cDark;
+  // Anillo principal base (medio)
+  ctx.fillStyle = outline;
   ctx.beginPath();
-  ctx.ellipse(-s * 0.05, s * 0.33, s * 0.3, s * 0.1, 0, 0, Math.PI * 2);
+  ctx.roundRect(-13, -3, 26, 10, 3);
   ctx.fill();
 
-  // 2. COLA (Sobresale sutilmente por un lado)
-  ctx.fillStyle = cBase;
+  ctx.fillStyle = base;
   ctx.beginPath();
-  ctx.arc(s * 0.55, s * 0.2, s * 0.12, 0, Math.PI * 2);
+  ctx.roundRect(-12, -2, 24, 8, 2);
   ctx.fill();
-  ctx.stroke();
 
-  // 3. CUELLO (Sube erguido desde el centro de la rosca)
-  ctx.fillStyle = cBase;
+  // Brillo del anillo
+  ctx.fillStyle = highlight;
+  ctx.fillRect(-10, -2, 20, 2);
+
+  // Anillo interno trasero (da profundidad al centro de la espiral)
+  ctx.fillStyle = outline;
   ctx.beginPath();
-  ctx.moveTo(-s * 0.3, s * 0.3);
-  ctx.quadraticCurveTo(-s * 0.4, -s * 0.1, -s * 0.2, -s * 0.2); // Curva S del cuello
-  ctx.lineTo(s * 0.05, -s * 0.2);
-  ctx.quadraticCurveTo(-s * 0.1, s * 0.1, -s * 0.02, s * 0.3);
+  ctx.roundRect(-8, 1, 16, 6, 2);
+  ctx.fill();
+
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.roundRect(-7, 2, 14, 4, 1);
+  ctx.fill();
+
+  // 2. CUELLO ERGUIDO (Conexión geométrica con el cuerpo)
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.moveTo(-11, 2);
+  ctx.lineTo(headX - 5, headY + 3);
+  ctx.lineTo(headX + 5, headY + 3);
+  ctx.lineTo(-2, 2);
   ctx.closePath();
   ctx.fill();
-  ctx.stroke();
 
-  // 4. LENGUA BÍFIDA (Animación rápida de parpadeo)
-  const showTongue = Math.floor(t / 100) % 3 !== 0;
+  ctx.fillStyle = base;
+  ctx.beginPath();
+  ctx.moveTo(-9, 2);
+  ctx.lineTo(headX - 3, headY + 3);
+  ctx.lineTo(headX + 3, headY + 3);
+  ctx.lineTo(-4, 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // Sombra del cuello (lateral derecho)
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.moveTo(-6, 2);
+  ctx.lineTo(headX, headY + 3);
+  ctx.lineTo(headX + 3, headY + 3);
+  ctx.lineTo(-4, 2);
+  ctx.closePath();
+  ctx.fill();
+
+  // 3. CABEZA DE VÍBORA (Silueta geométrica angulada)
+  ctx.fillStyle = outline;
+  ctx.beginPath();
+  ctx.moveTo(headX + 12, headY);
+  ctx.lineTo(headX - 5, headY - 9);
+  ctx.lineTo(headX - 14, headY);
+  ctx.lineTo(headX - 5, headY + 9);
+  ctx.closePath();
+  ctx.fill();
+
+  ctx.fillStyle = base;
+  ctx.beginPath();
+  ctx.moveTo(headX + 10, headY);
+  ctx.lineTo(headX - 5, headY - 7);
+  ctx.lineTo(headX - 12, headY);
+  ctx.lineTo(headX - 5, headY + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Sombreando la mitad inferior de la cabeza
+  ctx.fillStyle = shadow;
+  ctx.beginPath();
+  ctx.moveTo(headX - 12, headY);
+  ctx.lineTo(headX - 5, headY);
+  ctx.lineTo(headX + 10, headY);
+  ctx.lineTo(headX - 5, headY + 7);
+  ctx.closePath();
+  ctx.fill();
+
+  // Brillo en la frente/hocico de la cabeza
+  ctx.fillStyle = highlight;
+  ctx.beginPath();
+  ctx.moveTo(headX - 12, headY);
+  ctx.lineTo(headX - 5, headY - 7);
+  ctx.lineTo(headX - 5, headY);
+  ctx.closePath();
+  ctx.fill();
+
+  // 4. LENGUA BÍFIDA RECTA (#E53935)
+  const showTongue = Math.floor(t / 120) % 3 !== 0;
   if (showTongue) {
-    ctx.strokeStyle = cTongue;
-    ctx.lineWidth = 3;
-    ctx.lineCap = 'round';
-    
-    // Extensión de la lengua saliendo de la boca hacia la izquierda
-    const tX = -s * 0.5;
-    const tY = -s * 0.25;
+    ctx.strokeStyle = "#E53935";
+    ctx.lineWidth = 1.5;
     ctx.beginPath();
-    ctx.moveTo(-s * 0.35, -s * 0.25);
-    ctx.lineTo(tX, tY);
-    // Puntas bífidas
-    ctx.moveTo(tX, tY);
-    ctx.lineTo(tX - s * 0.12, tY - s * 0.08);
-    ctx.moveTo(tX, tY);
-    ctx.lineTo(tX - s * 0.12, tY + s * 0.08);
+    ctx.moveTo(headX - 12, headY);
+    ctx.lineTo(headX - 17, headY);
+    ctx.lineTo(headX - 21, headY - 2);
+    ctx.moveTo(headX - 17, headY);
+    ctx.lineTo(headX - 21, headY + 2);
     ctx.stroke();
   }
 
-  // 5. CABEZA (Forma de gota/triángulo redondeado)
-  ctx.fillStyle = cBase;
-  ctx.strokeStyle = cDark;
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.ellipse(-s * 0.15, -s * 0.28, s * 0.32, s * 0.24, -Math.PI / 12, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
+  // 5. OJO RETRO (Único ojo visible, fondo oscuro + punto amarillo)
+  ctx.fillStyle = "#16233A";
+  ctx.fillRect(headX - 6, headY - 4, 4, 4);
 
-  // Ceja agresiva
-  ctx.strokeStyle = cDark;
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.32, -s * 0.38);
-  ctx.lineTo(-s * 0.1, -s * 0.32);
-  ctx.stroke();
-
-  // Ojo enfadado (Igual que el de tu gorila, usando amarillo brillante)
-  ctx.fillStyle = '#facc15';
-  ctx.beginPath();
-  ctx.arc(-s * 0.2, -s * 0.3, s * 0.05, 0, Math.PI * 2);
-  ctx.fill();
-
-  // Pupila (Línea vertical de reptil)
-  ctx.strokeStyle = '#000000';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.2, -s * 0.33);
-  ctx.lineTo(-s * 0.2, -s * 0.27);
-  ctx.stroke();
-
-  // Detalle de la fosa nasal
-  ctx.fillStyle = cDark;
-  ctx.beginPath();
-  ctx.arc(-s * 0.38, -s * 0.26, s * 0.025, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.fillStyle = "#FFD84D";
+  ctx.fillRect(headX - 5, headY - 3, 2, 2);
 
   ctx.restore();
 };
