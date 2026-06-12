@@ -396,21 +396,49 @@ export const drawMap = (
         ctx.fillRect(x + 8 + (hashVal % 12), y + 18 + ((hashVal * 11) % 6), 1.0, 1.0);
         ctx.fillRect(x + 28 + (hashVal % 6), y + 22 + ((hashVal * 13) % 8), 1.2, 1.2);
 
-        // Pebbles
-        if (hashVal % 10 < 1.0) {
-          const px = x + 8 + (hashVal % 24);
-          const py = y + 8 + ((hashVal * 7) % 24);
-          ctx.fillStyle = '#9e9a96';
-          ctx.strokeStyle = '#6e6a66';
-          ctx.lineWidth = 0.8;
+        // Step 3.5: Scattered Organic Stones
+        if (hashVal % 100 < 10.0) {
+          const rx = x + 8 + (hashVal % 20);
+          const ry = y + 8 + ((hashVal * 9) % 20);
+          const rSize = 2.5 + (hashVal % 3.0); // size 2.5 to 5.5px
+          const mossy = (hashVal % 10 > 7.0); // 30% of stones are mossy
+          
+          ctx.save();
+          // Draw subtle shadow
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.16)';
           ctx.beginPath();
-          ctx.moveTo(px, py);
-          ctx.lineTo(px + 4, py - 2);
-          ctx.lineTo(px + 6, py + 2);
-          ctx.lineTo(px + 2, py + 4);
-          ctx.closePath();
+          ctx.ellipse(rx + 0.5, ry + rSize * 0.4, rSize * 1.1, rSize * 0.4, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Draw rock body
+          ctx.fillStyle = '#9e9a92';
+          ctx.strokeStyle = '#2B2728';
+          ctx.lineWidth = 0.7;
+          ctx.beginPath();
+          ctx.arc(rx, ry, rSize, 0, Math.PI * 2);
           ctx.fill();
           ctx.stroke();
+
+          // Clip to rock shape for highlights and moss
+          ctx.clip();
+
+          ctx.fillStyle = '#c2beb6'; // light face
+          ctx.beginPath();
+          ctx.ellipse(rx - rSize * 0.3, ry - rSize * 0.3, rSize * 0.6, rSize * 0.4, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#78746c'; // dark shadow face
+          ctx.beginPath();
+          ctx.ellipse(rx + rSize * 0.3, ry + rSize * 0.3, rSize * 0.6, rSize * 0.4, 0.3, 0, Math.PI * 2);
+          ctx.fill();
+
+          if (mossy) {
+            ctx.fillStyle = '#5a782b'; // green moss
+            ctx.beginPath();
+            ctx.ellipse(rx - rSize * 0.05, ry - rSize * 0.55, rSize * 0.6, rSize * 0.25, 0.15, 0, Math.PI * 2);
+            ctx.fill();
+          }
+          ctx.restore();
         }
 
         // Dry Twigs
@@ -484,458 +512,627 @@ function lerpColor(a: string, b: string, t: number): string {
 // Detalle máximo: entrada central con arco de raíces, 7+ entradas
 // de túnel, 3 pares de ojos acechando, ZZZ durmientes.
 // ==========================================
-function drawBossDen(
+function mulberry32(a: number) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  }
+}
+
+export function drawBossDen(
   ctx: CanvasRenderingContext2D,
   ox: number,
   oy: number,
   timestamp: number
 ) {
   ctx.save();
+  const S = TILE * 4;
+  const L = ox, T = oy, R = ox + S, B = oy + S;
+  const cx = ox + S / 2;
+  const cy = oy + S / 2 + 4;
 
-  const W = TILE * 4; // 160px
-  const H = TILE * 4; // 160px
-  const cx = ox + W / 2;
-  const cy = oy + H / 2 + 8;
-
-  // ── 1. Sombra suelo difuminada ─────────────────────────────────
-  const shadowGrad = ctx.createRadialGradient(cx, cy + 55, 5, cx, cy + 55, 90);
-  shadowGrad.addColorStop(0, "rgba(10,4,0,0.65)");
-  shadowGrad.addColorStop(1, "rgba(10,4,0,0)");
-  ctx.fillStyle = shadowGrad;
-  ctx.beginPath();
-  ctx.ellipse(cx, cy + 55, 90, 28, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // ── 2. Función: dibujar un bloque de tierra isométrico ─────────
-  // iso top face + side face right + side face left
-  const drawEarthBlock = (
-    bx: number,
-    by: number,
-    bw: number,
-    bh: number,
-    depth: number,
-    colorTop: string,
-    colorRight: string,
-    colorLeft: string
-  ) => {
-    // Top face (parallelogram isométrico simplificado = rect con leve skew)
-    ctx.fillStyle = colorTop;
-    ctx.beginPath();
-    ctx.moveTo(bx, by);
-    ctx.lineTo(bx + bw, by);
-    ctx.lineTo(bx + bw, by + bh);
-    ctx.lineTo(bx, by + bh);
-    ctx.closePath();
-    ctx.fill();
-
-    // Right face (depth hacia abajo-derecha)
-    ctx.fillStyle = colorRight;
-    ctx.beginPath();
-    ctx.moveTo(bx + bw, by);
-    ctx.lineTo(bx + bw + depth * 0.6, by + depth * 0.5);
-    ctx.lineTo(bx + bw + depth * 0.6, by + bh + depth * 0.5);
-    ctx.lineTo(bx + bw, by + bh);
-    ctx.closePath();
-    ctx.fill();
-
-    // Left face (depth hacia abajo-izquierda, más oscura)
-    ctx.fillStyle = colorLeft;
-    ctx.beginPath();
-    ctx.moveTo(bx, by + bh);
-    ctx.lineTo(bx + depth * 0.6, by + bh + depth * 0.5);
-    ctx.lineTo(bx + bw + depth * 0.6, by + bh + depth * 0.5);
-    ctx.lineTo(bx + bw, by + bh);
-    ctx.closePath();
-    ctx.fill();
-
-    // Borde superior sutil
-    ctx.strokeStyle = "rgba(0,0,0,0.35)";
-    ctx.lineWidth = 0.8;
-    ctx.strokeRect(bx, by, bw, bh);
+  const P = {
+    dirtDeep: "#2a1504",
+    dirtDark: "#4d2a10",
+    dirtBase: "#7a5230",
+    dirtMid: "#663f1a",
+    dirtLight: "#9c6a3a",
+    outline: "#201000",
+    holeBlack: "#000000",
+    holeDark: "#0c0600",
+    rock: "#7a746c",
+    rockLight: "#a6a096",
+    rockDark: "#524c44",
+    moss: "#5c7d30",
+    mossDark: "#3d541f",
+    root: "#663a15",
+    rootDark: "#301805",
+    rootLight: "#a36c34"
   };
 
-  // ── 3. BASE DEL MONTÍCULO (nivel 0, el más ancho) ─────────────
-  // Forma irregular usando path
-  const baseColor = "#7a5230";
-  const baseShadow = "#4a2e10";
-  const baseLight = "#9c6a3a";
+  // ════ helpers ════════════════════════════════════════
 
-  // Contorno principal del montículo – forma asimétrica
-  const moundPath = () => {
+  const lumpyBlob = (x: number, y: number, rx: number, ry: number, seedR: number, lump = 0.16) => {
+    const r2 = mulberry32(seedR);
+    const n = 16, pts: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2;
+      const j = 1 + (r2() - 0.35) * lump;
+      pts.push([x + Math.cos(a) * rx * j, y + Math.sin(a) * ry * j]);
+    }
     ctx.beginPath();
-    ctx.moveTo(cx - 72, cy + 48);      // esquina inf izq
-    ctx.lineTo(cx - 80, cy + 20);      // sube lado izq
-    ctx.lineTo(cx - 65, cy - 5);
-    ctx.lineTo(cx - 48, cy - 28);      // hombro izq
-    ctx.lineTo(cx - 22, cy - 52);      // nivel superior izq
-    ctx.lineTo(cx + 5, cy - 62);      // cima central
-    ctx.lineTo(cx + 30, cy - 50);      // nivel superior der
-    ctx.lineTo(cx + 52, cy - 22);      // hombro der
-    ctx.lineTo(cx + 70, cy + 0);
-    ctx.lineTo(cx + 78, cy + 22);      // sube lado der
-    ctx.lineTo(cx + 72, cy + 48);      // esquina inf der
+    for (let i = 0; i < n; i++) {
+      const [x1, y1] = pts[i];
+      const [x2, y2] = pts[(i + 1) % n];
+      const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+      const px = x + (mx - x) * 1.07, py = y + (my - y) * 1.07;
+      if (i === 0) ctx.moveTo(x1, y1);
+      ctx.quadraticCurveTo(px, py, x2, y2);
+    }
     ctx.closePath();
   };
 
-  // Relleno base con gradiente de tierra
-  const earthGrad = ctx.createLinearGradient(cx - 80, cy - 62, cx + 78, cy + 48);
-  earthGrad.addColorStop(0, "#9c6a3a");
-  earthGrad.addColorStop(0.4, "#7a5230");
-  earthGrad.addColorStop(1, "#4a2e10");
-  moundPath();
-  ctx.fillStyle = earthGrad;
-  ctx.fill();
-
-  // Borde del montículo
-  moundPath();
-  ctx.strokeStyle = "#2a1500";
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // ── 4. TEXTURAS DE TIERRA: grietas y variación tonal ──────────
-  ctx.save();
-  moundPath();
-  ctx.clip();
-
-  // Variaciones de color internas (manchas de tierra)
-  const earthPatches = [
-    { x: cx - 55, y: cy + 10, rx: 22, ry: 12, c: "rgba(90,55,25,0.4)" },
-    { x: cx + 30, y: cy + 15, rx: 18, ry: 10, c: "rgba(130,85,45,0.35)" },
-    { x: cx - 20, y: cy - 10, rx: 25, ry: 14, c: "rgba(60,35,12,0.3)" },
-    { x: cx + 10, y: cy + 35, rx: 30, ry: 10, c: "rgba(100,65,30,0.25)" },
-    { x: cx - 45, y: cy + 38, rx: 20, ry: 8, c: "rgba(55,30,10,0.4)" },
-    { x: cx + 50, y: cy + 28, rx: 18, ry: 9, c: "rgba(80,50,20,0.35)" },
-  ];
-  earthPatches.forEach(p => {
-    ctx.fillStyle = p.c;
+  // Rectángulo redondeado GRUMOSO: la base cuadrada 4×4
+  const lumpyRect = (x0: number, y0: number, x1: number, y1: number, cr: number, seedR: number, lump = 3) => {
+    const r2 = mulberry32(seedR);
+    const ptsBase: [number, number][] = [];
+    const seg = (ax: number, ay: number, bx: number, by: number, n: number) => {
+      for (let i = 0; i < n; i++) {
+        const t = i / n;
+        ptsBase.push([ax + (bx - ax) * t, ay + (by - ay) * t]);
+      }
+    };
+    const arc = (ccx: number, ccy: number, a0: number, a1: number, n: number) => {
+      for (let i = 0; i < n; i++) {
+        const a = a0 + (a1 - a0) * (i / n);
+        ptsBase.push([ccx + Math.cos(a) * cr, ccy + Math.sin(a) * cr]);
+      }
+    };
+    seg(x0 + cr, y0, x1 - cr, y0, 7);
+    arc(x1 - cr, y0 + cr, -Math.PI / 2, 0, 4);
+    seg(x1, y0 + cr, x1, y1 - cr, 7);
+    arc(x1 - cr, y1 - cr, 0, Math.PI / 2, 4);
+    seg(x1 - cr, y1, x0 + cr, y1, 7);
+    arc(x0 + cr, y1 - cr, Math.PI / 2, Math.PI, 4);
+    seg(x0, y1 - cr, x0, y0 + cr, 7);
+    arc(x0 + cr, y0 + cr, Math.PI, Math.PI * 1.5, 4);
+    const mcx = (x0 + x1) / 2, mcy = (y0 + y1) / 2;
+    const pts = ptsBase.map(([px, py]) => {
+      const dx = px - mcx, dy = py - mcy;
+      const d = Math.hypot(dx, dy) || 1;
+      const j = (r2() - 0.4) * lump;
+      return [px + (dx / d) * j, py + (dy / d) * j];
+    });
     ctx.beginPath();
-    ctx.ellipse(p.x, p.y, p.rx, p.ry, 0.3, 0, Math.PI * 2);
-    ctx.fill();
-  });
+    const n = pts.length;
+    for (let i = 0; i < n; i++) {
+      const [x1p, y1p] = pts[i];
+      const [x2p, y2p] = pts[(i + 1) % n];
+      if (i === 0) ctx.moveTo(x1p, y1p);
+      ctx.quadraticCurveTo(x1p, y1p, (x1p + x2p) / 2, (y1p + y2p) / 2);
+    }
+    ctx.closePath();
+  };
 
-  // Grietas de tierra
-  ctx.strokeStyle = "rgba(30,12,0,0.5)";
-  ctx.lineWidth = 0.8;
-  const cracks = [
-    [[cx - 60, cy + 30], [cx - 45, cy + 22], [cx - 38, cy + 28]],
-    [[cx + 40, cy + 20], [cx + 52, cy + 30], [cx + 48, cy + 40]],
-    [[cx - 10, cy + 40], [cx + 5, cy + 44]],
-    [[cx - 30, cy - 5], [cx - 18, cy + 5], [cx - 25, cy + 12]],
-  ];
-  cracks.forEach(pts => {
+  const speckle = (x: number, y: number, rx: number, ry: number, count: number, seedR: number) => {
+    const r2 = mulberry32(seedR);
+    for (let i = 0; i < count; i++) {
+      ctx.fillStyle = r2() > 0.5 ? "rgba(50,26,8,0.28)" : "rgba(230,180,115,0.25)";
+      const a = r2() * Math.PI * 2, rr = Math.sqrt(r2());
+      ctx.fillRect(x + Math.cos(a) * rx * rr, y + Math.sin(a) * ry * rr, 1.2, 1.2);
+    }
+  };
+
+  const plateau = (x: number, y: number, rx: number, ry: number, h: number, seedR: number) => {
+    lumpyBlob(x, y + h, rx, ry, seedR);
+    ctx.fillStyle = P.dirtDeep; ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 1.3; ctx.stroke();
+    lumpyBlob(x, y + h * 0.5, rx, ry, seedR);
+    ctx.fillStyle = P.dirtDark; ctx.fill();
+    lumpyBlob(x, y, rx, ry, seedR);
+    ctx.fillStyle = P.dirtBase; ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 1.1; ctx.stroke();
+    ctx.save();
+    lumpyBlob(x, y, rx, ry, seedR); ctx.clip();
+    ctx.fillStyle = "rgba(224,174,110,0.45)";
+    ctx.beginPath(); ctx.ellipse(x - rx * 0.1, y - ry * 0.35, rx * 0.8, ry * 0.55, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "rgba(60,32,8,0.3)";
+    ctx.beginPath(); ctx.ellipse(x + rx * 0.05, y + ry * 0.65, rx * 0.85, ry * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    speckle(x, y, rx, ry, 26, seedR + 3);
+    ctx.restore();
+  };
+
+  const hole = (x: number, y: number, rx: number, ry: number, rot = 0, seedR = 1) => {
+    ctx.save();
+    ctx.translate(x, y); ctx.rotate(rot);
+    lumpyBlob(0, 0.5, rx + 2.6, ry + 2.6, seedR, 0.28);
+    ctx.fillStyle = P.dirtLight; ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 0.9; ctx.stroke();
+    lumpyBlob(0, -0.4, rx + 1.4, ry + 1.4, seedR + 1, 0.2);
+    ctx.fillStyle = P.dirtDark; ctx.fill();
+    const g = ctx.createRadialGradient(0, -ry * 0.35, 0.5, 0, 0, Math.max(rx, ry) * 1.1);
+    g.addColorStop(0, P.holeBlack);
+    g.addColorStop(0.65, P.holeDark);
+    g.addColorStop(1, "#33190a");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 1; ctx.stroke();
+    ctx.restore();
+  };
+
+  const rock = (x: number, y: number, r: number, mossy: boolean, seedR: number) => {
+    const r2 = mulberry32(seedR);
+    const n = 7, pts: [number, number][] = [];
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - 0.5;
+      const j = 0.72 + r2() * 0.5;
+      pts.push([x + Math.cos(a) * r * j, y + Math.sin(a) * r * 0.78 * j]);
+    }
     ctx.beginPath();
     pts.forEach(([px, py], i) => i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py));
-    ctx.stroke();
-  });
-
-  ctx.restore(); // fin clip mound
-
-  // ── 5. NIVELES DE PLATAFORMA (terrazas de tierra) ──────────────
-  // Nivel 1: plataforma izquierda
-  drawEarthBlock(cx - 72, cy + 12, 28, 12, 8, "#8c6235", "#5a3a18", "#4a2e10");
-  // Nivel 1: plataforma derecha
-  drawEarthBlock(cx + 44, cy + 12, 28, 12, 8, "#8c6235", "#5a3a18", "#4a2e10");
-  // Nivel 2: plataforma central superior
-  drawEarthBlock(cx - 20, cy - 38, 40, 12, 8, "#a07040", "#6a4520", "#4a2e10");
-
-  // Rampas de tierra compactada (path diagonales)
-  ctx.fillStyle = "#7a5530";
-  // Rampa izq → centro inf
-  ctx.beginPath();
-  ctx.moveTo(cx - 44, cy + 24);
-  ctx.lineTo(cx - 20, cy + 24);
-  ctx.lineTo(cx - 28, cy + 36);
-  ctx.lineTo(cx - 52, cy + 36);
-  ctx.closePath();
-  ctx.fill();
-  // Rampa der → centro inf
-  ctx.beginPath();
-  ctx.moveTo(cx + 20, cy + 24);
-  ctx.lineTo(cx + 44, cy + 24);
-  ctx.lineTo(cx + 52, cy + 36);
-  ctx.lineTo(cx + 28, cy + 36);
-  ctx.closePath();
-  ctx.fill();
-
-  // ── 6. ENTRADAS DE TÚNEL (7 bocas de túnel) ───────────────────
-  const drawTunnelMouth = (
-    tx: number, ty: number,
-    tw: number, th: number,
-    angle: number = 0,
-    isMain: boolean = false
-  ) => {
-    ctx.save();
-    ctx.translate(tx, ty);
-    ctx.rotate(angle);
-
-    // Borde exterior de tierra (marco)
-    ctx.fillStyle = isMain ? "#3a1f05" : "#2e1800";
-    ctx.beginPath();
-    ctx.ellipse(0, 0, tw + 6, th + 4, 0, Math.PI, 0, true);
-    ctx.lineTo(tw + 6, 5);
-    ctx.lineTo(-tw - 6, 5);
     ctx.closePath();
-    ctx.fill();
-
-    // Oscuridad interior del túnel
-    const tunGrad = ctx.createRadialGradient(0, 0, 2, 0, 0, tw);
-    tunGrad.addColorStop(0, "#000000");
-    tunGrad.addColorStop(0.6, "#0a0400");
-    tunGrad.addColorStop(1, "#1a0800");
-    ctx.fillStyle = tunGrad;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, tw, th, 0, Math.PI, 0, true);
-    ctx.lineTo(tw, 5);
-    ctx.lineTo(-tw, 5);
-    ctx.closePath();
-    ctx.fill();
-
-    // Highlight superior del túnel
-    ctx.strokeStyle = "rgba(150,100,50,0.4)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.ellipse(0, -2, tw - 3, th - 2, 0, Math.PI, 0, true);
-    ctx.stroke();
-
+    ctx.fillStyle = P.rock; ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 1; ctx.stroke();
+    ctx.save(); ctx.clip();
+    ctx.fillStyle = P.rockLight;
+    ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.35, r * 0.55, r * 0.4, -0.4, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = P.rockDark;
+    ctx.beginPath(); ctx.ellipse(x + r * 0.3, y + r * 0.4, r * 0.6, r * 0.35, 0.3, 0, Math.PI * 2); ctx.fill();
+    if (mossy) {
+      ctx.fillStyle = P.moss;
+      ctx.beginPath(); ctx.ellipse(x - r * 0.05, y - r * 0.55, r * 0.55, r * 0.25, 0.15, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = P.mossDark;
+      ctx.beginPath(); ctx.ellipse(x + r * 0.3, y - r * 0.42, r * 0.3, r * 0.14, 0.3, 0, Math.PI * 2); ctx.fill();
+    }
     ctx.restore();
   };
 
-  // Entrada CENTRAL PRINCIPAL (la más grande, en el centro superior)
-  drawTunnelMouth(cx, cy - 28, 28, 18, 0, true);
+  // Roca semi-enterrada en el terreno
+  const buriedRock = (x: number, y: number, r: number, mossy: boolean, seedR: number) => {
+    rock(x, y, r, mossy, seedR);
+    lumpyBlob(x, y + r * 0.62, r * 1.15, r * 0.45, seedR + 5, 0.3);
+    ctx.fillStyle = P.dirtMid; ctx.fill();
+    ctx.strokeStyle = "rgba(42,20,4,0.5)"; ctx.lineWidth = 0.7; ctx.stroke();
+  };
 
-  // Entradas nivel superior izquierdo
-  drawTunnelMouth(cx - 48, cy - 18, 12, 8, -0.15);
-  // Entradas nivel superior derecho
-  drawTunnelMouth(cx + 48, cy - 18, 12, 8, 0.15);
+  const rockCluster = (x: number, y: number, baseR: number, count: number, mossy: boolean, seedR: number) => {
+    const r2 = mulberry32(seedR);
+    for (let i = 0; i < count; i++) {
+      rock(x + (r2() - 0.5) * baseR * 2.8, y + (r2() - 0.5) * baseR * 1.5,
+        baseR * (0.45 + r2() * 0.7), mossy && r2() > 0.45, seedR + i * 13);
+    }
+  };
 
-  // Entradas nivel medio izquierdo
-  drawTunnelMouth(cx - 62, cy + 14, 10, 7, -0.2);
-  // Entradas nivel medio derecho
-  drawTunnelMouth(cx + 62, cy + 14, 10, 7, 0.2);
-
-  // Entradas base izquierda
-  drawTunnelMouth(cx - 30, cy + 42, 14, 9, 0);
-  // Entradas base derecha
-  drawTunnelMouth(cx + 30, cy + 42, 14, 9, 0);
-
-  // ── 7. RAÍCES SECAS Y RETORCIDAS ─────────────────────────────
-  const drawRoot = (
-    pts: [number, number][],
-    baseWidth: number,
-    color: string = "#6b3d15"
-  ) => {
-    if (pts.length < 2) return;
-    for (let i = 0; i < pts.length - 1; i++) {
-      const t = i / (pts.length - 1);
-      const w = baseWidth * (1 - t * 0.55);
-
-      // Capa exterior oscura (canal de tierra)
-      ctx.strokeStyle = "#1a0800";
-      ctx.lineWidth = w + 3;
-      ctx.lineCap = "round";
+  // Parche de erosión: zona hundida con grietas
+  const erosion = (x: number, y: number, rx: number, ry: number, seedR: number) => {
+    const r2 = mulberry32(seedR);
+    lumpyBlob(x, y, rx, ry, seedR, 0.35);
+    ctx.fillStyle = "rgba(58,30,8,0.4)"; ctx.fill();
+    lumpyBlob(x + rx * 0.1, y + ry * 0.15, rx * 0.6, ry * 0.55, seedR + 1, 0.35);
+    ctx.fillStyle = "rgba(40,20,5,0.35)"; ctx.fill();
+    ctx.strokeStyle = "rgba(30,14,2,0.55)"; ctx.lineWidth = 0.8;
+    for (let k = 0; k < 3; k++) {
+      const a0 = r2() * Math.PI * 2;
       ctx.beginPath();
-      ctx.moveTo(pts[i][0], pts[i][1]);
-      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
-      ctx.stroke();
-
-      // Cuerpo de madera
-      ctx.strokeStyle = color;
-      ctx.lineWidth = w;
-      ctx.beginPath();
-      ctx.moveTo(pts[i][0], pts[i][1]);
-      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
-      ctx.stroke();
-
-      // Highlight superior
-      ctx.strokeStyle = lerpColor(color, "#c8853a", 0.45);
-      ctx.lineWidth = w * 0.5;
-      ctx.beginPath();
-      ctx.moveTo(pts[i][0], pts[i][1]);
-      ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+      ctx.moveTo(x + Math.cos(a0) * rx * 0.3, y + Math.sin(a0) * ry * 0.3);
+      ctx.lineTo(x + Math.cos(a0) * rx * (0.9 + r2() * 0.4), y + Math.sin(a0) * ry * (0.9 + r2() * 0.4));
+      ctx.lineTo(x + Math.cos(a0 + 0.5) * rx * (1.1 + r2() * 0.3), y + Math.sin(a0 + 0.5) * ry * (1.1 + r2() * 0.3));
       ctx.stroke();
     }
   };
 
-  // Raíz 1: Arco superior sobre entrada principal (izquierda)
-  drawRoot([
-    [cx - 38, cy - 18],
-    [cx - 42, cy - 35],
-    [cx - 32, cy - 50],
-    [cx - 18, cy - 58],
-    [cx - 5, cy - 62],
-  ], 9);
-
-  // Raíz 2: Arco superior sobre entrada principal (derecha)
-  drawRoot([
-    [cx + 38, cy - 18],
-    [cx + 42, cy - 35],
-    [cx + 32, cy - 50],
-    [cx + 18, cy - 58],
-    [cx + 5, cy - 62],
-  ], 9);
-
-  // Raíz 3: Lateral izquierda, baja serpenteando
-  drawRoot([
-    [cx - 52, cy - 5],
-    [cx - 70, cy + 8],
-    [cx - 75, cy + 28],
-    [cx - 68, cy + 44],
-  ], 7, "#5a3010");
-
-  // Raíz 4: Lateral derecha
-  drawRoot([
-    [cx + 52, cy - 5],
-    [cx + 70, cy + 8],
-    [cx + 72, cy + 30],
-    [cx + 62, cy + 48],
-  ], 7, "#5a3010");
-
-  // Raíz 5: Base izquierda emergiendo del suelo
-  drawRoot([
-    [cx - 35, cy + 48],
-    [cx - 55, cy + 52],
-    [cx - 72, cy + 50],
-  ], 6, "#4a2510");
-
-  // Raíz 6: Base derecha
-  drawRoot([
-    [cx + 35, cy + 48],
-    [cx + 55, cy + 52],
-    [cx + 70, cy + 50],
-  ], 6, "#4a2510");
-
-  // Raíz delgada: pequeña, entrelazada en nivel superior
-  drawRoot([
-    [cx - 15, cy - 55],
-    [cx - 8, cy - 68],
-    [cx + 8, cy - 70],
-    [cx + 15, cy - 58],
-  ], 4, "#7a4a20");
-
-  // ── 8. ROCAS EN LA BASE ───────────────────────────────────────
-  const drawRock = (rx: number, ry: number, size: number, angle: number = 0) => {
-    ctx.save();
-    ctx.translate(rx, ry);
-    ctx.rotate(angle);
-    // Cuerpo
-    ctx.fillStyle = "#7e7870";
-    ctx.strokeStyle = "#3a3530";
-    ctx.lineWidth = 0.8;
-    ctx.beginPath();
-    ctx.ellipse(0, 0, size, size * 0.7, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    // Highlight
-    ctx.fillStyle = "rgba(180,170,160,0.4)";
-    ctx.beginPath();
-    ctx.ellipse(-size * 0.25, -size * 0.25, size * 0.3, size * 0.2, -0.5, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.restore();
+  // ── RAÍCES RAMIFICADAS: trazo cónico + ramas hijas recursivas ──
+  const sampleQuad = (x1: number, y1: number, qx: number, qy: number, x2: number, y2: number, segs: number, wob: number, seedR: number) => {
+    const r2 = mulberry32(seedR);
+    const phase = r2() * 6.28;
+    const pts: number[][] = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs, mt = 1 - t;
+      let px = mt * mt * x1 + 2 * mt * t * qx + t * t * x2;
+      let py = mt * mt * y1 + 2 * mt * t * qy + t * t * y2;
+      const dx = 2 * mt * (qx - x1) + 2 * t * (x2 - qx);
+      const dy = 2 * mt * (qy - y1) + 2 * t * (y2 - qy);
+      const dl = Math.hypot(dx, dy) || 1;
+      const off = Math.sin(t * Math.PI * 3 + phase) * wob * Math.sin(t * Math.PI)
+        + (r2() - 0.5) * 1.4;
+      px += (-dy / dl) * off; py += (dx / dl) * off;
+      pts.push([px, py, dx / dl, dy / dl]);
+    }
+    return pts;
   };
 
-  drawRock(cx - 62, cy + 50, 7, 0.2);
-  drawRock(cx - 48, cy + 54, 5.5, -0.3);
-  drawRock(cx - 38, cy + 56, 4.5, 0.1);
-  drawRock(cx + 60, cy + 50, 7.5, -0.2);
-  drawRock(cx + 46, cy + 54, 5, 0.4);
-  drawRock(cx + 35, cy + 56, 4, -0.1);
-  drawRock(cx - 8, cy + 58, 4.5, 0);
-  drawRock(cx + 10, cy + 57, 5, 0.2);
-
-  // ── 9. MUSGO VERDE APAGADO ────────────────────────────────────
-  const mossPatches = [
-    { x: cx - 55, y: cy + 8, rx: 12, ry: 5 },
-    { x: cx + 50, y: cy + 10, rx: 10, ry: 4 },
-    { x: cx - 18, y: cy + 20, rx: 8, ry: 3 },
-    { x: cx + 25, y: cy - 5, rx: 9, ry: 4 },
-    { x: cx - 30, y: cy - 35, rx: 7, ry: 3 },
-  ];
-  mossPatches.forEach(m => {
-    ctx.fillStyle = "rgba(65, 90, 40, 0.55)";
-    ctx.beginPath();
-    ctx.ellipse(m.x, m.y, m.rx, m.ry, 0, 0, Math.PI * 2);
-    ctx.fill();
-  });
-
-  // ── 10. OJOS DE REPTIL ACECHANDO (3 pares, rojos/ámbar) ───────
-  const blinkPhase = (timestamp * 0.001) % 6;
-  const isBlinking = blinkPhase < 0.12 || (blinkPhase > 3 && blinkPhase < 3.08);
-
-  if (!isBlinking) {
-    const drawEye = (ex: number, ey: number, ew: number, eh: number) => {
-      // Resplandor exterior
-      ctx.save();
-      ctx.shadowColor = "#ff2200";
-      ctx.shadowBlur = 8;
-      ctx.fillStyle = "#cc1100";
-      ctx.beginPath();
-      ctx.ellipse(ex, ey, ew + 2, eh + 1, 0, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.restore();
-
-      // Iris rojo-naranja
-      ctx.fillStyle = "#ff4400";
-      ctx.beginPath();
-      ctx.ellipse(ex, ey, ew, eh, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Pupila vertical (rendija de reptil)
-      ctx.fillStyle = "#000000";
-      ctx.beginPath();
-      ctx.ellipse(ex, ey, ew * 0.22, eh * 0.92, 0, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Reflejo de luz
-      ctx.fillStyle = "rgba(255,220,180,0.7)";
-      ctx.beginPath();
-      ctx.ellipse(ex - ew * 0.3, ey - eh * 0.35, ew * 0.18, eh * 0.15, -0.4, 0, Math.PI * 2);
-      ctx.fill();
+  const drawTaperedPath = (pts: number[][], w0: number, wEnd: number) => {
+    const pass = (col: string, mul: number, add: number) => {
+      ctx.strokeStyle = col; ctx.lineCap = "round"; ctx.lineJoin = "round";
+      for (let i = 0; i < pts.length - 1; i++) {
+        const t = i / (pts.length - 1);
+        ctx.lineWidth = Math.max(0.6, (w0 + (wEnd - w0) * t) * mul + add);
+        ctx.beginPath();
+        ctx.moveTo(pts[i][0], pts[i][1]);
+        ctx.lineTo(pts[i + 1][0], pts[i + 1][1]);
+        ctx.stroke();
+      }
     };
+    pass(P.rootDark, 1, 1.8);
+    pass(P.root, 1, 0);
+    pass(P.rootLight, 0.45, 0);
+  };
 
-    // Par central (más grande, detrás de la entrada principal)
-    drawEye(cx - 10, cy - 22, 5.5, 3);
-    drawEye(cx + 10, cy - 22, 5.5, 3);
+  const rootBranch = (x1: number, y1: number, qx: number, qy: number, x2: number, y2: number, w: number, seedR: number, depth: number) => {
+    const segs = 22;
+    const pts = sampleQuad(x1, y1, qx, qy, x2, y2, segs, 1.4 + w * 0.25, seedR);
+    drawTaperedPath(pts, w, Math.max(0.8, w * 0.28));
+    const r2 = mulberry32(seedR + 7);
+    // nudos engrosados
+    for (let i = 4; i < segs - 3; i += 7) {
+      const [px, py] = pts[i];
+      ctx.fillStyle = P.rootDark;
+      ctx.beginPath(); ctx.arc(px, py, w * 0.5, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = P.root;
+      ctx.beginPath(); ctx.arc(px - 0.5, py - 0.5, w * 0.3, 0, Math.PI * 2); ctx.fill();
+    }
+    // ramas hijas recursivas
+    if (depth > 0 && w > 1.4) {
+      for (let b = 0; b < 2; b++) {
+        const ti = Math.floor(segs * (0.38 + b * 0.3 + r2() * 0.08));
+        const [bx, by, tx, ty] = pts[ti];
+        const side = b % 2 === 0 ? 1 : -1;
+        const len = 10 + w * 4 + r2() * 8;
+        const ang = Math.atan2(ty, tx) + side * (0.7 + r2() * 0.4);
+        const ex = bx + Math.cos(ang) * len;
+        const ey = by + Math.sin(ang) * len;
+        const mxq = bx + Math.cos(ang + side * 0.4) * len * 0.55;
+        const myq = by + Math.sin(ang + side * 0.4) * len * 0.55;
+        rootBranch(bx, by, mxq, myq, ex, ey, w * 0.5, seedR + 31 + b * 17, depth - 1);
+      }
+    }
+    // punta enterrándose en la tierra (solo raíces principales)
+    if (w >= 2.2) {
+      const [ex2, ey2] = pts[segs];
+      lumpyBlob(ex2, ey2 + 1, w * 1.3 + 1.5, w * 0.8 + 1.2, seedR + 91, 0.3);
+      ctx.fillStyle = P.dirtMid; ctx.fill();
+      ctx.strokeStyle = "rgba(42,20,4,0.45)"; ctx.lineWidth = 0.6; ctx.stroke();
+    }
+  };
 
-    // Par izquierdo (túnel izquierdo superior)
-    drawEye(cx - 50, cy - 13, 4, 2.5);
-    drawEye(cx - 40, cy - 12, 4, 2.5);
+  const eyes = (x: number, y: number, s: number, phase: number) => {
+    const t = timestamp * 0.001 + phase;
+    const blink = (Math.sin(t * 0.6 + phase) > 0.99) ? 0.12 : 1;
+    const pulse = 0.75 + 0.25 * Math.sin(t * 2.0 + phase);
+    const g = ctx.createRadialGradient(x, y, 0.5, x, y, s * 3.8);
+    g.addColorStop(0, `rgba(255,40,25,${0.38 * pulse * blink})`);
+    g.addColorStop(0.5, `rgba(200,15,10,${0.1 * pulse * blink})`);
+    g.addColorStop(1, "rgba(180,10,10,0)");
+    ctx.fillStyle = g;
+    ctx.beginPath(); ctx.arc(x, y, s * 3.8, 0, Math.PI * 2); ctx.fill();
+    [-1, 1].forEach(side => {
+      const ex = x + side * s * 1.6;
+      ctx.save();
+      ctx.translate(ex, y);
+      ctx.scale(1, blink);
+      ctx.fillStyle = "#ff2a1a";
+      ctx.beginPath(); ctx.ellipse(0, 0, s, s * 0.62, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ff8a60";
+      ctx.beginPath(); ctx.ellipse(-side * s * 0.05, s * 0.05, s * 0.5, s * 0.3, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#ffd9c0";
+      ctx.beginPath(); ctx.ellipse(-side * s * 0.3, -s * 0.05, s * 0.18, s * 0.12, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#0c0500";
+      ctx.beginPath();
+      ctx.moveTo(-s * 1.2, -s * 0.9);
+      ctx.lineTo(s * 1.2, -s * 0.9);
+      ctx.lineTo(s * 1.2, side > 0 ? -s * 0.48 : -s * 0.12);
+      ctx.lineTo(-s * 1.2, side > 0 ? -s * 0.12 : -s * 0.48);
+      ctx.closePath(); ctx.fill();
+      ctx.restore();
+    });
+  };
 
-    // Par derecho (túnel derecho superior)
-    drawEye(cx + 40, cy - 12, 4, 2.5);
-    drawEye(cx + 50, cy - 13, 4, 2.5);
+  // ════ 1. SOMBRA cuadrada suave ════════════════════════
+  for (let k = 3; k >= 1; k--) {
+    lumpyRect(L - k * 3, T + 8 - k * 2, R + k * 3, B + k * 3, 22, 200, 0);
+    ctx.fillStyle = "rgba(20,8,0,0.1)";
+    ctx.fill();
   }
 
-  // ── 11. ZZZ DURMIENTES FLOTANTES ─────────────────────────────
-  for (let i = 0; i < 3; i++) {
-    const tZ = ((timestamp * 0.00075 + i * 0.7) % 2.0);
-    const alpha = Math.max(0, 1.0 - tZ / 1.8);
-    if (alpha > 0.02) {
-      const zx = cx + 5 + Math.sin(tZ * 3.2 + i * 1.2) * 14;
-      const zy = cy - 52 - tZ * 45;
-      const fontSize = 12 + tZ * 12;
-      ctx.save();
-      ctx.globalAlpha = alpha * 0.9;
-      ctx.fillStyle = "#b8d8ff";
-      ctx.font = `900 ${fontSize}px "Arial Black", Impact, sans-serif`;
-      ctx.textAlign = "center";
-      ctx.fillText("Z", zx, zy);
-      ctx.restore();
+  // ════ 2. DISIPACIÓN hacia el terreno normal ═══════════
+  {
+    const r2 = mulberry32(901);
+    for (let i = 0; i < 110; i++) {
+      const edge = Math.floor(r2() * 4);
+      const along = r2(), dist = r2() * r2() * 16 + 1;
+      let px: number, py: number;
+      if (edge === 0) { px = L + along * S; py = T + 6 - dist; }
+      else if (edge === 1) { px = L + along * S; py = B + dist; }
+      else if (edge === 2) { px = L - dist; py = T + 10 + along * (S - 10); }
+      else { px = R + dist; py = T + 10 + along * (S - 10); }
+      const fade = Math.max(0, 1 - dist / 16);
+      if (r2() < 0.82) {
+        ctx.fillStyle = r2() > 0.5
+          ? `rgba(110,65,30,${0.4 * fade})`
+          : `rgba(60,32,10,${0.32 * fade})`;
+        ctx.fillRect(px, py, 1.2 + r2(), 1.2 + r2());
+      } else {
+        ctx.fillStyle = `rgba(158,154,150,${0.8 * fade})`;
+        ctx.strokeStyle = `rgba(70,66,62,${0.7 * fade})`;
+        ctx.lineWidth = 0.6;
+        ctx.beginPath();
+        ctx.ellipse(px, py, 1.6 + r2() * 1.2, 1.1 + r2(), r2(), 0, Math.PI * 2);
+        ctx.fill(); ctx.stroke();
+      }
+    }
+    for (let i = 0; i < 14; i++) {
+      const edge = Math.floor(r2() * 4);
+      const along = 0.08 + r2() * 0.84;
+      let px: number, py: number;
+      if (edge === 0) { px = L + along * S; py = T + 4 - r2() * 5; }
+      else if (edge === 1) { px = L + along * S; py = B + 2 + r2() * 6; }
+      else if (edge === 2) { px = L - 2 - r2() * 6; py = T + 14 + along * (S - 18); }
+      else { px = R + 2 + r2() * 6; py = T + 14 + along * (S - 18); }
+      lumpyBlob(px, py, 2.2 + r2() * 2.4, 1.6 + r2() * 1.6, 910 + i, 0.35);
+      ctx.fillStyle = r2() > 0.5 ? P.dirtMid : P.dirtBase;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(42,20,4,0.4)"; ctx.lineWidth = 0.6; ctx.stroke();
     }
   }
 
-  // ── 12. PARTÍCULAS DE POLVO ───────────────────────────────────
-  for (let i = 0; i < 6; i++) {
-    const phase = ((timestamp * 0.0003 + i * 1.8) % 1.0);
-    const angle = i * Math.PI * 0.35 + phase * Math.PI;
-    const dist = 12 + (i * 9) % 28 + Math.sin(phase * 4) * 5;
-    const px = cx + Math.cos(angle) * dist;
-    const py = (cy - 22) + Math.sin(angle) * dist * 0.5;
-    const pa = 0.08 + Math.sin(phase * Math.PI) * 0.25;
-    ctx.fillStyle = `rgba(210,175,140,${pa})`;
-    ctx.fillRect(px, py, 1.6, 1.6);
-  }
+  // ════ 3. BASE CUADRADA 4×4 (dos niveles) ══════════════
+  lumpyRect(L + 1, T + 12, R - 1, B - 1, 18, 201, 3.5);
+  ctx.fillStyle = P.dirtDark; ctx.fill();
+  ctx.strokeStyle = P.outline; ctx.lineWidth = 1.4; ctx.stroke();
+  lumpyRect(L + 3, T + 9, R - 3, B - 6, 17, 202, 3);
+  ctx.fillStyle = P.dirtMid; ctx.fill();
+  ctx.strokeStyle = P.outline; ctx.lineWidth = 1.1; ctx.stroke();
 
-  ctx.restore(); // fin Boss Den
+  // ── 3b. DETALLE GLOBAL DEL TERRENO ──
+  ctx.save();
+  lumpyRect(L + 3, T + 9, R - 3, B - 6, 17, 202, 3);
+  ctx.clip();
+  {
+    const r2 = mulberry32(903);
+    const tonePatches: [number, number, number, number, string][] = [
+      [L + 30, T + 40, 26, 14, "rgba(160,106,56,0.45)"],
+      [R - 34, T + 44, 24, 13, "rgba(92,53,20,0.35)"],
+      [L + 36, B - 34, 28, 12, "rgba(198,140,78,0.3)"],
+      [R - 40, B - 38, 26, 13, "rgba(60,32,10,0.3)"],
+      [cx, T + 26, 34, 10, "rgba(138,85,38,0.4)"],
+      [cx - 10, B - 22, 36, 10, "rgba(74,42,16,0.32)"],
+    ];
+    tonePatches.forEach(([x, y, rx, ry, c], i) => {
+      lumpyBlob(x, y, rx, ry, 920 + i * 7, 0.3);
+      ctx.fillStyle = c; ctx.fill();
+    });
+    speckle(cx, cy + 4, 78, 74, 260, 904);
+    for (let i = 0; i < 26; i++) {
+      const px = L + 10 + r2() * (S - 20);
+      const py = T + 16 + r2() * (S - 26);
+      ctx.fillStyle = r2() > 0.5 ? "#9e9a92" : "#8c8076";
+      ctx.strokeStyle = "rgba(50,40,30,0.6)";
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.ellipse(px, py, 1 + r2() * 1.2, 0.9 + r2(), r2() * 3, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+    for (let i = 0; i < 12; i++) {
+      const px = L + 14 + r2() * (S - 28);
+      const py = T + 20 + r2() * (S - 34);
+      const rr = 2.5 + r2() * 3;
+      ctx.fillStyle = "rgba(40,20,5,0.3)";
+      ctx.beginPath(); ctx.ellipse(px + 1, py + 1.4, rr, rr * 0.5, 0, 0, Math.PI * 2); ctx.fill();
+      lumpyBlob(px, py, rr, rr * 0.65, 930 + i, 0.35);
+      ctx.fillStyle = r2() > 0.5 ? P.dirtBase : P.dirtLight;
+      ctx.fill();
+      ctx.strokeStyle = "rgba(42,20,4,0.45)"; ctx.lineWidth = 0.6; ctx.stroke();
+    }
+    erosion(L + 44, T + 58, 13, 7, 941);
+    erosion(R - 46, B - 52, 14, 7, 942);
+    erosion(cx + 30, T + 36, 10, 6, 943);
+    erosion(L + 30, B - 46, 11, 6, 944);
+  }
+  ctx.restore();
+
+  // ════ 5. ESQUINAS: domos y mesetas con túneles ════════
+  hole(L + 16, T + 18, 5.5, 4.5, 0.05, 12);
+  hole(L + 32, T + 18, 5.0, 4.0, -0.08, 13);
+  hole(L + 24, T + 28, 6.0, 5.0, 0.12, 14); // 3 holes grouped in this corner (no plateau)
+  rockCluster(L + 10, T + 32, 5.2, 9, true, 21); // Richer rock cluster (9 stones, larger base)
+  buriedRock(L + 6, T + 24, 3.8, true, 22); // Additional mossy corner stone
+
+  plateau(R - 24, T + 26, 21, 12, 8, 31);
+  hole(R - 26, T + 24, 6.5, 5, -0.05, 32);
+  rockCluster(R - 12, T + 32, 5.8, 10, true, 41); // Richer rock cluster (10 stones, larger base)
+  buriedRock(R - 6, T + 20, 4.0, true, 42); // Additional mossy corner stone
+
+  plateau(L + 26, B - 22, 23, 11, 8, 71);
+  hole(L + 15, B - 15, 6, 6.5, -0.1, 72);
+  rockCluster(L + 32, B - 28, 5.5, 9, true, 91); // Richer rock cluster (9 stones, larger base)
+  buriedRock(L + 6, B - 20, 3.8, true, 92); // Additional mossy corner stone
+
+  plateau(R - 26, B - 22, 23, 11, 8, 81);
+  hole(R - 10, B - 16, 6.5, 7, 0.08, 82);
+  rockCluster(R - 48, B - 15, 5.5, 9, true, 191); // Richer rock cluster (9 stones, larger base)
+
+  // (Las excavaciones/trincheras han sido eliminadas por el momento)
+
+  // rocas incrustadas a lo largo de los bordes
+  buriedRock(cx - 26, T + 18, 4.5, false, 601);
+  buriedRock(cx + 30, T + 16, 3.8, true, 602);
+  buriedRock(L + 12, cy - 30, 4, false, 603);
+  buriedRock(R - 12, cy + 28, 4.2, true, 604);
+  buriedRock(cx - 34, B - 12, 4.5, true, 605);
+  buriedRock(cx + 22, B - 10, 3.6, false, 606);
+
+  // rocas incrustadas dispersas por todo el escenario para mayor variedad
+  buriedRock(L + 54, T + 46, 3.2, false, 610);
+  buriedRock(R - 54, T + 42, 3.5, true, 611);
+  buriedRock(L + 42, B - 46, 3.0, true, 612);
+  buriedRock(R - 44, B - 42, 3.4, false, 613);
+  buriedRock(L + 20, cy, 3.8, false, 614);
+  buriedRock(R - 20, cy - 10, 3.6, true, 615);
+  buriedRock(cx - 52, cy + 26, 3.2, false, 616);
+  buriedRock(cx + 50, cy + 28, 3.5, true, 617);
+
+  // ════ 6. MONTÍCULO CENTRAL ═══════════════════════════
+  const moundPts: [number, number][] = [
+    [cx - 48, cy + 36], [cx - 54, cy + 12], [cx - 46, cy - 8],
+    [cx - 36, cy - 24], [cx - 24, cy - 38], [cx - 10, cy - 48],
+    [cx + 8, cy - 50], [cx + 24, cy - 40], [cx + 36, cy - 26],
+    [cx + 46, cy - 10], [cx + 54, cy + 10], [cx + 48, cy + 36],
+  ];
+  const moundPath = () => {
+    const r2 = mulberry32(99);
+    ctx.beginPath();
+    ctx.moveTo(moundPts[0][0], moundPts[0][1]);
+    for (let i = 0; i < moundPts.length; i++) {
+      const [x1, y1] = moundPts[i];
+      const [x2, y2] = moundPts[(i + 1) % moundPts.length];
+      const mx = (x1 + x2) / 2 + (r2() - 0.5) * 4;
+      const my = (y1 + y2) / 2 - 1.5 - r2() * 2.5;
+      ctx.quadraticCurveTo(mx, my, x2, y2);
+    }
+    ctx.closePath();
+  };
+  const eg = ctx.createLinearGradient(cx - 54, cy - 50, cx + 54, cy + 36);
+  eg.addColorStop(0, P.dirtLight);
+  eg.addColorStop(0.45, P.dirtBase);
+  eg.addColorStop(1, P.dirtDark);
+  moundPath(); ctx.fillStyle = eg; ctx.fill();
+  moundPath(); ctx.strokeStyle = P.outline; ctx.lineWidth = 1.8; ctx.stroke();
+
+  ctx.save();
+  moundPath(); ctx.clip();
+  ctx.strokeStyle = "rgba(50,26,8,0.45)"; ctx.lineWidth = 1.1;
+  [[-42, 0, -27, -22], [-34, 16, -28, 2], [28, -26, 44, -6], [34, 14, 48, 2]].forEach(([ax, ay, bx, by]) => {
+    ctx.beginPath();
+    ctx.moveTo(cx + ax, cy + ay);
+    ctx.quadraticCurveTo(cx + (ax + bx) / 2 - 4, cy + (ay + by) / 2 - 5, cx + bx, cy + by);
+    ctx.stroke();
+  });
+  const patches: [number, number, number, number, string][] = [
+    [cx - 36, cy + 4, 13, 8, "rgba(60,32,8,0.35)"],
+    [cx + 34, cy + 8, 12, 8, "rgba(198,140,78,0.32)"],
+    [cx - 2, cy - 36, 16, 8, "rgba(228,178,114,0.35)"],
+    [cx + 12, cy + 26, 18, 6, "rgba(50,26,8,0.3)"],
+  ];
+  patches.forEach(([x, y, rx, ry, c]) => {
+    ctx.fillStyle = c;
+    ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0.3, 0, Math.PI * 2); ctx.fill();
+  });
+  speckle(cx, cy - 6, 50, 42, 90, 207);
+  {
+    const r2 = mulberry32(908);
+    for (let i = 0; i < 10; i++) {
+      const px = cx - 40 + r2() * 80, py = cy - 30 + r2() * 56;
+      ctx.fillStyle = "#9e9a92"; ctx.strokeStyle = "rgba(50,40,30,0.6)"; ctx.lineWidth = 0.5;
+      ctx.beginPath(); ctx.ellipse(px, py, 1 + r2() * 1.2, 0.8 + r2() * 0.8, r2() * 3, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // ════ 7. ENTRADA CENTRAL ═════════════════════════════
+  const archPath = () => {
+    ctx.beginPath();
+    ctx.moveTo(cx - 24, cy + 36);
+    ctx.lineTo(cx - 27, cy + 4);
+    ctx.quadraticCurveTo(cx - 25, cy - 23, cx, cy - 29);
+    ctx.quadraticCurveTo(cx + 25, cy - 23, cx + 27, cy + 4);
+    ctx.lineTo(cx + 24, cy + 36);
+    ctx.closePath();
+  };
+  const r3 = mulberry32(303);
+  const archPt = (t: number): [number, number] => {
+    const ang = Math.PI - t * Math.PI;
+    const rX = 30, rY = 32;
+    return [cx + Math.cos(ang) * rX, cy + 6 - Math.sin(ang) * rY];
+  };
+  for (let i = 0; i <= 12; i++) {
+    const [ax, ay] = archPt(i / 12);
+    lumpyBlob(ax, ay, 5 + r3() * 3.0, 4 + r3() * 2.5, 310 + i, 0.3);
+    ctx.fillStyle = i % 2 ? P.dirtMid : P.dirtDark;
+    ctx.fill();
+    ctx.strokeStyle = P.outline; ctx.lineWidth = 0.9; ctx.stroke();
+  }
+  const ig = ctx.createLinearGradient(cx, cy - 29, cx, cy + 36);
+  ig.addColorStop(0, P.holeBlack);
+  ig.addColorStop(0.7, "#150a02");
+  ig.addColorStop(1, "#2e1808");
+  archPath(); ctx.fillStyle = ig; ctx.fill();
+  archPath(); ctx.strokeStyle = P.outline; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.save(); archPath(); ctx.clip();
+  ctx.fillStyle = "rgba(140,90,45,0.16)";
+  ctx.beginPath(); ctx.ellipse(cx, cy + 34, 23, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // ════ 8. RAÍCES RAMIFICADAS (antes de re-tallar el arco) ══════
+  // Thick primary roots
+  rootBranch(cx - 27, cy + 34, cx - 36, cy - 14, cx - 6, cy - 30, 5.2, 401, 2); // Left arch wrap
+  rootBranch(cx + 27, cy + 34, cx + 36, cy - 12, cx + 6, cy - 29, 4.8, 402, 2); // Right arch wrap
+  rootBranch(cx - 15, cy - 25, L + 50, T + 32, L + 55, T + 12, 4.5, 420, 1); // Upper-left corner connector
+
+  // Medium roots
+  rootBranch(cx - 24, cy + 12, cx - 44, cy + 2, cx - 56, cy - 22, 3.0, 403, 1); // Leftward
+  rootBranch(cx + 24, cy + 10, cx + 46, cy, cx + 58, cy - 20, 3.0, 404, 1); // Rightward
+  rootBranch(cx - 10, cy + 32, L + 60, T + 145, L + 48, T + 152, 2.6, 422, 1); // Bottom-left crawl
+
+  // Thin roots
+  rootBranch(cx - 30, cy + 30, cx - 46, cy + 42, L + 46, T + 108, 1.8, 406, 1); // Down-left crawl
+  rootBranch(cx + 32, cy + 28, cx + 48, cy + 42, L + 114, T + 108, 1.8, 407, 1); // Down-right crawl
+  rootBranch(L + 110, T + 8, L + 134, T + 8, L + 150, T + 10, 1.6, 424, 0); // Top-right border crawl
+  rootBranch(cx + 10, cy - 28, L + 100, T + 20, L + 110, T + 8, 1.5, 421, 0); // Top border crawl
+
+  // Very thin roots
+  rootBranch(L + 48, T + 152, L + 24, T + 154, L + 10, T + 150, 1.3, 425, 0); // Bottom-left border crawl
+  rootBranch(L + 120, T + 146, L + 136, T + 152, L + 150, T + 148, 1.3, 426, 0); // Bottom-right border crawl
+  rootBranch(cx + 42, cy + 44, cx + 45, cy + 56, L + 120, T + 146, 1.2, 405, 0); // Bottom-right corner connect
+  rootBranch(L + 42, T + 12, L + 26, T + 6, L + 12, T + 8, 1.2, 423, 0); // Top-left border crawl
+
+
+  // ════ 8b. RE-TALLAR el interior del arco sobre las raíces ═════
+  // (las raíces que invaden el hueco quedan cortadas en el borde,
+  //  como si se hundieran en la tierra alrededor de la entrada)
+  archPath(); ctx.fillStyle = ig; ctx.fill();
+  archPath(); ctx.strokeStyle = P.outline; ctx.lineWidth = 1.5; ctx.stroke();
+  ctx.save(); archPath(); ctx.clip();
+  ctx.fillStyle = "rgba(140,90,45,0.16)";
+  ctx.beginPath(); ctx.ellipse(cx, cy + 34, 23, 7, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.restore();
+
+  // ════ 9. OJOS ACECHANDO (3 pares) ════════════════════
+  ctx.save();
+  archPath(); ctx.clip();
+  eyes(cx, cy - 10, 4.2, 0);
+  eyes(cx - 12, cy + 10, 3.2, 2.1);
+  eyes(cx + 13, cy + 12, 3.4, 4.4);
+  ctx.restore();
+
+  // musgo sobre el arco
+  ctx.fillStyle = P.moss;
+  ctx.beginPath(); ctx.ellipse(cx - 30, cy - 6, 5.5, 2.5, 0.5, 0, Math.PI * 2); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(cx + 28, cy - 16, 4.5, 2.0, -0.4, 0, Math.PI * 2); ctx.fill();
+  ctx.fillStyle = P.mossDark;
+  ctx.beginPath(); ctx.ellipse(cx - 28, cy - 3, 2.8, 1.2, 0.5, 0, Math.PI * 2); ctx.fill();
+
+  rockCluster(cx - 23, cy + 34, 3.2, 3, true, 111);
+  rockCluster(cx + 23, cy + 38, 3, 3, false, 121);
+
+  // ════ 11. ZZZ durmientes ═════════════════════════════
+  const zSpots = [
+    { x: cx, y: cy - 8, ph: 0 }
+  ];
+  ctx.textAlign = "center";
+  zSpots.forEach(sp => {
+    for (let i = 0; i < 3; i++) {
+      const t = ((timestamp * 0.0003 + sp.ph + i * 0.33) % 1);
+      const a = Math.sin(t * Math.PI);
+      ctx.fillStyle = `rgba(255,250,235,${0.8 * a})`;
+      ctx.font = `bold ${12 + i * 5 + t * 8}px sans-serif`;
+      ctx.fillText("Z", sp.x + Math.sin(t * 6 + i) * 8, sp.y - i * 8 - t * 30);
+    }
+  });
+
+  ctx.restore();
 }
 
 // ==========================================

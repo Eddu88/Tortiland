@@ -47,13 +47,23 @@ interface GameCanvasProps {
   setFruitsLeft: (n: number) => void;
   goldenBroccoliTimer: number;
   setGoldenBroccoliTimer: (t: number) => void;
-  resetTrigger: number;
+  resetTrigger: number;                        // Number state change triggers level config re-initialization.
   soundOn: boolean;
-  virtualCommand: string | null;
+  virtualCommand: string | null;               // Direction/Action virtual controllers command inputs.
   clearVirtualCommand: () => void;
   currentLevelIndex: number;
 }
 
+/**
+ * GameCanvas coordinates high-frequency game logic, delta physics steps,
+ * input mapping, and canvas render loops.
+ * 
+ * DESIGN PATTERN - MUTABLE REFS ARCHITECTURE:
+ * High-frequency variables (player coordinates, enemies positions, particles array, grid arrays)
+ * are stored inside React `useRef` tokens instead of standard component states.
+ * This completely bypasses React's virtual-dom updates overhead, enabling 60 FPS
+ * smooth rendering on HTML5 canvas.
+ */
 export const GameCanvas: React.FC<GameCanvasProps> = ({
   gameState,
   setGameState,
@@ -77,11 +87,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   clearVirtualCommand,
   currentLevelIndex,
 }) => {
+  // HTML5 Canvas element reference used to access the 2D rendering context
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  // Current level configurations loaded once when level shifts
   const levelConfig = LEVELS[currentLevelIndex];
 
-  // References to keep high-frequency loops extremely fast without component re-renders
+  // ==========================================
+  // Core high-frequency variables cache (Refs)
+  // ==========================================
+  
+  // The active level grid containing tile type identifiers (walls, bushes, empty, burrows)
   const mapRef = useRef<TileType[][]>([]);
+  
+  // The player's active state including exact pixel coordinates, target grid column/row,
+  // directional vectors, animation tracking variables, and action timers
   const playerRef = useRef<Player>({
     col: 1,
     row: 1,
@@ -91,7 +110,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     targetRow: 1,
     moving: false,
     dir: { x: 1, y: 0 },
-    speed: 120, // px/s (era 120)
+    speed: 120, // fixed px/s speed
     animFrame: 0,
     animTimer: 0,
     invincible: 0,
@@ -102,31 +121,49 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     deathAnimTimer: 0,
   });
 
+  // Active enemies list tracked across each physics update cycle
   const enemiesRef = useRef<Enemy[]>([]);
+  // Active vegetable collectibles on the current grid map
   const fruitsRef = useRef<Fruit[]>([]);
+  // Particle effects systems currently alive and animating in the game scene
   const particlesRef = useRef<Particle[]>([]);
+  // Previous grid copy used to detect cell changes and trigger organic grass particle bursts
   const prevMapRef = useRef<TileType[][] | null>(null);
+  // Timestamps indicating when bushes were created, used to render age-based colors and moss
   const grassAgesRef = useRef<{ [key: string]: { createdAt: number } }>({});
+  // Tiles queued for breaking on the next physics step of the action sequence
   const breakingTilesRef = useRef<GridPos[]>([]);
+  // Empty slots designated to grow bushes on the next physics step of the action sequence
   const plantingTilesRef = useRef<GridPos[]>([]);
+  // Dynamic callback wrapper pointing to the current player input's action trigger
   const triggerActionRef = useRef<() => void>(() => { });
+  // High-precision accumulator of milliseconds elapsed during play, used for animations and clocks
   const frameCountRef = useRef<number>(0);
+  // Queued planting animations with timestamps indicating when the bush should be fully created
   const scheduledPlantsRef = useRef<{ col: number; row: number; triggerAt: number }[]>([]);
+  // Queued breaking animations with timestamps indicating when the bush should be removed
   const scheduledBreaksRef = useRef<ScheduledBreak[]>([]);
+  // Multi-dimensional array tracking when individual cells are ready to be acted upon again
   const tileReadyRef = useRef<number[][]>([]);
+  // Toggle flag marking when all primary collectibles are picked up and the escape burrow is open
   const awaitingBurrowRef = useRef<boolean>(false);
+  // Bushes in the process of dissolving, holding details for opacity decay and visual variants
   const dyingBushesRef = useRef<{ col: number; row: number; alpha: number; variant: number }[]>([]);
+  // Tracks if the golden broccoli power-up has been spawned in the current level to prevent duplicate drops
   const goldenBroccoliUsedRef = useRef<boolean>(false);
+  // Tracks if the player has consumed the golden broccoli during the current level (affects star scoring)
   const usedGoldenBroccoliRef = useRef<boolean>(false);
 
-  // Sounds active state tracker (to sync with prop without closures stale)
+  // Synchronize sounds active state dynamically to prevent state capture in closures.
+  // This ref ensures that the requestAnimationFrame render loop can always read the latest sound setting
+  // without re-subscribing the game loop thread.
   const soundOnRef = useRef<boolean>(soundOn);
   useEffect(() => {
     soundOnRef.current = soundOn;
     SoundEffects.toggle(soundOn);
   }, [soundOn]);
 
-  // Synchronize game elapsed timer (1s frequency timer helper safely initialized)
+  // General second tick timer (safely registers interval when playing)
   useEffect(() => {
     let timerInterval: any = null;
     if (gameState === 'playing') {
@@ -139,7 +176,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     };
   }, [gameState, setGameTimeElapsed]);
 
-  // Initialize Input management
+  // Hook 1: Input controls handlers
   const {
     keysRef,
     keysPressTimeRef,
@@ -163,7 +200,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     setGameState,
   });
 
-  // Initialize Game Entity simulation methods
+  // Hook 2: Entities updates handlers
   const {
     updatePlayer,
     updateEnemy,
@@ -206,14 +243,21 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     usedGoldenBroccoliRef,
   });
 
-  // Decoupled unified rendering callback function
+  /**
+   * Unified render loop drawing all visual objects to canvas context.
+   * Runs frame-shake calculations during action triggers (e.g. soil breaking).
+   * 
+   * @param ctx 2D Canvas Context.
+   * @param timestamp RAF high-resolution clock timing in milliseconds.
+   */
   const onRender = (ctx: CanvasRenderingContext2D, timestamp: number) => {
-    // Clear layout
+    // Clear display buffer
     ctx.clearRect(0, 0, W, H);
 
     const player = playerRef.current;
 
-    // Screen shake calculation: proportional for new 620ms duration
+    // Screen Shake effect: Offset rendering context canvas viewport by minor translations
+    // when action animations are active (Soil breaking gets heavier shake than planting).
     const isBreakShake = player.breakingAnimTimer >= 344 && player.breakingAnimTimer <= 415;
     const isPlantShake = player.plantingAnimTimer >= 517 && player.plantingAnimTimer <= 620;
 
@@ -231,16 +275,20 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
     const escapeActive = fruitsRef.current.filter(f => f.type !== 5).length === 0;
 
-    // Render game layers using pure functions from the Capa de Render
+    // 1. Draw static background components (Walls, Bushes, ground dirt)
     drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, player.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current, 18, 13);
+    
+    // 2. Draw visual effects particles
     drawParticles(ctx, particlesRef.current);
+    
+    // 3. Draw vegetables collectibles
     drawFruits(ctx, fruitsRef.current, mapRef.current, timestamp);
 
     if (['playing', 'dead', 'win', 'paused'].includes(gameState)) {
-      // Draw player main
       const px = player.x;
       const py = player.y;
 
+      // Invincibility hit-flash effect (Flickers alpha at high frequency)
       const alpha = player.invincible > 0
         ? (Math.floor(player.invincible / 6) % 2 === 0 ? 0.25 : 1.0)
         : 1.0;
@@ -251,6 +299,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
       const isFlickering = player.goldenBroccoliTimer <= 3000 && isGolden;
       const flickerOn = isFlickering ? Math.floor(player.goldenBroccoliTimer / 133) % 2 === 0 : true;
 
+      // Draw glowing golden broccoli aura ring
       if (isGolden) {
         ctx.save();
         if (!flickerOn) {
@@ -266,6 +315,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         ctx.restore();
       }
 
+      // 4. Draw Player character (Turtle)
       drawGardenTurtle(
         ctx,
         px,
@@ -280,6 +330,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         player.deathAnimTimer
       );
 
+      // Draw Action indicators ahead of the turtle to preview target tiles affected
       if (gameState === 'playing') {
         const powerCount = getPowerCount();
         drawPlayerIndicators(ctx, player, enemiesRef.current, mapRef.current, powerCount);
@@ -287,15 +338,19 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       ctx.globalAlpha = 1.0;
 
-      // Draw enemies
+      // 5. Draw Active Enemies
       enemiesRef.current.forEach(e => {
-        if (e.type === 'ghost') {
+        // Translucent overlay drawing for ghost lobos
+        if (e.type === 'fox_ghost') {
           ctx.globalAlpha = 0.55;
         } else {
           ctx.globalAlpha = 1.0;
         }
 
-        drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, timestamp);
+        drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, timestamp, {
+          isJumping: e.isJumping,
+          jumpProgress: e.jumpProgress
+        });
         ctx.globalAlpha = 1.0;
       });
     }
@@ -303,7 +358,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     ctx.restore();
   };
 
-  // Initialize main canvas requestAnimationFrame loop hook
+  // Hook 3: Main requestAnimationFrame render loop manager
   useGameLoop({
     canvasRef,
     gameState,
@@ -336,14 +391,15 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     currentLevelIndex,
   });
 
-  // Handle layout loading and reset trigger bounds
+  // Reinitializes the map and resets positions when reset trigger changes
   useEffect(() => {
     initLevel(lives);
     keysRef.current = {};
     lastDirRef.current = null;
   }, [resetTrigger]);
 
-  // Hook Virtual Pad inputs in preview iframe
+  // Hook Virtual Pad input events from HUD/Console buttons
+  // Sets keysRef values as if physical keyboard keystrokes happened
   useEffect(() => {
     if (!virtualCommand) return;
 
@@ -431,6 +487,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
         width={W}
         height={H}
         onClick={(e) => {
+          // Pause when clicking on standard canvas gameplay viewport
           if (gameState === 'playing') {
             const nativeEvt = e.nativeEvent;
             if ('pointerType' in nativeEvt && (nativeEvt as any).pointerType !== 'mouse') {

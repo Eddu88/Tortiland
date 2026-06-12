@@ -44,6 +44,17 @@ interface UseGameEntitiesProps {
   usedGoldenBroccoliRef: React.MutableRefObject<boolean>;
 }
 
+/**
+ * Hook that contains the main game entities state update subroutines.
+ * This hook is responsible for managing:
+ * - Player movement physics, coordinate updates, level transitions, and inventory updates.
+ * - Enemy AI pathfinding calculations (BFS) and frame updating.
+ * - Vegetable spawning logic and collision detection (between player and enemies, player and items).
+ * - Decorative particle generation and map-change monitoring.
+ * 
+ * @param props References to shared game entities caches, triggers, and state setter callbacks.
+ * @returns An object of entity management functions invoked by the main game loop thread.
+ */
 export const useGameEntities = ({
   playerRef,
   enemiesRef,
@@ -87,6 +98,13 @@ export const useGameEntities = ({
   };
 
 
+  /**
+   * Spawns a fruit of a given type at a random unoccupied cell.
+   * Leverages the `findRandomEmptyCell` utility to find a cell that does not contain walls,
+   * active players, or existing items, excluding target critical cells (like home base coordinates).
+   * 
+   * @param type Numeric code representing the vegetable type (e.g. 3 = Tomato, 4 = Carrot, 5 = Golden Broccoli, 6 = Beet).
+   */
   const spawnFruitInMap = (type: number) => {
     const pos = findRandomEmptyCell(
       mapRef.current,
@@ -101,34 +119,54 @@ export const useGameEntities = ({
         col: pos.col,
         row: pos.row,
         type: type,
-        anim: Math.random() * Math.PI * 2,
+        anim: Math.random() * Math.PI * 2, // randomized bobbing offset
       });
     }
   };
 
+  /**
+   * Finds an empty grid cell near the player (Manhattan distance between 3 and 5 cells).
+   * Used specifically to spawn the Golden Broccoli near Torti when in critical danger (1 life left).
+   * Falls back to a random empty cell if no suitable candidate cells are found.
+   * 
+   * @returns Grid cell coordinates object or null if map is full.
+   */
   const findCellNearPlayer = (): { col: number; row: number } | null => {
     const player = playerRef.current;
     const candidates: { col: number; row: number; dist: number }[] = [];
+    
+    // Scan the inner grid cells (avoid border coordinates)
     for (let c = 1; c < COLS - 1; c++) {
       for (let r = 1; r < ROWS - 1; r++) {
         const dist = Math.abs(c - player.col) + Math.abs(r - player.row);
+        // Candidate selection: proximity boundaries filter (neither too close nor too far)
         if (dist < 3 || dist > 5) continue;
         if (mapRef.current[r][c] !== T_EMPTY) continue;
         if (fruitsRef.current.some(f => f.col === c && f.row === r)) continue;
+        // Exclude the boss burrow zone and player home coordinates
         if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
         if (c === 18 && r === 13) continue;
         candidates.push({ col: c, row: r, dist });
       }
     }
+    
     if (candidates.length === 0) {
       return findRandomEmptyCell(mapRef.current, player.col, player.row, fruitsRef.current, 18, 13);
     }
+    
+    // Sort ascending by distance and select randomly from the top 5 closest candidates
     candidates.sort((a, b) => a.dist - b.dist);
     return candidates[Math.floor(Math.random() * Math.min(5, candidates.length))];
   };
 
+  /**
+   * Evaluates requirements and spawns the Golden Broccoli power-up.
+   * Spawning is allowed only once per level configuration, and only when the player
+   * drops down to exactly 1 life.
+   * 
+   * @param currentLives Active lives count.
+   */
   const checkGoldenBroccoliSpawn = (currentLives: number) => {
-    // Solo permitido si: 1 vida Y no se ha usado ya en este nivel
     if (currentLives !== 1) return;
     if (goldenBroccoliUsedRef.current) return;
 
@@ -147,26 +185,36 @@ export const useGameEntities = ({
       spawnFruitInMap(5);
     }
 
-    goldenBroccoliUsedRef.current = true; // Marcar como usado para este nivel
+    goldenBroccoliUsedRef.current = true; // Mark as spent for the rest of this level phase
 
-    // Sync fruits left
+    // Sync fruits remaining state so the HUD displays the updated counts
     const targetType = levelPhase === 'tomatoes' ? 3 : levelPhase === 'carrots' ? 4 : 6;
     const freshCount = fruitsRef.current.filter(f => f.type === targetType).length;
     setFruitsLeft(freshCount);
   };
 
+  /**
+   * Emits a cluster of decorative particles at a specific tile coordinate.
+   * 
+   * @param col Center column of emission.
+   * @param row Center row of emission.
+   * @param color Particle style color hex.
+   * @param dir Optional projection heading vector. If specified, generates a focused directional cone;
+   *            otherwise, generates a radial explosion.
+   * @param isDirt Set to true to emit brown dirt jump particles that pop upwards (action landing style).
+   */
   const spawnParticles = (col: number, row: number, color: string, dir?: Position, isDirt = false) => {
     const cx = col * TILE + TILE / 2;
     const cy = row * TILE + TILE / 2;
 
     if (isDirt) {
-      // Spawn 4 brown dirt particles jumping from the ground
+      // Spawn 4 brown dirt particles jumping upward from the bottom edge of the tile
       for (let i = 0; i < 4; i++) {
         const vx = (Math.random() - 0.5) * 2.5;
-        const vy = -1.5 - Math.random() * 2.5; // pop upwards
+        const vy = -1.5 - Math.random() * 2.5; // push vertical speed upward
         particlesRef.current.push({
           x: cx + (Math.random() - 0.5) * 12,
-          y: cy + TILE / 3, // start near bottom of the tile
+          y: cy + TILE / 3, // start near the bottom edge
           vx,
           vy,
           life: 25,
@@ -177,21 +225,23 @@ export const useGameEntities = ({
       return;
     }
 
-    const count = dir ? 8 : 12; // 8 particles for focused cone, 12 for radial
+    const count = dir ? 8 : 12; // 8 particles for a directional cone, 12 for a radial burst
     for (let i = 0; i < count; i++) {
       let vx = 0;
       let vy = 0;
 
       if (dir) {
-        // Focused cone velocity in direction of 'dir' with lateral spread
+        // Compute vectors for a directional cone:
+        // Calculate the perpendicular vector of the direction to determine lateral spread
         const perpX = -dir.y;
         const perpY = dir.x;
-        const factor = (Math.random() - 0.5) * 5.0; // spread of ±2.5
+        const factor = (Math.random() - 0.5) * 5.0; // spread scale factor
 
+        // Combine forward direction vector and lateral spread offset
         vx = dir.x * 4.5 + perpX * factor + (Math.random() - 0.5) * 1.0;
         vy = dir.y * 4.5 + perpY * factor - (Math.random() * 1.5); // slight upward pop
       } else {
-        // Original radial uniform
+        // Standard radial uniform explosion (random angle and speed)
         const angle = Math.random() * Math.PI * 2;
         const spd = 1.2 + Math.random() * 3.5;
         vx = Math.cos(angle) * spd;
@@ -270,7 +320,7 @@ export const useGameEntities = ({
       targetCol: e.col,
       targetRow: e.row,
       moving: false,
-      dir: e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 },
+      dir: e.type === 'fox_chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 },
       speed: e.speed,
       chaseTimer: 16, // 1 frame en ms
       animFrame: 0,
@@ -350,12 +400,29 @@ export const useGameEntities = ({
     }
   };
 
-  const findChaseDirection = (e: Enemy, ghostMode: boolean): Position => {
+  /**
+   * Breadth-First Search (BFS) pathfinding algorithm designed to find the shortest grid path
+   * from the enemy's current cell to the player's current cell.
+   * 
+   * Mechanics:
+   * 1. Uses a FIFO queue to perform level-order traversal of adjacent reachable grid cells.
+   * 2. Excludes cells containing solid tiles (walls/bushes), taking into account if the enemy is
+   *    a ghost (which can phase directly through bushes, ignoring solid checks).
+   * 3. Backtracks using a parent-pointers matrix to isolate the first tile direction step.
+   * 4. Integrates a greedy Manhattan-distance fallback in case the player is completely enclosed
+   *    or unreachable.
+   * 
+   * @param e The enemy entity.
+   * @param ghostMode True if the enemy is a ghost that ignores bush collisions.
+   * @returns A Position direction vector specifying the immediate next step.
+   */
+  const findChaseDirection = (e: Enemy, ghostMode: boolean, gorillaMode = false): Position => {
     const startC = e.col;
     const startR = e.row;
     const goalC = playerRef.current.col;
     const goalR = playerRef.current.row;
 
+    // If already at player cell, maintain current heading
     if (startC === goalC && startR === goalR) return e.dir;
 
     const DIRS = [
@@ -365,27 +432,32 @@ export const useGameEntities = ({
       { x: 0, y: -1 }
     ];
 
-    // standard Grid representation tracking parents for reconstructing paths
+    // Visited matrix storing { fromC, fromR } pointers to reconstruct the computed path
     const visited: ({ fromC: number; fromR: number } | null)[][] = Array.from(
       { length: ROWS },
       () => new Array(COLS).fill(null)
     );
 
-    visited[startR][startC] = { fromC: -1, fromR: -1 };
+    visited[startR][startC] = { fromC: -1, fromR: -1 }; // mark starting cell parent
     const queue: { c: number; r: number }[] = [{ c: startC, r: startR }];
     let found = false;
 
+    // FIFO Queue BFS expansion loop
     bfsLoop: while (queue.length > 0) {
       const { c, r } = queue.shift()!;
       for (const d of DIRS) {
         const nc = c + d.x;
         const nr = r + d.y;
 
+        // Verify grid boundaries
         if (nr < 0 || nr >= ROWS || nc < 0 || nc >= COLS) continue;
         if (visited[nr][nc] !== null) continue;
-        if (isSolid(nc, nr, mapRef.current, ghostMode)) continue;
+        // Verify tile solidness (ghosts pass through bushes, gorilla jumps walls & bushes)
+        if (isSolid(nc, nr, mapRef.current, ghostMode, false, false, false, gorillaMode)) continue;
 
         visited[nr][nc] = { fromC: c, fromR: r };
+        
+        // Break early if we hit the player cell
         if (nc === goalC && nr === goalR) {
           found = true;
           break bfsLoop;
@@ -394,9 +466,9 @@ export const useGameEntities = ({
       }
     }
 
+    // Fallback: If no path is found, execute a greedy best-first choice based on Manhattan distance
     if (!found) {
-      // Greedy fallback path search
-      const fallback = DIRS.filter(d => !isSolid(e.col + d.x, e.row + d.y, mapRef.current, ghostMode));
+      const fallback = DIRS.filter(d => !isSolid(e.col + d.x, e.row + d.y, mapRef.current, ghostMode, false, false, false, gorillaMode));
       fallback.sort((a, b) => {
         const da = Math.abs((e.col + a.x) - goalC) + Math.abs((e.row + a.y) - goalR);
         const db = Math.abs((e.col + b.x) - goalC) + Math.abs((e.row + b.y) - goalR);
@@ -405,12 +477,13 @@ export const useGameEntities = ({
       return fallback[0] || e.dir;
     }
 
-    // Reconstruct backwards to extract first movement step
+    // Path reconstruction: Trace backward from the goal cell to extract the first step
     let c = goalC;
     let r = goalR;
     while (true) {
       const parent = visited[r][c];
       if (!parent) break;
+      // If parent points directly to the start cell, we found the first step coordinates
       if (parent.fromC === startC && parent.fromR === startR) {
         return { x: c - startC, y: r - startR };
       }
@@ -422,6 +495,13 @@ export const useGameEntities = ({
   };
 
   const updatePlayer = (deltaMs: number) => {
+    // Tick fruit spawn animation timers
+    fruitsRef.current.forEach(f => {
+      if (f.spawnAnim !== undefined && f.spawnAnim > 0) {
+        f.spawnAnim = Math.max(0, f.spawnAnim - deltaMs);
+      }
+    });
+
     const player = playerRef.current;
     if (player.invincible > 0) {
       player.invincible -= deltaMs;
@@ -555,7 +635,7 @@ export const useGameEntities = ({
             // Sync max unlocked level
             const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
             const nextLevel = currentLevelIndex + 2; // currentLevelIndex is 0-based
-            if (nextLevel > maxUnlocked && nextLevel <= 6) {
+            if (nextLevel > maxUnlocked && nextLevel <= LEVELS.length) {
               localStorage.setItem('tortiland_max_level', String(nextLevel));
             }
 
@@ -582,19 +662,150 @@ export const useGameEntities = ({
     }
   };
 
+  const pushFruit = (fruit: Fruit, dir: Position) => {
+    const isCellBlocked = (c: number, r: number) => {
+      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return true;
+      if (mapRef.current[r]?.[c] !== T_EMPTY) return true;
+      if (c === 18 && r === 13) return true;
+      if (c >= 8 && c <= 11 && r >= 5 && r <= 8) return true;
+      if (fruitsRef.current.some(f => f.col === c && f.row === r)) return true;
+      return false;
+    };
+
+    const targetCol = fruit.col + dir.x;
+    const targetRow = fruit.row + dir.y;
+
+    if (!isCellBlocked(targetCol, targetRow)) {
+      fruit.col = targetCol;
+      fruit.row = targetRow;
+    } else {
+      // Try random adjacent cell
+      const candidates = [
+        { x: 1, y: 0 },
+        { x: -1, y: 0 },
+        { x: 0, y: 1 },
+        { x: 0, y: -1 }
+      ].map(d => ({ col: fruit.col + d.x, row: fruit.row + d.y }))
+       .filter(cell => !isCellBlocked(cell.col, cell.row));
+
+      if (candidates.length > 0) {
+        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
+        fruit.col = chosen.col;
+        fruit.row = chosen.row;
+      }
+    }
+  };
+
+  const relocateAllFruitsFarFromPlayer = () => {
+    const player = playerRef.current;
+    
+    // Find all empty cells on the map that are far from the player (Manhattan distance >= 6)
+    const candidates: { col: number; row: number }[] = [];
+    for (let c = 1; c < COLS - 1; c++) {
+      for (let r = 1; r < ROWS - 1; r++) {
+        if (mapRef.current[r]?.[c] !== T_EMPTY) continue;
+        if (c === 18 && r === 13) continue; // Torti's house
+        if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue; // Boss Burrow
+        
+        const dist = Math.abs(c - player.col) + Math.abs(r - player.row);
+        if (dist >= 6) {
+          candidates.push({ col: c, row: r });
+        }
+      }
+    }
+
+    // Fallback if no cells found at >= 6
+    if (candidates.length === 0) {
+      for (let c = 1; c < COLS - 1; c++) {
+        for (let r = 1; r < ROWS - 1; r++) {
+          if (mapRef.current[r]?.[c] !== T_EMPTY) continue;
+          if (c === 18 && r === 13) continue;
+          if (c >= 8 && c <= 11 && r >= 5 && r <= 8) continue;
+          
+          const dist = Math.abs(c - player.col) + Math.abs(r - player.row);
+          if (dist >= 4) {
+            candidates.push({ col: c, row: r });
+          }
+        }
+      }
+    }
+
+    // Relocate each fruit to a unique candidate cell
+    fruitsRef.current.forEach(fruit => {
+      const available = candidates.filter(cell => 
+        !fruitsRef.current.some(f => f !== fruit && f.col === cell.col && f.row === cell.row)
+      );
+      if (available.length > 0) {
+        const chosen = available[Math.floor(Math.random() * available.length)];
+        fruit.col = chosen.col;
+        fruit.row = chosen.row;
+        fruit.spawnAnim = 1000; // set spawn animation duration to 1000ms
+        // Spawn golden sparkles particles
+        spawnParticles(fruit.col, fruit.row, '#fbbf24');
+      }
+    });
+
+    // Sync fruits left HUD state
+    const targetType = levelPhase === 'tomatoes' ? 3 : levelPhase === 'carrots' ? 4 : 6;
+    const freshCount = fruitsRef.current.filter(f => f.type === targetType).length;
+    setFruitsLeft(freshCount);
+  };
+
   const updateEnemy = (e: Enemy, deltaMs: number) => {
-    const ghost = e.type === 'ghost';
+    const ghost = e.type === 'fox_ghost';
+    const gorilla = e.type === 'gorilla';
+
+    if (e.type === 'gorilla') {
+      if (e.gorillaJumpCooldown === undefined) {
+        e.gorillaJumpCooldown = 4000 + Math.random() * 2000; // 4 to 6 seconds initial cooldown
+      }
+
+      if (e.isJumping) {
+        e.gorillaJumpTimer = (e.gorillaJumpTimer || 0) - deltaMs;
+        e.jumpProgress = Math.min(1.0, 1.0 - (e.gorillaJumpTimer / 1000));
+        
+        if (e.gorillaJumpTimer <= 0) {
+          e.isJumping = false;
+          e.jumpProgress = 0;
+          e.gorillaJumpCooldown = 8000 + Math.random() * 4000; // 8 to 12 seconds post-jump cooldown
+          
+          SoundEffects.playBreak(); // Heavy landing sound
+          relocateAllFruitsFarFromPlayer(); // Relocate fruits upon landing
+          spawnParticles(e.col, e.row, '#71717a'); // Landing dust puff
+        }
+        
+        e.animTimer += deltaMs;
+        if (e.animTimer > 150) {
+          e.animTimer = 0;
+          e.animFrame = (e.animFrame + 1) % 4;
+        }
+        return;
+      } else {
+        e.gorillaJumpCooldown -= deltaMs;
+        if (e.gorillaJumpCooldown <= 0 && !e.moving) {
+          e.isJumping = true;
+          e.gorillaJumpTimer = 1000;
+          e.jumpProgress = 0;
+          SoundEffects.playJump(); // Play jump sound on takeoff
+        }
+      }
+    }
 
     if (!e.moving) {
       e.chaseTimer -= deltaMs;
       let newDir;
 
       if (e.chaseTimer <= 0) {
-        newDir = findChaseDirection(e, ghost);
-        if (e.type === 'patrol') {
-          e.chaseTimer = 67 + Math.floor(Math.random() * 67); // patrol=4~8 frames → 67~133ms
-        } else if (e.type === 'chaser') {
-          e.chaseTimer = 16; // chaser=1 frame → 16ms
+        newDir = findChaseDirection(e, ghost, gorilla);
+        if (e.type === 'fox_patrol' || e.type === 'snake_patrol') {
+          if (e.type === 'fox_patrol' && currentLevelIndex === 6) {
+            // Level 7 patrol foxes are fast and aggressive (aggressive pathfinding)
+            e.chaseTimer = 16;
+          } else {
+            e.chaseTimer = 67 + Math.floor(Math.random() * 67); // patrol=4~8 frames → 67~133ms
+          }
+        } else if (e.type === 'fox_chaser' || e.type === 'snake_chaser' || e.type === 'gorilla') {
+          e.chaseTimer = 16; // chaser/gorilla = 1 frame → 16ms
         } else {
           e.chaseTimer = 50; // ghost=3 frames → 50ms
         }
@@ -604,8 +815,8 @@ export const useGameEntities = ({
 
       const nc0 = e.col + newDir.x;
       const nr0 = e.row + newDir.y;
-      if (isSolid(nc0, nr0, mapRef.current, ghost)) {
-        newDir = findChaseDirection(e, ghost);
+      if (isSolid(nc0, nr0, mapRef.current, ghost, false, false, false, gorilla)) {
+        newDir = findChaseDirection(e, ghost, gorilla);
         e.chaseTimer = 16; // 1 frame en ms
       }
 
@@ -613,7 +824,7 @@ export const useGameEntities = ({
       const nc = e.col + newDir.x;
       const nr = e.row + newDir.y;
 
-      if (!isSolid(nc, nr, mapRef.current, ghost)) {
+      if (!isSolid(nc, nr, mapRef.current, ghost, false, false, false, gorilla)) {
         e.targetCol = nc;
         e.targetRow = nr;
         e.moving = true;
@@ -695,7 +906,7 @@ export const useGameEntities = ({
         targetCol: e.col,
         targetRow: e.row,
         moving: false,
-        dir: existing?.dir || (e.type === 'chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 }),
+        dir: existing?.dir || (e.type === 'fox_chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 }),
         speed: e.speed,
         chaseTimer: 16, // 1 frame en ms
         animFrame: existing?.animFrame || 0,

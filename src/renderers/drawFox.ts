@@ -3,27 +3,58 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { Position } from '../types';
+import { Position, EnemyType } from '../types';
 import { TILE } from '../constants';
+import { drawSnake } from './drawSnakes';
+import { drawGorilla } from './drawGorillas';
 
+/**
+ * Vector rendering function that draws the enemy character (Fox/Lobo) onto the Canvas context.
+ * Computes sizes, colors, and specific visual attachments (like metal neck plates and glowing gems)
+ * depending on the enemy type.
+ * 
+ * Animation details:
+ * - Floating/bobbing height using a sine function of running timestamp `t`.
+ * - Tail swinging angle using a cosine function of running timestamp `t`.
+ * - Rotates the tail base relative to the direction vector `dir`.
+ * 
+ * @param ctx 2D Canvas rendering context.
+ * @param px Center X coordinate.
+ * @param py Center Y coordinate.
+ * @param dir Direction heading vector of the enemy.
+ * @param frame Current animation frame index.
+ * @param type Enemy variant: 'fox_patrol' (orange lobo), 'fox_chaser' (large gray armored rodent), or 'fox_ghost' (ghostly translucent blue spectral lobo).
+ * @param t Time clock used for animations.
+ */
 export const drawFoxEnemy = (
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
   dir: Position,
   frame: number,
-  type: 'patrol' | 'chaser' | 'ghost',
-  t: number
+  type: EnemyType,
+  t: number,
+  extra?: { isJumping?: boolean; jumpProgress?: number }
 ) => {
+  if (type === 'snake_patrol' || type === 'snake_chaser') {
+    drawSnake(ctx, px, py, dir, frame, type, t);
+    return;
+  }
+
+  if (type === 'gorilla') {
+    drawGorilla(ctx, px, py, dir, frame, type, t, extra);
+    return;
+  }
+
   ctx.save();
   
   // Dynamic scale based on enemy type to differentiate mechanics and threat levels:
   let s = TILE * 0.42;
-  if (type === 'patrol') {
+  if (type === 'fox_patrol') {
     s = TILE * 0.48; // Red patrol lobos stay medium but clearly visible (up from 0.42)
-  } else if (type === 'chaser') {
+  } else if (type === 'fox_chaser') {
     s = TILE * 0.58; // Gray armored chaser rodent is huge, imposing, and terrifying!
-  } else if (type === 'ghost') {
+  } else if (type === 'fox_ghost') {
     s = TILE * 0.52; // Ghost spectral lobo is intermediate size
   }
   
@@ -44,13 +75,13 @@ export const drawFoxEnemy = (
   let eCol = '#3bf9a0'; // Eyes
   const tailSwing = Math.cos(t * 0.012 + frame) * 0.26;
 
-  if (type === 'chaser') {
+  if (type === 'fox_chaser') {
     pCol = '#64748b'; // Gray/Steel armored lobo
     iCol = '#f1f5f9';
     dCol = '#0f172a';
     sCol = '#334155';
     eCol = '#f43f5e'; // Red focused eyes
-  } else if (type === 'ghost') {
+  } else if (type === 'fox_ghost') {
     pCol = '#bfdbfe'; // Whimsical ghost-blue spectral lobo
     iCol = '#f0fdf4';
     dCol = '#3b82f6';
@@ -114,7 +145,7 @@ export const drawFoxEnemy = (
   ctx.fill();
 
   // If Chaser type, draw metal neck/pectoral chestplate
-  if (type === 'chaser') {
+  if (type === 'fox_chaser') {
     ctx.fillStyle = '#94a3b8';
     ctx.strokeStyle = '#475569';
     ctx.lineWidth = 1.2;
@@ -208,7 +239,7 @@ export const drawFoxEnemy = (
   ctx.fill();
 
   // If Chaser type, draw dark iron headband armor
-  if (type === 'chaser') {
+  if (type === 'fox_chaser') {
     ctx.fillStyle = '#475569';
     ctx.strokeStyle = sCol;
     ctx.lineWidth = 1;

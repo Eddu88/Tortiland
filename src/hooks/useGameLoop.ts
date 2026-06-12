@@ -40,6 +40,19 @@ interface UseGameLoopProps {
   currentLevelIndex: number;
 }
 
+/**
+ * Hook that manages the core requestAnimationFrame render and update loops.
+ * 
+ * Functions:
+ * 1. Computes delta milliseconds per tick, capping frame time at 50ms to prevent game coordinate
+ *    glitches and collision tunnel breakthroughs on heavy lag spikes.
+ * 2. Processes timed plant growths and leaf dissolvings.
+ * 3. Triggers player breaking/planting animations and synchronizes audio triggers.
+ * 4. Checks entity positions and coordinates collision response triggers.
+ * 5. Executes decoupled render loop calls.
+ * 
+ * @param props Game states, callbacks, refs, and update functions.
+ */
 export const useGameLoop = ({
   canvasRef,
   gameState,
@@ -71,6 +84,7 @@ export const useGameLoop = ({
 }: UseGameLoopProps) => {
 
   // Frame Request Gameloop Execution
+  // Subscribes requestAnimationFrame loop on mounting, cleans it up on unmounting.
   useEffect(() => {
     let isSubscribed = true;
     let lastTime = 0;
@@ -98,7 +112,8 @@ export const useGameLoop = ({
       if (gameState === 'playing') {
         const player = playerRef.current;
 
-        // Update dying bushes alpha
+        // 1. Update opacity of dissolving bushes
+        // Decrements alpha values based on delta time to ensure smooth, frame-rate independent fading.
         const db = dyingBushesRef.current;
         for (let i = db.length - 1; i >= 0; i--) {
           db[i].alpha -= (0.06 * deltaMs) / FRAME_MS;
@@ -107,7 +122,8 @@ export const useGameLoop = ({
           }
         }
 
-        // Escape active particles
+        // 2. Trigger particles near the escape burrow
+        // When all main fruits are collected, emit celebratory leaf particles around Torti's house.
         const escapeActive = fruitsRef.current.filter(f => f.type !== 5).length === 0;
         if (escapeActive && Math.floor(frameCountRef.current / 500) !== Math.floor((frameCountRef.current - deltaMs) / 500)) {
           const randomCol = 17 + Math.floor(Math.random() * 3);
@@ -115,7 +131,8 @@ export const useGameLoop = ({
           spawnParticles(randomCol, randomRow, '#5ec263', { x: 0, y: -1 });
         }
 
-        // Process scheduled plants
+        // 3. Process scheduled plants (bushes growing)
+        // Decrements growth timers and sets grid cells to T_BUSH upon completion, emitting dirt particles.
         scheduledPlantsRef.current.forEach(plant => {
           plant.triggerAt -= deltaMs;
           if (plant.triggerAt <= 0) {
@@ -123,38 +140,40 @@ export const useGameLoop = ({
             mapRef.current[plant.row][plant.col] = T_BUSH;
             const key = `${plant.row}_${plant.col}`;
             grassAgesRef.current[key] = { createdAt: Date.now() };
-            // Spawn brown dirt particles!
+            // Spawn brown dirt particles indicating soil planting impact
             spawnParticles(plant.col, plant.row, '#8B5E3C', undefined, true);
             SoundEffects.playBuild();
           }
         });
 
-        // Filter active schedules
+        // Filter out completed schedules
         scheduledPlantsRef.current = scheduledPlantsRef.current.filter(p => p.triggerAt > 0);
 
-        // Process scheduled breaks
+        // 4. Process scheduled breaks (bushes breaking)
+        // Decrements breaking timers and sets grid cells to T_EMPTY upon completion, triggering fading leaves and sound.
         scheduledBreaksRef.current.forEach(b => {
           b.triggerAt -= deltaMs;
           if (b.triggerAt <= 0) {
             console.log(`[BREAK EJECUTADO] col=${b.col} row=${b.row}`);
             mapRef.current[b.row][b.col] = T_EMPTY;
+            // Compute a stable hash variant for foliage texture chip variety
             const hashVal = Math.abs(Math.sin(b.row * 12.9898 + b.col * 78.233)) * 43758.5453;
             const variant = Math.floor(hashVal % 3);
             dyingBushesRef.current.push({ col: b.col, row: b.row, alpha: 1.0, variant });
-            // Directional leaf particles!
+            // Emit leaf green particles in the direction of the action hit
             spawnParticles(b.col, b.row, '#4caf50', b.dir);
             spawnParticles(b.col, b.row, '#2e7d32', b.dir);
             SoundEffects.playBreak();
           }
         });
 
-        // Filter active scheduled breaks
+        // Filter out completed scheduled breaks
         scheduledBreaksRef.current = scheduledBreaksRef.current.filter(b => b.triggerAt > 0);
 
         const prevBreak = player.breakingAnimTimer + deltaMs;
         const prevPlant = player.plantingAnimTimer + deltaMs;
 
-        // Reset the trigger flags when animations are inactive
+        // Reset action triggers when timers run out to prepare for subsequent commands
         if (player.breakingAnimTimer <= 0) {
           player.breakTriggerFired = false;
         }
@@ -169,47 +188,51 @@ export const useGameLoop = ({
           console.log(`[PLANT TRIGGER CHECK] timer=${player.plantingAnimTimer.toFixed(1)} prev=${prevPlant.toFixed(1)} tilesEnRef=${plantingTilesRef.current.length} fired=${player.plantTriggerFired}`);
         }
  
-        // Trigger Break action when breakingAnimTimer <= 415ms
+        // 5. Trigger Break schedule when animation reaches impact frames (<= 415ms)
+        // Queues breaking events with a 54ms staggered delay to create a nice visual ripple wave effect.
         if (!player.breakTriggerFired && player.breakingAnimTimer > 0 && player.breakingAnimTimer <= 415 && breakingTilesRef.current.length > 0) {
           player.breakTriggerFired = true;
           breakingTilesRef.current.forEach(({ col, row }, index) => {
-            const delay = index * 54; // 54ms delay
+            const delay = index * 54;
             scheduledBreaksRef.current.push({
               col,
               row,
-              triggerAt: 16 + delay, // 1 frame en ms + delay
+              triggerAt: 16 + delay, // 1 frame delay (16ms) + cumulative offset
               dir: { ...player.dir }
             });
           });
           breakingTilesRef.current = [];
         }
 
-        // Trigger Plant action when plantingAnimTimer <= 415ms
+        // 6. Trigger Plant schedule when animation reaches impact frames (<= 415ms)
+        // Queues planting events with a 54ms staggered delay, registering ready frames to avoid action conflicts.
         if (!player.plantTriggerFired && player.plantingAnimTimer > 0 && player.plantingAnimTimer <= 415 && plantingTilesRef.current.length > 0) {
           player.plantTriggerFired = true;
           plantingTilesRef.current.forEach(({ col, row }, index) => {
-            const delay = index * 54; // 54ms delay
+            const delay = index * 54;
             const triggerOffset = 155 + delay; // 155ms trigger offset
             scheduledPlantsRef.current.push({ col, row, triggerAt: triggerOffset });
 
-            // Set individual ready frame
+            // Mark when the individual tile will be fully grown and ready for breaking
             tileReadyRef.current[row][col] = frameCountRef.current + triggerOffset;
           });
           plantingTilesRef.current = [];
         }
 
+        // 7. Process Player Death Animation and lives reduction sequence
+        // Freezes normal updates, decrementing lives and triggering player/enemies respawn coordinates reset.
         if (player.deathAnimTimer > 0) {
           player.deathAnimTimer -= deltaMs;
           if (player.deathAnimTimer <= 0) {
             player.deathAnimTimer = 0;
-            // Death animation completed! Handle life reduction and respawn/gameover
+            // Death animation finished! Decrement lives
             setLives((prev: number) => {
               const updated = prev - 1;
               if (updated <= 0) {
                 setGameState('gameover');
                 SoundEffects.playGameOver();
               } else {
-                player.invincible = 2000; // 2 seconds protection (ms)
+                player.invincible = 2000; // Give 2 seconds of invincibility
                 const levelConfig = LEVELS[currentLevelIndex];
                 respawnEntities(levelConfig);
                 checkGoldenBroccoliSpawn(updated);
@@ -217,14 +240,19 @@ export const useGameLoop = ({
               return updated;
             });
           }
-        } else if (player.breakingAnimTimer > 0 && (
+        } 
+        // 8. Freeze-frame effect on break stomp impact
+        // Pauses player and enemy movements for a brief frame to add kinetic weight to actions.
+        else if (player.breakingAnimTimer > 0 && (
           (player.breakingAnimTimer <= 415 && player.breakingAnimTimer > 382) ||
           (prevBreak > 415 && player.breakingAnimTimer <= 382)
         )) {
-          // Freeze frame: bypass updates/collisions, manually decrement breakingAnimTimer
           player.breakingAnimTimer -= deltaMs;
           if (player.breakingAnimTimer < 0) player.breakingAnimTimer = 0;
-        } else {
+        } 
+        // 9. Standard Entity Updates
+        // Moves the player character, triggers enemy pathfinding decisions, checks collisions, and tracks map variations.
+        else {
           updatePlayer(deltaMs);
           enemiesRef.current.forEach(e => updateEnemy(e, deltaMs));
           checkCollisions();

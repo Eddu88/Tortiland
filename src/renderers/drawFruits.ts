@@ -6,6 +6,20 @@
 import { Fruit, TileType, Player, Enemy } from '../types';
 import { TILE, T_BUSH, T_WALL, T_EMPTY, COLS, ROWS } from '../constants';
 
+/**
+ * Renders a single square overlay indicator cell indicating where a plant/break action will hit.
+ * 
+ * Aesthetics:
+ * - Red translucent fill + red border + X shape for breaking actions.
+ * - Green translucent fill + green border + plus shape for planting actions.
+ * - Yellow translucent fill + yellow border + plus shape if player has the Golden Broccoli.
+ * 
+ * @param ctx 2D Canvas rendering context.
+ * @param col Destination grid column coordinate.
+ * @param row Destination grid row coordinate.
+ * @param isBreaking True if this tile is being destroyed.
+ * @param isGolden True if the player has the Golden Broccoli power active.
+ */
 export const drawIndicatorCell = (
   ctx: CanvasRenderingContext2D,
   col: number,
@@ -34,13 +48,13 @@ export const drawIndicatorCell = (
   const r = 6;
 
   if (isBreaking) {
-    // Red X
+    // Draw X sign for breaking
     ctx.beginPath();
     ctx.moveTo(cx - r, cy - r); ctx.lineTo(cx + r, cy + r);
     ctx.moveTo(cx + r, cy - r); ctx.lineTo(cx - r, cy + r);
     ctx.stroke();
   } else {
-    // Plus sign (matches the outline strokeStyle color automatically)
+    // Draw plus sign for planting
     ctx.beginPath();
     ctx.moveTo(cx, cy - r); ctx.lineTo(cx, cy + r);
     ctx.moveTo(cx - r, cy); ctx.lineTo(cx + r, cy);
@@ -48,6 +62,21 @@ export const drawIndicatorCell = (
   }
 };
 
+/**
+ * Calculates the line of tiles affected by the player's front action projection
+ * and draws the corresponding preview overlay indicator cells.
+ * 
+ * It projects a ray starting from the tile in front of the player, extending up to `powerCount` tiles.
+ * - If the ray hits a wall, the line drawing stops.
+ * - If the ray hits a bush, it projects a red 'breaking' indicator (up to `powerCount` contiguous bushes).
+ * - If the ray scans empty cells, it projects green 'planting' indicators (stopping if occupied by characters or other obstacles).
+ * 
+ * @param ctx 2D Canvas rendering context.
+ * @param player The active player entity.
+ * @param enemies Active enemies list on map.
+ * @param map Active grid array.
+ * @param powerCount Number of tiles affected by the action range.
+ */
 export const drawPlayerIndicators = (
   ctx: CanvasRenderingContext2D,
   player: Player,
@@ -110,6 +139,24 @@ export const drawPlayerIndicators = (
   }
 };
 
+/**
+ * Iterates over the active fruit list and renders vectors for each item.
+ * 
+ * Animation and Layout:
+ * - Computes a float height `bob` based on timestamp `t` and randomized offset `f.anim`.
+ * - Detects if the fruit is covered by a bush. If covered, renders the fruit as translucent (55% opacity)
+ *   with a warm yellow glowing aura to maintain player visibility.
+ * - Draws high-fidelity 2.5D graphics for:
+ *   - tomatoes (radial red-to-dark gradient, green star sepal lobes, specular gloss)
+ *   - carrots (linear orange gradient, texture ridges, slanted leaf sprays)
+ *   - golden broccolis (yellow-gold stalk, sparkling highlights)
+ *   - beetroots (magenta-rose gradient bulb, tall reddish leaf stems)
+ * 
+ * @param ctx 2D Canvas rendering context.
+ * @param fruits Array of active collectibles.
+ * @param map Active grid array.
+ * @param t Time clock used for floating bob dynamics.
+ */
 export const drawFruits = (
   ctx: CanvasRenderingContext2D,
   fruits: Fruit[],
@@ -125,6 +172,33 @@ export const drawFruits = (
     const isCovered = map[f.row]?.[f.col] === T_BUSH;
 
     ctx.save();
+
+    // Spawn highlight effect: expanding gold shockwave and rotating sparks
+    if (f.spawnAnim !== undefined && f.spawnAnim > 0) {
+      const progress = 1.0 - (f.spawnAnim / 1000);
+      const waveRadius = progress * TILE * 0.85;
+      
+      // Fading expanding ring
+      ctx.strokeStyle = `rgba(253, 224, 71, ${1 - progress})`;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(px, py, waveRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Fading rotating sparks
+      ctx.fillStyle = `rgba(251, 191, 36, ${1 - progress})`;
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 + progress * 2.5;
+        const sparkDist = waveRadius * 0.75;
+        ctx.fillRect(px + Math.cos(angle) * sparkDist - 1.5, py + Math.sin(angle) * sparkDist - 1.5, 3, 3);
+      }
+
+      // Apply scale-up and fade-in to the fruit and its shadow
+      ctx.globalAlpha = progress;
+      ctx.translate(px, yBob);
+      ctx.scale(progress, progress);
+      ctx.translate(-px, -yBob);
+    }
 
     if (!isCovered) {
       // Grounded float relative floor shadow

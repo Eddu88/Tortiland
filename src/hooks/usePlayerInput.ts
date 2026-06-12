@@ -25,6 +25,16 @@ interface UsePlayerInputProps {
   setGameState?: (s: GameState) => void;
 }
 
+/**
+ * Hook that manages physical keyboard input, virtual gamepad controllers events,
+ * and context-aware action triggers (planting or breaking bushes) for the player character.
+ * 
+ * It tracks active key presses, handles turn restrictions, and coordinates multi-tile 
+ * power animations (clearing or creating bushes in lines).
+ * 
+ * @param props Configurations, game state callbacks, and mutable refs linking to player/enemies/map structures.
+ * @returns Input ref maps, command handlers, and utility calculations.
+ */
 export const usePlayerInput = ({
   gameState,
   levelScore,
@@ -41,11 +51,22 @@ export const usePlayerInput = ({
   tileReadyRef,
   setGameState,
 }: UsePlayerInputProps) => {
+  // Map of currently pressed key codes to their boolean state (true = down, false = up)
   const keysRef = useRef<{ [code: string]: boolean }>({});
+  // Timestamps of when movement keys were first pressed, used to detect holding patterns and override turn locks
   const keysPressTimeRef = useRef<{ [code: string]: number }>({});
+  // Direction vector requested by the user that will be applied on the next grid alignment check
   const lastDirRef = useRef<Position | null>(null);
+  // Turn lock toggle preventing diagonal or double-movement registers when quickly switching axes
   const turnBlockedRef = useRef<boolean>(false);
 
+  /**
+   * Calculates the maximum tile range affected by the player's plant/break action.
+   * If the player is powered by the Golden Broccoli, the range is maxed out at 10.
+   * Otherwise, the range scales linearly with the player's levelScore + 1, capped at 10.
+   * 
+   * @returns Integer count between 1 and 10.
+   */
   const getPowerCount = () => {
     if (playerRef.current.goldenBroccoliTimer > 0) {
       return 10;
@@ -54,17 +75,29 @@ export const usePlayerInput = ({
   };
 
 
+  /**
+   * Triggers a linear projection action, propagating outward from the player's facing direction.
+   * - 'break': Sweeps outward, detecting contiguous bushes and queueing them to dissolve.
+   * - 'create': Sweeps outward, detecting empty space and queueing new bushes to grow.
+   * 
+   * Actions are blocked if player.powerCooldown is active or player is currently moving.
+   * The action sequence sets player.powerCooldown and animation timers to 620ms (equivalent to 37 frames at 60 FPS).
+   * 
+   * @param action Identifier ('create' or 'break') mapping to the requested command.
+   */
   const useBushPower = (action: 'create' | 'break') => {
     const player = playerRef.current;
     if (player.powerCooldown > 0) return;
-    if (player.moving) return; // Prevent bugs mid-motion
+    if (player.moving) return; // Prevent bugs and alignment glitches mid-motion
 
     const dir = player.dir;
     const powerCount = getPowerCount();
 
+    // Coordinates of the first tile directly in front of the player
     const firstCc = player.col + dir.x;
     const firstCr = player.row + dir.y;
 
+    // Check map boundaries to prevent array index out-of-bounds access
     if (firstCc <= 0 || firstCc >= COLS - 1 || firstCr <= 0 || firstCr >= ROWS - 1) return;
     if (isWall(firstCc, firstCr, mapRef.current)) return;
 
@@ -74,56 +107,66 @@ export const usePlayerInput = ({
 
     if (action === 'break') {
       breakingTilesRef.current = [];
-      // Limpiar entradas residuales antes de evaluar
+      // Clean residual scheduled breaks pointing to non-bush tiles to prevent visual glitches
       scheduledBreaksRef.current = scheduledBreaksRef.current.filter(
         b => isBush(b.col, b.row, mapRef.current)
       );
+      
+      // Sweep forward in a line to select bushes for breaking
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
         if (isWall(currentCc, currentCr, mapRef.current)) break;
 
         if (isBush(currentCc, currentCr, mapRef.current)) {
-          // Check ready frame for individual tiles
+          // Check if this specific tile has finished its previous growth cycle
           const readyFrame = tileReadyRef.current[currentCr]?.[currentCc] ?? 0;
           const isScheduledBreak = scheduledBreaksRef.current.some(b => b.col === currentCc && b.row === currentCr);
 
+          // Only queue for breaking if it is fully grown and not already scheduled for demolition
           if (readyFrame <= frameCountRef.current && !isScheduledBreak) {
             breakingTilesRef.current.push({ col: currentCc, row: currentCr });
             actionExecuted = true;
           }
-          // Si no está listo o ya está en cola, simplemente continúa al siguiente
         } else {
-          break; // Solo para si no es arbusto (es espacio vacío o pared)
+          break; // Stop line sweep immediately if we hit an empty space
         }
         currentCc += dir.x;
         currentCr += dir.y;
       }
+      
       if (actionExecuted) {
-        player.powerCooldown = 620; // 37 frames * 16.67ms = 620ms
-        player.breakingAnimTimer = 620; // 37 frames * 16.67ms = 620ms
+        player.powerCooldown = 620; // Block further actions for 620ms (37 frames * 16.67ms)
+        player.breakingAnimTimer = 620; // Trigger the breaking animation sequence
       }
     } else if (action === 'create') {
       plantingTilesRef.current = [];
+      
+      // Sweep forward in a line to select empty spaces for planting
       for (let i = 0; i < powerCount; i++) {
         if (currentCc <= 0 || currentCc >= COLS - 1 || currentCr <= 0 || currentCr >= ROWS - 1) break;
 
+        // Check if player's current or target tile overlaps with this cell
         const hasPlayer = (player.col === currentCc && player.row === currentCr) ||
           (player.targetCol === currentCc && player.targetRow === currentCr);
 
+        // Check if any enemy is currently occupying or moving towards this cell
         const enemyAtCurrent = enemiesRef.current.some(e =>
           (e.col === currentCc && e.row === currentCr) ||
           (e.targetCol === currentCc && e.targetRow === currentCr)
         );
 
+        // Check if a bush is already scheduled to be planted here
         const isScheduled = scheduledPlantsRef.current.some(p => p.col === currentCc && p.row === currentCr);
 
-        // Check blockage
+        // Terminate sweep if blocked by wall, existing bush, characters, or active schedules
         if (isWall(currentCc, currentCr, mapRef.current) || isBush(currentCc, currentCr, mapRef.current) || hasPlayer || enemyAtCurrent || isScheduled) {
           break;
         }
 
         const nextCc = currentCc + dir.x;
         const nextCr = currentCr + dir.y;
+        
+        // Prevent planting directly in front of an oncoming enemy to avoid instant entrapment glitches
         const enemyAtNext = enemiesRef.current.some(e =>
           (e.col === nextCc && e.row === nextCr) ||
           (e.targetCol === nextCc && e.targetRow === nextCr)
@@ -135,15 +178,16 @@ export const usePlayerInput = ({
         }
 
         if (enemyAtNext) {
-          break;
+          break; // Stop sweep if an enemy is approaching on the next tile
         }
 
         currentCc += dir.x;
         currentCr += dir.y;
       }
+      
       if (actionExecuted) {
-        player.powerCooldown = 620; // 37 frames * 16.67ms = 620ms
-        player.plantingAnimTimer = 620; // 37 frames * 16.67ms = 620ms
+        player.powerCooldown = 620; // Block further actions for 620ms (37 frames * 16.67ms)
+        player.plantingAnimTimer = 620; // Trigger the planting animation sequence
       }
     }
 
@@ -152,12 +196,18 @@ export const usePlayerInput = ({
     }
   };
 
+  /**
+   * Main high-level selector that triggers planting or breaking depending on the state
+   * of the tile directly in front of the player.
+   * If the adjacent tile is a bush, it fires the 'break' action.
+   * If the adjacent tile is empty dirt, it fires the 'create' action.
+   */
   const triggerAction = () => {
     const player = playerRef.current;
     if (player.powerCooldown > 0) return;
-    if (player.deathAnimTimer > 0) return;
+    if (player.deathAnimTimer > 0) return; // Prevent actions during death sequence
 
-    // Detener movimiento en curso siempre antes de actuar
+    // Force turtle alignment with the current grid cell to prevent mid-motion visual drift
     player.moving = false;
     player.x = player.col * TILE + TILE / 2;
     player.y = player.row * TILE + TILE / 2;

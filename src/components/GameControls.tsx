@@ -9,20 +9,27 @@ import { formatTime } from '../utils/map';
 import { Volume2, VolumeX, Star, Pause, Play } from 'lucide-react';
 
 interface GameControlsProps {
-  score: number;
-  lives: number;
-  levelPhase: LevelPhase;
-  fruitsLeft: number;
-  gameTimeElapsed: number;
-  goldenBroccoliTimer: number;
-  soundOn: boolean;
-  setSoundOn: (s: boolean) => void;
-  triggerVirtualCommand: (cmd: string) => void;
-  triggerReset: () => void;
-  gameState: GameState;
-  setGameState: (s: GameState) => void;
+  score: number;                      // Global game score (multiplied by 100 on leaderboard save).
+  lives: number;                      // Player remaining lives.
+  levelPhase: LevelPhase;             // Active phase of the current level ('tomatoes', 'carrots', 'beets').
+  fruitsLeft: number;                 // Remaining items to collect in the current phase.
+  gameTimeElapsed: number;            // Total level duration elapsed in seconds.
+  goldenBroccoliTimer: number;        // Cooldown timer of golden broccoli power in seconds.
+  soundOn: boolean;                   // Toggle state of Web Audio synthesis.
+  setSoundOn: (s: boolean) => void;   // Sound state modifier callback.
+  triggerVirtualCommand: (cmd: string) => void; // Virtual Pad input commands dispatcher.
+  triggerReset: () => void;           // Complete game state reload trigger.
+  gameState: GameState;               // Main state engine identifier.
+  setGameState: (s: GameState) => void; // State engine modifier callback.
 }
 
+/**
+ * GameControls represents the sidebar panel HUD and controller wrapper.
+ * Renders stats (score, lives, phases) and incorporates:
+ * - A virtual D-Pad for directional control mapping.
+ * - LocalStorage leaderboard syncing.
+ * - Game sound toggle indicators.
+ */
 export const GameControls: React.FC<GameControlsProps> = ({
   score,
   lives,
@@ -40,18 +47,22 @@ export const GameControls: React.FC<GameControlsProps> = ({
   const [highScores, setHighScores] = useState<HighScore[]>([]);
   const [playerName, setPlayerName] = useState<string>('JUGADOR');
 
-  // Load and store high scores locally
+  // Load high scores database locally on initial component mount
   useEffect(() => {
     const raw = localStorage.getItem('tortiland_scores');
     if (raw) {
       try {
         setHighScores(JSON.parse(raw));
       } catch (e) {
-        console.error(e);
+        console.error('Failed to parse high scores:', e);
       }
     }
   }, []);
 
+  /**
+   * Constructs a new highscore entry and merges it with local storage records.
+   * Highscores are sorted descending by score, ascending by time, keeping top 5.
+   */
   const saveHighScore = () => {
     const finalScore = score * 100;
     const newEntry: HighScore = {
@@ -61,6 +72,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
       date: new Date().toLocaleDateString(),
     };
 
+    // Stagger score sorting sequence and restrict array to top 5
     const updated = [...highScores, newEntry]
       .sort((a, b) => b.score - a.score || a.time - b.time)
       .slice(0, 5);
@@ -69,6 +81,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
     localStorage.setItem('tortiland_scores', JSON.stringify(updated));
   };
 
+  // Automatically trigger leaderboard save when the player hits victory or defeat game over screens
   useEffect(() => {
     if (gameState === 'gameover' || gameState === 'win') {
       saveHighScore();
@@ -88,6 +101,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             <span className="font-press-start text-[8px] tracking-widest text-[#fef08a]">CONSOLA TORTILAND</span>
           </div>
           <div className="flex items-center gap-1.5">
+            {/* Pause Control Button */}
             <button
               onClick={() => triggerVirtualCommand('PAUSE')}
               className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4a2e19] hover:bg-[#5c3a21] border border-[#a1622e] text-[#fef08a] transition-all cursor-pointer shadow-md"
@@ -95,6 +109,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             >
               {gameState === 'paused' ? <Play size={11} fill="currentColor" className="text-[#86efac] animate-pulse" /> : <Pause size={11} fill="currentColor" className="text-[#fde047]" />}
             </button>
+            {/* Audio Toggle Button */}
             <button
               onClick={() => setSoundOn(!soundOn)}
               className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4a2e19] hover:bg-[#5c3a21] border border-[#a1622e] text-[#fef08a] transition-all cursor-pointer shadow-md"
@@ -106,7 +121,9 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
 
         {/* DPAD Controller Design in Carved Wood styling */}
+        {/* Sends direction changes triggering state callbacks in GameCanvas input hook */}
         <div className="flex flex-col items-center gap-1.5 my-1">
+          {/* UP button */}
           <button
             onTouchStart={() => triggerVirtualCommand('UP_START')}
             onMouseDown={() => triggerVirtualCommand('UP_START')}
@@ -120,6 +137,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </button>
 
           <div className="flex items-center gap-7">
+            {/* LEFT button */}
             <button
               onTouchStart={() => triggerVirtualCommand('LEFT_START')}
               onMouseDown={() => triggerVirtualCommand('LEFT_START')}
@@ -131,9 +149,11 @@ export const GameControls: React.FC<GameControlsProps> = ({
             >
               <span className="font-press-start text-[14px] font-bold text-[#fde047]">A</span>
             </button>
+            {/* Center joypad core detail */}
             <div className="h-6 w-6 rounded-full bg-[#160d07] border-2 border-[#5c3a21] flex items-center justify-center shadow-inner">
               <div className="h-2 w-2 rounded-full bg-[#a1622e]" />
             </div>
+            {/* RIGHT button */}
             <button
               onTouchStart={() => triggerVirtualCommand('RIGHT_START')}
               onMouseDown={() => triggerVirtualCommand('RIGHT_START')}
@@ -147,6 +167,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
             </button>
           </div>
 
+          {/* DOWN button */}
           <button
             onTouchStart={() => triggerVirtualCommand('DOWN_START')}
             onMouseDown={() => triggerVirtualCommand('DOWN_START')}
@@ -161,6 +182,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
         </div>
 
         {/* Contextual Action Button (Golden theme matching lightning bolt) */}
+        {/* Simulates Spacebar/F press inputs for touch device gameplay compatibility */}
         <div className="mt-1.5">
           <button
             onTouchStart={() => triggerVirtualCommand('ACTION')}
@@ -204,6 +226,7 @@ export const GameControls: React.FC<GameControlsProps> = ({
           </div>
         )}
 
+        {/* Input field to rename player nick in local highscores entries */}
         <div className="flex gap-2 items-center mt-2.5 border-t border-[#5c3a21] pt-2.5">
           <label className="font-mono text-[9px] text-[#fef08a] font-bold uppercase tracking-wider">APODO:</label>
           <input
@@ -218,4 +241,5 @@ export const GameControls: React.FC<GameControlsProps> = ({
     </div>
   );
 };
+
 export default GameControls;

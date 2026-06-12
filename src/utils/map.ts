@@ -81,10 +81,13 @@ export function isSolid(
   ghostMode = false,
   isPlayer = false,
   goldenBroccoliActive = false,
-  awaitingBurrow = false
+  awaitingBurrow = false,
+  gorillaMode = false
 ): boolean {
   if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
-  if (map[row]?.[col] === T_WALL) return true;
+  if (map[row]?.[col] === T_WALL) {
+    return true;
+  }
   if (map[row]?.[col] === T_BUSH) {
     if (ghostMode) return false;
     if (isPlayer && goldenBroccoliActive) return false;

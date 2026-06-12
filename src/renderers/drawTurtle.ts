@@ -6,6 +6,44 @@
 import { Position } from '../types';
 import { TILE } from '../constants';
 
+/**
+ * Premium vector renderer that draws the main player character, Torti the Turtle.
+ * Handles the complete catalog of visual states, complex transformations, and animations:
+ * 
+ * 1. Normal State:
+ *    - Smooth floating y bobbing based on sine of time `t`.
+ *    - Foot walking animations corresponding to movement ticks.
+ *    - Flips horizontally when facing left (using negative x scale).
+ *    - Renders tail, shell base, spot details, chubby arms, tan belly, letter 'T', head, blush, and smiling mouth.
+ * 2. Golden Broccoli Mode:
+ *    - Shifts colors to bright golden hues (yellow skin, orange shell, yellow-cream belly).
+ *    - Flickers alpha when the power-up duration is running out (under 3000ms).
+ * 3. Planting (Siembra / Stomp impact) Animation:
+ *    - Phase 1 (impulse): Squats body/head, compresses legs down.
+ *    - Phase 2 (jump/impact): Leaps up, then crashes down, creating a heavy horizontal body squash (stomp).
+ *    - Phase 3 (settle): Head shakes side-to-side dynamically.
+ * 4. Breaking (Breaking tiles / Soil break) Animation:
+ *    - Phase 1 (limb retraction): Hides legs, head, and tail inside shell.
+ *    - Phase 2 (spin/strike): Launches shell forward. Spinning shell rotates, stretches/squashes, and draws visual wind lines.
+ *    - Phase 3 (rebound): Returns backward.
+ *    - Phase 4 (settle): Restores limbs and settles.
+ * 5. Death Sequence (Surprise / Hide / Roll falling):
+ *    - Phase 1 (shock): Large shocked glinting eyes, jumps upward in fear.
+ *    - Phase 2 (retraction/shake): Limbs tuck into shell, shell shakes frantically.
+ *    - Phase 3 (fall/roll): Shell spins 720 degrees, slides down, and fades to translucent ghost alpha.
+ * 
+ * @param ctx 2D Canvas rendering context.
+ * @param px Center X coordinate.
+ * @param py Center Y coordinate.
+ * @param dir Direction heading vector.
+ * @param frame Current animation frame index.
+ * @param t Time clock used for animations.
+ * @param goldenBroccoliTimer Cooldown timer for the active golden broccoli.
+ * @param playerIsMoving True if the player is currently walking.
+ * @param plantingAnimTimer Current countdown tracking planting action.
+ * @param breakingAnimTimer Current countdown tracking breaking action.
+ * @param deathAnimTimer Current countdown tracking death action sequence.
+ */
 export const drawGardenTurtle = (
   ctx: CanvasRenderingContext2D,
   px: number,
