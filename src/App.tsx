@@ -62,7 +62,7 @@ export default function App() {
     if (gameState === 'level_complete' || gameState === 'win') {
       const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
       const nextLevel = currentLevelIndex + 2; // currentLevelIndex is 0-based
-      if (nextLevel > maxUnlocked && nextLevel <= 6) {
+      if (nextLevel > maxUnlocked && nextLevel <= LEVELS.length) {
         localStorage.setItem('tortiland_max_level', String(nextLevel));
       }
 
@@ -331,7 +331,7 @@ export default function App() {
                     <button
                       onClick={() => {
                         const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
-                        setSelectedLevelIndex(Math.min(5, maxUnlocked - 1));
+                        setSelectedLevelIndex(Math.min(LEVELS.length - 1, maxUnlocked - 1));
                         setPreviousScreen('menu');
                         setGameState('level_select');
                       }}
@@ -373,7 +373,7 @@ export default function App() {
                       <div className="grid grid-cols-8 gap-2.5 p-1">
                         {Array.from({ length: 40 }).map((_, idx) => {
                           const levelNum = idx + 1;
-                          const isComingSoon = levelNum >= 7;
+                          const isComingSoon = levelNum > LEVELS.length;
                           const maxUnlocked = parseInt(localStorage.getItem('tortiland_max_level') || '1', 10);
                           const isUnlocked = !isComingSoon && levelNum <= maxUnlocked;
                           const isSelected = selectedLevelIndex === idx;
@@ -430,7 +430,7 @@ export default function App() {
                       <div className="flex-1 text-left w-full">
                         {(() => {
                           const levelNum = selectedLevelIndex + 1;
-                          const isComingSoon = levelNum >= 7;
+                          const isComingSoon = levelNum > LEVELS.length;
                           if (isComingSoon) {
                             return (
                               <>
@@ -468,7 +468,7 @@ export default function App() {
                       </div>
 
                       <button
-                        disabled={selectedLevelIndex >= 6}
+                        disabled={selectedLevelIndex >= LEVELS.length}
                         onClick={() => {
                           const isGameInProgress = previousScreen === 'pause';
                           if (isGameInProgress) {
@@ -480,7 +480,7 @@ export default function App() {
                         }}
                         className={`
                           shrink-0 font-press-start text-xs tracking-wider px-8 py-4 rounded-xl transition-all duration-150 transform font-bold w-full sm:w-auto text-center
-                          ${selectedLevelIndex >= 6
+                          ${selectedLevelIndex >= LEVELS.length
                             ? 'bg-[#2d1a10] border-2 border-[#5c3a21] text-stone-600 opacity-50 cursor-not-allowed'
                             : 'bg-[#854d0e] hover:bg-[#a16207] active:bg-[#4a2e19] border-2 border-[#eab308] text-[#fef9c3] cursor-pointer hover:scale-[1.02] active:scale-95 shadow-md shadow-amber-950/40'
                           }

@@ -16,9 +16,11 @@ export type TileType = 0 | 1 | 2 | 3;
  * Defines enemy behavioral configurations:
  * - 'fox_patrol': Patrols the maze, shifting directions periodically.
  * - 'fox_chaser': Highly aggressive, recalculates paths to directly hunt down the player.
- * - 'fox_ghost': Can phase/pass through bush blocks.
+ * - 'fox_zombie': Summoner zombie fox, periodically howls to spawn fast minions.
+ * - 'fox_zombie_spawn': Faster minion spawned by zombie fox, dies when colliding with a bush.
+ * - 'snake': Burrowing/emerging snake chaser.
  */
-export type EnemyType = 'fox_patrol' | 'fox_chaser' | 'fox_ghost' | 'snake_patrol' | 'snake_chaser' | 'gorilla';
+export type EnemyType = 'fox_patrol' | 'fox_chaser' | 'fox_zombie' | 'fox_zombie_spawn' | 'snake' | 'gorilla' | 'eagle' | 'scorpion';
 
 /**
  * A standard 2D vector for position coordinates or directions.
@@ -47,7 +49,7 @@ export interface Player {
   targetCol: number;       // Grid column index of the tile the player is moving towards.
   targetRow: number;       // Grid row index of the tile the player is moving towards.
   moving: boolean;         // True if the player is currently traversing between tiles.
-  dir: Position;           // Current facing direction vector.
+  dir: Position;           // Facing direction vector.
   speed: number;           // Movement speed (pixels per second).
   animFrame: number;       // Current frame index for walking animation.
   animTimer: number;       // Accumulator for frame timing (milliseconds).
@@ -66,7 +68,7 @@ export interface Player {
  */
 export interface Enemy {
   id: string;              // Unique identifier of the enemy instance.
-  type: EnemyType;         // Subtype ('fox_patrol', 'fox_chaser', 'fox_ghost') defining AI logic.
+  type: EnemyType;         // Subtype ('fox_patrol', 'fox_chaser', 'fox_zombie') defining AI logic.
   col: number;             // Grid column index.
   row: number;             // Grid row index.
   x: number;               // Rendering X coordinate on screen.
@@ -83,6 +85,23 @@ export interface Enemy {
   jumpProgress?: number;   // 0 to 1 representing visual jump arc
   gorillaJumpTimer?: number; // Duration countdown of jump (ms)
   gorillaJumpCooldown?: number; // Cooldown between unexpected jumps (ms)
+  isDiving?: boolean;
+  diveTargetCol?: number;
+  diveTargetRow?: number;
+  isStunned?: boolean;
+  stunTimer?: number;
+  sandstormTimer?: number;
+  sandstormCooldown?: number;
+  sandstormCol?: number;
+  sandstormRow?: number;
+  isBurrowed?: boolean;
+  burrowTimer?: number;
+  telegraphTimer?: number;
+  telegraphCol?: number;
+  telegraphRow?: number;
+  isHowling?: boolean;
+  howlTimer?: number;
+  howlCooldown?: number;
 }
 
 /**

@@ -7,24 +7,12 @@ import { Position, EnemyType } from '../types';
 import { TILE } from '../constants';
 import { drawSnake } from './drawSnakes';
 import { drawGorilla } from './drawGorillas';
+import { drawEagle } from './drawEagle';
+import { drawScorpion } from './drawScorpion';
 
 /**
  * Vector rendering function that draws the enemy character (Fox/Lobo) onto the Canvas context.
- * Computes sizes, colors, and specific visual attachments (like metal neck plates and glowing gems)
- * depending on the enemy type.
- * 
- * Animation details:
- * - Floating/bobbing height using a sine function of running timestamp `t`.
- * - Tail swinging angle using a cosine function of running timestamp `t`.
- * - Rotates the tail base relative to the direction vector `dir`.
- * 
- * @param ctx 2D Canvas rendering context.
- * @param px Center X coordinate.
- * @param py Center Y coordinate.
- * @param dir Direction heading vector of the enemy.
- * @param frame Current animation frame index.
- * @param type Enemy variant: 'fox_patrol' (orange lobo), 'fox_chaser' (large gray armored rodent), or 'fox_ghost' (ghostly translucent blue spectral lobo).
- * @param t Time clock used for animations.
+ * Delegates to other files for non-fox enemy types.
  */
 export const drawFoxEnemy = (
   ctx: CanvasRenderingContext2D,
@@ -34,10 +22,21 @@ export const drawFoxEnemy = (
   frame: number,
   type: EnemyType,
   t: number,
-  extra?: { isJumping?: boolean; jumpProgress?: number }
+  extra?: { 
+    isJumping?: boolean; 
+    jumpProgress?: number;
+    isDiving?: boolean;
+    isStunned?: boolean;
+    stunTimer?: number;
+    isBurrowed?: boolean;
+    telegraphTimer?: number;
+    isHowling?: boolean;
+    howlTimer?: number;
+    isOverBush?: boolean;
+  }
 ) => {
-  if (type === 'snake_patrol' || type === 'snake_chaser') {
-    drawSnake(ctx, px, py, dir, frame, type, t);
+  if (type === 'snake') {
+    drawSnake(ctx, px, py, dir, frame, t, 0, true, 0, 0, 0, type, extra);
     return;
   }
 
@@ -46,255 +45,1012 @@ export const drawFoxEnemy = (
     return;
   }
 
-  ctx.save();
-  
-  // Dynamic scale based on enemy type to differentiate mechanics and threat levels:
-  let s = TILE * 0.42;
-  if (type === 'fox_patrol') {
-    s = TILE * 0.48; // Red patrol lobos stay medium but clearly visible (up from 0.42)
-  } else if (type === 'fox_chaser') {
-    s = TILE * 0.58; // Gray armored chaser rodent is huge, imposing, and terrifying!
-  } else if (type === 'fox_ghost') {
-    s = TILE * 0.52; // Ghost spectral lobo is intermediate size
+  if (type === 'eagle') {
+    drawEagle(ctx, px, py, dir, frame, t, 0, true, 0, 0, 0, extra);
+    return;
   }
-  
-  const abc = Math.sin(t * 0.009 + frame) * 1.5;
-  const cy = py + abc;
 
-  // Base floor shadow (placed firmly on ground, not affected by bobbing/jumping)
+  if (type === 'scorpion') {
+    drawScorpion(ctx, px, py, dir, frame, t, 0, true, 0, 0, 0);
+    return;
+  }
+
+  // Draw Fox (fox_patrol, fox_chaser, fox_zombie, fox_zombie_spawn) using high-fidelity vector drawFox
+  drawFox(ctx, px, py, dir, frame, t, 0, true, 0, 0, 0, type, extra);
+};
+
+/**
+ * High-fidelity vector renderer for Todd the Fox.
+ * Implements 4-directional facing, stylized proportions (large ears, puffy tail),
+ * interactive gameplay expressions, impact squash-stretch, and a green explorer bandana.
+ */
+export const drawFox = (
+  ctx: CanvasRenderingContext2D,
+  px: number,
+  py: number,
+  dir: Position,
+  frame: number,
+  t: number,
+  goldenBroccoliTimer: number,
+  playerIsMoving: boolean,
+  plantingAnimTimer: number = 0,
+  breakingAnimTimer: number = 0,
+  deathAnimTimer: number = 0,
+  type?: EnemyType,
+  extra?: { isHowling?: boolean; howlTimer?: number }
+) => {
+  const isGolden = goldenBroccoliTimer > 0;
+  ctx.save();
+
+  let animScale = 1.0;
+  let bodyOffsetY = 0;
+  let headOffsetX = 0;
+  let headOffsetY = 0;
+  let tailRotation = 0;
+
+  if (extra?.isHowling) {
+    headOffsetY = -TILE * 0.15;
+    headOffsetX = -TILE * 0.08;
+    tailRotation = Math.sin(t * 0.05) * 0.2;
+  }
+
+  // Active state flags
+  let isShocked = false;
+  let isTuckedDeath = false;
+  let tuckProgress = 0;
+  let deathFallY = 0;
+  let deathJumpY = 0;
+  let deathOpacity = 1.0;
+  let shellRotation = 0;
+  let limbsScale = 1.0;
+
+  const bob = Math.sin(t * 0.008 + frame) * 1.8;
+  let cy = py + bob;
+
+  // 1. Death Animation
+  if (deathAnimTimer > 0) {
+    if (deathAnimTimer >= 2450) {
+      isShocked = true;
+      const tNorm = (3000 - deathAnimTimer) / 550;
+      deathJumpY = -TILE * 0.9 * Math.sin(tNorm * Math.PI);
+    } else if (deathAnimTimer >= 1850) {
+      isShocked = true;
+      tuckProgress = (2450 - deathAnimTimer) / 600;
+      isTuckedDeath = tuckProgress >= 0.5;
+      const shakeAngle = Math.sin(t * 0.28) * 0.10;
+      ctx.translate(px, cy);
+      ctx.rotate(shakeAngle);
+      ctx.translate(-px, -cy);
+    } else {
+      isTuckedDeath = true;
+      tuckProgress = 1.0;
+      const progress = (1850 - deathAnimTimer) / 1850;
+      deathFallY = progress * TILE * 0.7;
+      shellRotation = progress * Math.PI * 4;
+      deathOpacity = Math.max(0, 1.0 - progress);
+    }
+  }
+
+  cy += deathJumpY + deathFallY;
+  ctx.globalAlpha = ctx.globalAlpha * deathOpacity;
+
+  const isFlickering = goldenBroccoliTimer <= 3000 && isGolden;
+  const flickerOn = isFlickering ? Math.floor(goldenBroccoliTimer / 133) % 2 === 0 : true;
+  if (isGolden && !flickerOn) {
+    ctx.globalAlpha = ctx.globalAlpha * 0.3;
+  }
+
+  // 2. Breaking Tiles / Spinning Dash
+  if (breakingAnimTimer > 0) {
+    if (breakingAnimTimer >= 517) {
+      limbsScale = 0;
+      animScale = 0.9;
+    } else if (breakingAnimTimer >= 276) {
+      limbsScale = 1.0;
+      isShocked = true;
+      let vueloOffset = (517 - breakingAnimTimer >= 102) ? TILE : ((517 - breakingAnimTimer) / 102) * TILE;
+      const localOffsetX = Math.abs(dir.x) * vueloOffset;
+      const localOffsetY = dir.y * vueloOffset;
+      ctx.translate(localOffsetX, localOffsetY);
+      shellRotation = (517 - breakingAnimTimer) * 0.05; // Spin!
+      animScale = 1.1;
+    } else {
+      const progress = breakingAnimTimer / 276;
+      animScale = 0.85 + (1 - progress) * 0.15;
+    }
+  }
+
+  // 3. Planting / Stomp Impact
+  if (plantingAnimTimer > 0) {
+    if (plantingAnimTimer >= 517) {
+      bodyOffsetY = TILE * 0.08;
+      headOffsetY = TILE * 0.05;
+      animScale = 0.95;
+    } else if (plantingAnimTimer >= 172) {
+      if (plantingAnimTimer >= 344) {
+        bodyOffsetY = -TILE * 0.22;
+        headOffsetY = -TILE * 0.08;
+      } else {
+        bodyOffsetY = TILE * 0.15;
+        headOffsetY = TILE * 0.04;
+        if (plantingAnimTimer <= 336 && plantingAnimTimer > 318) {
+          animScale = 0.82;
+        }
+      }
+    } else {
+      const progress = plantingAnimTimer / 172;
+      headOffsetX = Math.sin(t * 0.3) * 3 * progress;
+    }
+  }
+
+  // Adjust scale naturally per subtype
+  let sizeBase = TILE * 0.58;
+  if (type === 'fox_patrol') {
+    sizeBase = TILE * 0.48;
+  } else if (type === 'fox_chaser') {
+    sizeBase = TILE * 0.58;
+  } else if (type === 'fox_zombie') {
+    sizeBase = TILE * 0.60;
+  } else if (type === 'fox_zombie_spawn') {
+    sizeBase = TILE * 0.38;
+  }
+
+  const s = sizeBase * animScale;
+  const finalPx = px;
+  const finalCy = cy;
+
+  // Ground Shadow
   ctx.fillStyle = 'rgba(0, 0, 0, 0.42)';
   ctx.beginPath();
-  ctx.ellipse(px, py + s * 0.52, s * 0.76, s * 0.22, 0, 0, Math.PI * 2);
+  ctx.ellipse(finalPx, py + s * 0.56, s * 0.62, s * 0.16, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Adjust palettes naturally per lobo subtype
-  let pCol = '#f97316'; // Red Lobo
-  let iCol = '#ffffff'; // White fluff chest
-  let dCol = '#1e293b'; // Charcoal tail details
-  let sCol = '#7c2d12'; // Borders
-  let eCol = '#3bf9a0'; // Eyes
-  const tailSwing = Math.cos(t * 0.012 + frame) * 0.26;
+  // Color Palette (3-Tone System)
+  let baseOrange = isGolden ? '#ffd43b' : '#ff781f'; // Fox bright orange / Yellow-gold
+  let lightCream = isGolden ? '#fef08a' : '#fcfbf7'; // White fur / Light cream yellow
+  let earPink = isGolden ? '#eab308' : '#f43f5e'; // Inside ear pink / Yellow-orange
+  let darkDetail = isGolden ? '#78350f' : '#3c1800'; // Dark tips & outline
+  const bandanaGreen = '#10b981'; // Cozy emerald green bandana
 
   if (type === 'fox_chaser') {
-    pCol = '#64748b'; // Gray/Steel armored lobo
-    iCol = '#f1f5f9';
-    dCol = '#0f172a';
-    sCol = '#334155';
-    eCol = '#f43f5e'; // Red focused eyes
-  } else if (type === 'fox_ghost') {
-    pCol = '#bfdbfe'; // Whimsical ghost-blue spectral lobo
-    iCol = '#f0fdf4';
-    dCol = '#3b82f6';
-    sCol = '#1d4ed8';
-    eCol = '#facc15'; // Glowing light eyes
+    baseOrange = '#64748b'; // Gray/Steel armored lobo
+    lightCream = '#f1f5f9';
+    earPink = '#334155';
+    darkDetail = '#0f172a';
+  } else if (type === 'fox_zombie' || type === 'fox_zombie_spawn') {
+    baseOrange = '#4a5d4e'; // Zombie decay green/gray
+    lightCream = '#a9bfa8'; // Pale moldy green
+    earPink = '#ef4444'; // Crimson zombie ears
+    darkDetail = '#1b261c'; // Rotten dark highlights
   }
 
-  // 1. Cozy fluffy Tail swiping at back
-  ctx.save();
-  ctx.translate(px, cy);
-  const tailAngleOffset = Math.atan2(-dir.y, -dir.x);
-  ctx.rotate(tailAngleOffset + tailSwing);
+  const facing: 'right' | 'left' | 'up' | 'down' =
+    dir.x > 0 ? 'right' :
+      dir.x < 0 ? 'left' :
+        dir.y < 0 ? 'up' : 'down';
 
-  ctx.fillStyle = pCol;
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(0, 0);
-  ctx.bezierCurveTo(-s * 0.5, -s * 0.4, -s * 1.1, -s * 0.35, -s * 1.1, 0);
-  ctx.bezierCurveTo(-s * 1.1, s * 0.35, -s * 0.5, s * 0.4, 0, 0);
-  ctx.fill();
-  ctx.stroke();
+  // Mirror horizontal for left
+  if (facing === 'left') {
+    ctx.translate(finalPx, finalCy);
+    ctx.scale(-1, 1);
+    ctx.translate(-finalPx, -finalCy);
+  }
 
-  // White bushy tail cap tip
-  ctx.fillStyle = iCol;
-  ctx.beginPath();
-  ctx.moveTo(-s * 1.1, 0);
-  ctx.bezierCurveTo(-s * 0.95, -s * 0.16, -s * 0.78, -s * 0.14, -s * 0.78, 0);
-  ctx.bezierCurveTo(-s * 0.78, s * 0.14, -s * 0.95, s * 0.16, -s * 1.1, 0);
-  ctx.fill();
+  const walkCycle = playerIsMoving ? Math.sin(t * 0.015) * 0.20 : 0;
 
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 0.9;
-  ctx.beginPath();
-  ctx.moveTo(-s * 0.78, -s * 0.1);
-  ctx.quadraticCurveTo(-s * 0.92, 0, -s * 0.78, s * 0.1);
-  ctx.stroke();
+  // Legs helper
+  const drawFoxLeg = (lx: number, walkOff: number) => {
+    if (isTuckedDeath || limbsScale === 0) return;
+    ctx.save();
+    ctx.translate(lx, finalCy + s * 0.45 + bodyOffsetY + walkOff * s * 0.2);
+    ctx.fillStyle = baseOrange;
+    ctx.strokeStyle = darkDetail;
+    ctx.lineWidth = 1.8;
 
-  ctx.restore();
-
-  // 2. Cute tiny feet paws
-  ctx.fillStyle = dCol;
-  ctx.beginPath();
-  ctx.arc(px - s * 0.3, cy + s * 0.58, s * 0.14, 0, Math.PI * 2);
-  ctx.arc(px + s * 0.3, cy + s * 0.58, s * 0.14, 0, Math.PI * 2);
-  ctx.fill();
-
-  // 3. Lobo fluffy circular torso body
-  ctx.fillStyle = pCol;
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.arc(px, cy + s * 0.08, s * 0.58, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-
-  // White chest fluff
-  ctx.fillStyle = iCol;
-  ctx.beginPath();
-  ctx.ellipse(px, cy + s * 0.14, s * 0.36, s * 0.26, 0, 0, Math.PI * 2);
-  ctx.fill();
-
-  // If Chaser type, draw metal neck/pectoral chestplate
-  if (type === 'fox_chaser') {
-    ctx.fillStyle = '#94a3b8';
-    ctx.strokeStyle = '#475569';
-    ctx.lineWidth = 1.2;
+    // Drawn as a cute dark tipped paw
     ctx.beginPath();
-    ctx.moveTo(px - s * 0.22, cy);
-    ctx.lineTo(px + s * 0.22, cy);
-    ctx.lineTo(px + s * 0.16, cy + s * 0.34);
-    ctx.lineTo(px, cy + s * 0.44);
-    ctx.lineTo(px - s * 0.16, cy + s * 0.34);
-    ctx.closePath();
+    if (ctx.roundRect) {
+      ctx.roundRect(-s * 0.08, 0, s * 0.16, s * 0.18, s * 0.05);
+    } else {
+      ctx.rect(-s * 0.08, 0, s * 0.16, s * 0.18);
+    }
     ctx.fill();
     ctx.stroke();
 
-    // Glowing power gem central slot
-    ctx.fillStyle = '#ef4444';
+    // Dark paw tip
+    ctx.fillStyle = darkDetail;
     ctx.beginPath();
-    ctx.arc(px, cy + s * 0.22, 2, 0, Math.PI * 2);
+    if (ctx.roundRect) {
+      ctx.roundRect(-s * 0.08, s * 0.1, s * 0.16, s * 0.08, s * 0.03);
+    } else {
+      ctx.rect(-s * 0.08, s * 0.1, s * 0.16, s * 0.08);
+    }
     ctx.fill();
-  }
+    ctx.restore();
+  };
 
-  // 4. Lobo triangular face
-  const fdX = px + dir.x * 2.5;
-  const fdY = cy - s * 0.32;
+  // 4. RENDERING ACCORDING TO FACING DIRECTION
 
-  // Tall Pointy Left Ear
-  ctx.fillStyle = pCol;
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(fdX - s * 0.42, fdY - s * 0.15);
-  ctx.lineTo(fdX - s * 0.52, fdY - s * 0.9);
-  ctx.lineTo(fdX - s * 0.08, fdY - s * 0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+  // A. FACING UP (DE ESPALDAS)
+  if (facing === 'up') {
+    // 1. Large Puffy Fox Tail (elongated dragging brush tail)
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx - s * 0.05, finalCy + s * 0.15 + bodyOffsetY);
+      ctx.rotate(Math.sin(t * 0.01) * 0.15 + tailRotation);
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
 
-  ctx.fillStyle = '#fecdd3'; // pink inner ear
-  ctx.beginPath();
-  ctx.moveTo(fdX - s * 0.38, fdY - fdY * 0.01 - s * 0.22);
-  ctx.lineTo(fdX - s * 0.46, fdY - s * 0.78);
-  ctx.lineTo(fdX - s * 0.15, fdY - s * 0.45);
-  ctx.closePath();
-  ctx.fill();
+      // Elongated dragging brush tail shape
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-s * 0.35, s * 0.1, -s * 0.7, s * 0.25, -s * 1.0, s * 0.25);
+      ctx.bezierCurveTo(-s * 1.25, s * 0.25, -s * 1.2, 0, -s * 1.0, -s * 0.08);
+      ctx.bezierCurveTo(-s * 0.7, -s * 0.2, -s * 0.35, -s * 0.1, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-  // Tall Pointy Right Ear
-  ctx.fillStyle = pCol;
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(fdX + s * 0.42, fdY - s * 0.15);
-  ctx.lineTo(fdX + s * 0.52, fdY - s * 0.9);
-  ctx.lineTo(fdX + s * 0.08, fdY - s * 0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
+      // White tip
+      ctx.fillStyle = lightCream;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.75, s * 0.12);
+      ctx.bezierCurveTo(-s * 0.9, s * 0.2, -s * 1.0, s * 0.25, -s * 1.0, s * 0.25);
+      ctx.bezierCurveTo(-s * 1.25, s * 0.25, -s * 1.2, 0, -s * 1.0, -s * 0.08);
+      ctx.bezierCurveTo(-s * 0.85, -s * 0.15, -s * 0.7, -s * 0.05, -s * 0.75, s * 0.12);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
-  ctx.fillStyle = '#fecdd3';
-  ctx.beginPath();
-  ctx.moveTo(fdX + s * 0.38, fdY - fdY * 0.01 - s * 0.22);
-  ctx.lineTo(fdX + s * 0.46, fdY - s * 0.78);
-  ctx.lineTo(fdX + s * 0.15, fdY - s * 0.45);
-  ctx.closePath();
-  ctx.fill();
+    // Legs
+    drawFoxLeg(finalPx - s * 0.15, walkCycle);
+    drawFoxLeg(finalPx + s * 0.15, -walkCycle);
 
-  // Lobo Triangular snout face base
-  ctx.fillStyle = pCol;
-  ctx.strokeStyle = sCol;
-  ctx.lineWidth = 1.8;
-  ctx.beginPath();
-  ctx.moveTo(fdX - s * 0.56, fdY);
-  ctx.quadraticCurveTo(fdX - s * 0.58, fdY + s * 0.36, fdX, fdY + s * 0.5);
-  ctx.quadraticCurveTo(fdX + s * 0.56, fdY + s * 0.36, fdX + s * 0.56, fdY);
-  ctx.quadraticCurveTo(fdX, fdY - s * 0.32, fdX - s * 0.56, fdY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Left cheek fluff white
-  ctx.fillStyle = iCol;
-  ctx.beginPath();
-  ctx.moveTo(fdX - s * 0.48, fdY + s * 0.08);
-  ctx.quadraticCurveTo(fdX - s * 0.42, fdY + s * 0.4, fdX, fdY + s * 0.48);
-  ctx.quadraticCurveTo(fdX - s * 0.1, fdY + s * 0.26, fdX - s * 0.48, fdY + s * 0.08);
-  ctx.fill();
-
-  // Right cheek fluff white
-  ctx.beginPath();
-  ctx.moveTo(fdX + s * 0.48, fdY + s * 0.08);
-  ctx.quadraticCurveTo(fdX + s * 0.42, fdY + s * 0.4, fdX, fdY + s * 0.48);
-  ctx.quadraticCurveTo(fdX + s * 0.1, fdY + s * 0.26, fdX + s * 0.48, fdY + s * 0.08);
-  ctx.fill();
-
-  // If Chaser type, draw dark iron headband armor
-  if (type === 'fox_chaser') {
-    ctx.fillStyle = '#475569';
-    ctx.strokeStyle = sCol;
-    ctx.lineWidth = 1;
+    // 2. Torso
+    ctx.save();
+    ctx.translate(finalPx, finalCy + s * 0.08 + bodyOffsetY);
+    ctx.rotate(shellRotation);
+    ctx.fillStyle = baseOrange;
+    ctx.strokeStyle = darkDetail;
+    ctx.lineWidth = 2.2;
     ctx.beginPath();
-    ctx.arc(fdX, fdY, s * 0.38, Math.PI, 0, false);
-    ctx.closePath();
+    ctx.ellipse(0, 0, s * 0.4, s * 0.46, 0, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
 
-    // Little forehead central spike
-    ctx.fillStyle = '#cbd5e1';
-    ctx.beginPath();
-    ctx.moveTo(fdX - 2.5, fdY - s * 0.38);
-    ctx.lineTo(fdX, fdY - s * 0.65);
-    ctx.lineTo(fdX + 2.5, fdY - s * 0.38);
-    ctx.closePath();
-    ctx.fill();
+    // Add Chaser chestplate:
+    if (type === 'fox_chaser') {
+      ctx.fillStyle = '#94a3b8';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.22, 0);
+      ctx.lineTo(s * 0.22, 0);
+      ctx.lineTo(s * 0.16, s * 0.34);
+      ctx.lineTo(0, s * 0.44);
+      ctx.lineTo(-s * 0.16, s * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing power gem central slot
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Explorer Bandana Knot
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx, finalCy - s * 0.12 + bodyOffsetY);
+      ctx.fillStyle = bandanaGreen;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+
+      // Bandana wrap line
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.2, s * 0.04, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Waving tails
+      ctx.rotate(Math.sin(t * 0.02) * 0.25 - 0.2);
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(-s * 0.18, s * 0.16);
+      ctx.lineTo(-s * 0.06, s * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Head (plain back of head dome)
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx + headOffsetX, finalCy - s * 0.35 + headOffsetY);
+
+      // Ears (Rear ear and front ear)
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.translate(side * s * 0.16, -s * 0.2);
+        ctx.rotate(side * 0.12);
+        ctx.fillStyle = baseOrange;
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.12, 0);
+        ctx.quadraticCurveTo(-s * 0.15, -s * 0.38, 0, -s * 0.42);
+        ctx.quadraticCurveTo(s * 0.15, -s * 0.38, s * 0.12, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+      }
+
+      // Main head dome
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Add Chaser headband armor:
+      if (type === 'fox_chaser') {
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Little forehead central spike
+        ctx.fillStyle = '#cbd5e1';
+        ctx.beginPath();
+        ctx.moveTo(-2.5, -s * 0.38);
+        ctx.lineTo(0, -s * 0.65);
+        ctx.lineTo(2.5, -s * 0.38);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
   }
 
-  // Gentle almond lobo eyes
-  const eyeOffX = dir.x * 2.2;
-  const eyeY = fdY + s * 0.05 + dir.y * 1;
+  // B. FACING DOWN (HACIA CÁMARA)
+  else if (facing === 'down') {
+    // 1. Tail (partially showing at the left side)
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx - s * 0.18, finalCy + s * 0.18 + bodyOffsetY);
+      ctx.rotate(-Math.PI * 0.12 + Math.sin(t * 0.01) * 0.1 + tailRotation);
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
 
-  ctx.fillStyle = '#ffffff';
-  ctx.beginPath();
-  ctx.ellipse(fdX - s * 0.18 + eyeOffX, eyeY, s * 0.11, s * 0.07, Math.PI / 12, 0, Math.PI * 2);
-  ctx.ellipse(fdX + s * 0.18 + eyeOffX, eyeY, s * 0.11, s * 0.07, -Math.PI / 12, 0, Math.PI * 2);
-  ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-s * 0.3, s * 0.15, -s * 0.6, s * 0.3, -s * 0.85, s * 0.28);
+      ctx.bezierCurveTo(-s * 1.05, s * 0.25, -s * 1.0, 0.05, -s * 0.82, -s * 0.04);
+      ctx.bezierCurveTo(-s * 0.55, -s * 0.15, -s * 0.25, -s * 0.08, 0, 0);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
 
-  // Sharp bright iris
-  ctx.fillStyle = eCol;
-  ctx.beginPath();
-  ctx.arc(fdX - s * 0.16 + eyeOffX + dir.x * 0.6, eyeY + dir.y * 0.6, s * 0.055, 0, Math.PI * 2);
-  ctx.arc(fdX + s * 0.16 + eyeOffX + dir.x * 0.6, eyeY + dir.y * 0.6, s * 0.055, 0, Math.PI * 2);
-  ctx.fill();
+      // White tip
+      ctx.fillStyle = lightCream;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.65, s * 0.18);
+      ctx.bezierCurveTo(-s * 0.78, s * 0.25, -s * 0.85, s * 0.28, -s * 0.85, s * 0.28);
+      ctx.bezierCurveTo(-s * 1.05, s * 0.25, -s * 1.0, 0.05, -s * 0.82, -s * 0.04);
+      ctx.bezierCurveTo(-s * 0.72, -s * 0.08, -s * 0.6, -s * 0.02, -s * 0.55, s * 0.08);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
 
-  // Pupil
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(fdX - s * 0.16 + eyeOffX + dir.x * 1, eyeY + dir.y * 0.6, 1.2, 0, Math.PI * 2);
-  ctx.arc(fdX + s * 0.16 + eyeOffX + dir.x * 1, eyeY + dir.y * 0.6, 1.2, 0, Math.PI * 2);
-  ctx.fill();
+    // Legs
+    drawFoxLeg(finalPx - s * 0.15, walkCycle);
+    drawFoxLeg(finalPx + s * 0.15, -walkCycle);
 
-  // Nose tip of lobo snout
-  ctx.fillStyle = '#0f172a';
-  ctx.beginPath();
-  ctx.arc(fdX, fdY + s * 0.46, 3, 0, Math.PI * 2);
-  ctx.fill();
+    // 2. Torso with white belly patch
+    ctx.save();
+    ctx.translate(finalPx, finalCy + s * 0.08 + bodyOffsetY);
+    ctx.rotate(shellRotation);
+    ctx.fillStyle = baseOrange;
+    ctx.strokeStyle = darkDetail;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s * 0.42, s * 0.46, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
 
-  // Shy cheeks
-  ctx.fillStyle = 'rgba(239, 68, 68, 0.4)';
-  ctx.beginPath();
-  ctx.arc(fdX - s * 0.34, fdY + s * 0.26, 2, 0, Math.PI * 2);
-  ctx.arc(fdX + s * 0.34, fdY + s * 0.26, 2, 0, Math.PI * 2);
-  ctx.fill();
+    // Belly patch cream
+    ctx.fillStyle = lightCream;
+    ctx.beginPath();
+    ctx.ellipse(0, s * 0.08, s * 0.25, s * 0.28, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Add Chaser chestplate:
+    if (type === 'fox_chaser') {
+      ctx.fillStyle = '#94a3b8';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.22, 0);
+      ctx.lineTo(s * 0.22, 0);
+      ctx.lineTo(s * 0.16, s * 0.34);
+      ctx.lineTo(0, s * 0.44);
+      ctx.lineTo(-s * 0.16, s * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing power gem central slot
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Bandana scarf around neck
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx, finalCy - s * 0.14 + bodyOffsetY);
+      ctx.fillStyle = bandanaGreen;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+
+      // Wrap
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.22, s * 0.06, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Tails
+      ctx.rotate(Math.sin(t * 0.015) * 0.2 - 0.1);
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.05, s * 0.03);
+      ctx.lineTo(-s * 0.22, s * 0.2);
+      ctx.lineTo(-s * 0.12, s * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Head (Symmetrical face, big eyes)
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx + headOffsetX, finalCy - s * 0.35 + headOffsetY);
+
+      // Ears (Rear ear and front ear)
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.translate(side * s * 0.18, -s * 0.2);
+        ctx.rotate(side * 0.12);
+        ctx.fillStyle = baseOrange;
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.12, 0);
+        ctx.quadraticCurveTo(-s * 0.15, -s * 0.38, 0, -s * 0.42);
+        ctx.quadraticCurveTo(s * 0.15, -s * 0.38, s * 0.12, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Inner pink
+        ctx.fillStyle = earPink;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.06, -s * 0.04);
+        ctx.quadraticCurveTo(-s * 0.08, -s * 0.26, 0, -s * 0.3);
+        ctx.quadraticCurveTo(s * 0.06, -s * 0.26, s * 0.06, -s * 0.04);
+        ctx.closePath();
+        ctx.fill();
+        ctx.restore();
+      }
+
+      // Cheek fluff points (Left & Right cheeks)
+      ctx.fillStyle = lightCream;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.3, s * 0.1);
+      ctx.quadraticCurveTo(-s * 0.52, s * 0.15, -s * 0.44, s * 0.26);
+      ctx.quadraticCurveTo(-s * 0.26, s * 0.22, -s * 0.16, s * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(s * 0.3, s * 0.1);
+      ctx.quadraticCurveTo(s * 0.52, s * 0.15, s * 0.44, s * 0.26);
+      ctx.quadraticCurveTo(s * 0.26, s * 0.22, s * 0.16, s * 0.26);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Main head dome
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Add Chaser headband armor:
+      if (type === 'fox_chaser') {
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Little forehead central spike
+        ctx.fillStyle = '#cbd5e1';
+        ctx.beginPath();
+        ctx.moveTo(-2.5, -s * 0.38);
+        ctx.lineTo(0, -s * 0.65);
+        ctx.lineTo(2.5, -s * 0.38);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // White cheek accents around snout
+      ctx.fillStyle = lightCream;
+      ctx.beginPath();
+      ctx.ellipse(-s * 0.14, s * 0.16, s * 0.16, s * 0.14, -0.05, 0, Math.PI * 2);
+      ctx.ellipse(s * 0.14, s * 0.16, s * 0.16, s * 0.14, 0.05, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Eyes
+      const drawEye = (ex: number, ey: number) => {
+        const isZombie = type === 'fox_zombie' || type === 'fox_zombie_spawn';
+        if (plantingAnimTimer > 0) {
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.06, 0, Math.PI, true);
+          ctx.stroke();
+        } else if (isShocked) {
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = lightCream;
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.02, ey - s * 0.02, s * 0.04, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (isZombie) {
+          // Glowing red zombie eyes
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.075, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fef08a'; // yellow glint
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.015, ey - s * 0.015, s * 0.02, 0, Math.PI * 2);
+          ctx.fill();
+          
+          // Angry zombie eyebrow
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.0;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ex - s * 0.12, ey - s * 0.09);
+          ctx.lineTo(ex + s * 0.1, ey - s * 0.05); // tilted angry
+          ctx.stroke();
+        } else {
+          // Determined almond eyes
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.075, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.02, ey - s * 0.02, s * 0.025, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Determined eyebrows
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.0;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ex - s * 0.12, ey - s * 0.09);
+          ctx.lineTo(ex + s * 0.1, ey - s * 0.12);
+          ctx.stroke();
+        }
+      };
+
+      drawEye(-s * 0.14, -s * 0.02);
+      drawEye(s * 0.14, -s * 0.02);
+
+      // Symmetrical snout pointing down-center
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.15, s * 0.06);
+      ctx.lineTo(s * 0.15, s * 0.06);
+      ctx.lineTo(0, s * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Nose tip
+      ctx.fillStyle = darkDetail;
+      ctx.beginPath();
+      ctx.arc(0, s * 0.28, s * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Blush
+      if (!isShocked) {
+        ctx.fillStyle = 'rgba(251, 113, 133, 0.6)';
+        ctx.beginPath();
+        ctx.arc(-s * 0.25, s * 0.12, s * 0.05, 0, Math.PI * 2);
+        ctx.arc(s * 0.25, s * 0.12, s * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
+
+  // C. PROFILE OR 3/4 (DEFAULT FACING - RIGHT / LEFT)
+  else {
+    // 1. Cozy fluffy Tail swiping at back
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx - s * 0.1, finalCy + s * 0.12 + bodyOffsetY);
+      ctx.rotate(Math.sin(t * 0.012) * 0.15 + tailRotation);
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+
+      // Elongated dragging brush tail shape
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.bezierCurveTo(-s * 0.4, s * 0.15, -s * 0.8, s * 0.35, -s * 1.1, s * 0.35); // lower boundary dragging down-left
+      ctx.bezierCurveTo(-s * 1.3, s * 0.35, -s * 1.3, s * 0.15, -s * 1.1, s * 0.05); // sharp tip
+      ctx.bezierCurveTo(-s * 0.8, -s * 0.1, -s * 0.4, -s * 0.1, 0, 0); // upper boundary
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // White tip
+      ctx.fillStyle = lightCream;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.8, s * 0.25);
+      ctx.bezierCurveTo(-s * 1.0, s * 0.32, -s * 1.1, s * 0.35, -s * 1.1, s * 0.35);
+      ctx.bezierCurveTo(-s * 1.3, s * 0.35, -s * 1.3, s * 0.15, -s * 1.1, s * 0.05);
+      ctx.bezierCurveTo(-s * 0.95, 0, -s * 0.85, -s * 0.03, -s * 0.75, -s * 0.05);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // Legs
+    drawFoxLeg(finalPx - s * 0.12, walkCycle);
+    drawFoxLeg(finalPx + s * 0.16, -walkCycle);
+
+    // 2. Torso with white belly patch at the right edge
+    ctx.save();
+    ctx.translate(finalPx, finalCy + s * 0.08 + bodyOffsetY);
+    ctx.rotate(shellRotation);
+    ctx.fillStyle = baseOrange;
+    ctx.strokeStyle = darkDetail;
+    ctx.lineWidth = 2.2;
+    ctx.beginPath();
+    ctx.ellipse(0, 0, s * 0.4, s * 0.46, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // 3/4 White chest
+    ctx.fillStyle = lightCream;
+    ctx.beginPath();
+    ctx.ellipse(s * 0.15, s * 0.05, s * 0.2, s * 0.3, Math.PI * 0.06, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+
+    // Add Chaser chestplate:
+    if (type === 'fox_chaser') {
+      ctx.fillStyle = '#94a3b8';
+      ctx.strokeStyle = '#475569';
+      ctx.lineWidth = 1.2;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.22, 0);
+      ctx.lineTo(s * 0.22, 0);
+      ctx.lineTo(s * 0.16, s * 0.34);
+      ctx.lineTo(0, s * 0.44);
+      ctx.lineTo(-s * 0.16, s * 0.34);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Glowing power gem central slot
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    ctx.restore();
+
+    // Explorer Bandana
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx + s * 0.1, finalCy - s * 0.12 + bodyOffsetY);
+      ctx.fillStyle = bandanaGreen;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+
+      // Bandana wrap
+      ctx.beginPath();
+      ctx.ellipse(0, 0, s * 0.18, s * 0.05, Math.PI * 0.1, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Bandana knots waving back
+      ctx.rotate(Math.sin(t * 0.015) * 0.2 - 0.3);
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.05, 0);
+      ctx.lineTo(-s * 0.22, s * 0.15);
+      ctx.lineTo(-s * 0.12, s * 0.22);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    // 3. Head in 3/4 right view
+    if (!isTuckedDeath) {
+      ctx.save();
+      ctx.translate(finalPx + s * 0.15 + headOffsetX, finalCy - s * 0.35 + headOffsetY);
+
+      // Ears (Rear ear and front ear in perspective)
+      for (const side of [-1, 1]) {
+        ctx.save();
+        ctx.translate(side * s * 0.12 - s * 0.06, -s * 0.2);
+        ctx.rotate(side * 0.12 - 0.06);
+        ctx.fillStyle = baseOrange;
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 2.0;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.12, 0);
+        ctx.quadraticCurveTo(-s * 0.15, -s * 0.38, 0, -s * 0.42);
+        ctx.quadraticCurveTo(s * 0.15, -s * 0.38, s * 0.12, 0);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Dark tip
+        ctx.fillStyle = darkDetail;
+        ctx.beginPath();
+        ctx.moveTo(-s * 0.06, -s * 0.25);
+        ctx.quadraticCurveTo(-s * 0.08, -s * 0.38, 0, -s * 0.42);
+        ctx.quadraticCurveTo(s * 0.08, -s * 0.38, s * 0.06, -s * 0.25);
+        ctx.closePath();
+        ctx.fill();
+
+        // Inner Pink
+        if (side === 1) { // Only front ear has visible inner pink in 3/4
+          ctx.fillStyle = earPink;
+          ctx.beginPath();
+          ctx.moveTo(-s * 0.06, -s * 0.04);
+          ctx.quadraticCurveTo(-s * 0.08, -s * 0.26, 0, -s * 0.3);
+          ctx.quadraticCurveTo(s * 0.08, -s * 0.26, s * 0.06, -s * 0.04);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.restore();
+      }
+
+      // Cheek spike pointing left/back
+      ctx.fillStyle = lightCream;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(-s * 0.2, s * 0.1);
+      ctx.quadraticCurveTo(-s * 0.45, s * 0.15, -s * 0.35, s * 0.26);
+      ctx.quadraticCurveTo(-s * 0.15, s * 0.22, -s * 0.08, s * 0.28);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Main head dome
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.2;
+      ctx.beginPath();
+      ctx.arc(0, 0, s * 0.38, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      // Add Chaser headband armor:
+      if (type === 'fox_chaser') {
+        ctx.fillStyle = '#475569';
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.0;
+        ctx.beginPath();
+        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Little forehead central spike
+        ctx.fillStyle = '#cbd5e1';
+        ctx.beginPath();
+        ctx.moveTo(-2.5, -s * 0.38);
+        ctx.lineTo(0, -s * 0.65);
+        ctx.lineTo(2.5, -s * 0.38);
+        ctx.closePath();
+        ctx.fill();
+      }
+
+      // White cheek on right face
+      ctx.fillStyle = lightCream;
+      ctx.beginPath();
+      ctx.ellipse(s * 0.16, s * 0.14, s * 0.18, s * 0.16, 0.1, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Profile eye
+      const drawProfileEye = (ex: number, ey: number) => {
+        const isZombie = type === 'fox_zombie' || type === 'fox_zombie_spawn';
+        if (plantingAnimTimer > 0) {
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.06, Math.PI, 0, false);
+          ctx.stroke();
+        } else if (isShocked) {
+          ctx.fillStyle = '#000000';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.11, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = lightCream;
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.02, ey - s * 0.02, s * 0.04, 0, Math.PI * 2);
+          ctx.fill();
+        } else if (isZombie) {
+          // Glowing red zombie eye in profile
+          ctx.fillStyle = '#ef4444';
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.08, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.fillStyle = '#fef08a'; // yellow glint
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.015, ey - s * 0.015, s * 0.02, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Angry eyebrow pointing down-right
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ex + s * 0.1, ey - s * 0.08);
+          ctx.lineTo(ex - s * 0.08, ey - s * 0.05);
+          ctx.stroke();
+        } else {
+          // Predator/Wild sly fox eye (cunning vertical slit)
+          ctx.fillStyle = baseOrange;
+          ctx.beginPath();
+          ctx.arc(ex, ey, s * 0.08, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+
+          // Vertical slit/rasgada pupil
+          ctx.fillStyle = darkDetail;
+          ctx.beginPath();
+          ctx.ellipse(ex, ey, s * 0.02, s * 0.07, 0, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Glint
+          ctx.fillStyle = '#ffffff';
+          ctx.beginPath();
+          ctx.arc(ex - s * 0.018, ey - s * 0.018, s * 0.022, 0, Math.PI * 2);
+          ctx.fill();
+
+          // Eyebrow pointing down-right (determined)
+          ctx.strokeStyle = darkDetail;
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = 'round';
+          ctx.beginPath();
+          ctx.moveTo(ex + s * 0.1, ey - s * 0.12);
+          ctx.lineTo(ex - s * 0.08, ey - s * 0.08);
+          ctx.stroke();
+        }
+      };
+
+      drawProfileEye(s * 0.08, -s * 0.02);
+
+      // Fox snout pointing right (elongated for canine/wild predator profile)
+      ctx.fillStyle = baseOrange;
+      ctx.strokeStyle = darkDetail;
+      ctx.lineWidth = 2.0;
+      ctx.beginPath();
+      ctx.moveTo(s * 0.15, s * 0.02);
+      ctx.lineTo(s * 0.58, s * 0.12); // elongated snout tip
+      ctx.lineTo(s * 0.22, s * 0.24);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Black nose tip
+      ctx.fillStyle = darkDetail;
+      ctx.beginPath();
+      ctx.arc(s * 0.58, s * 0.12, s * 0.045, 0, Math.PI * 2);
+      ctx.fill();
+
+      if (extra?.isHowling) {
+        // Howling mouth (wide open circle)
+        ctx.fillStyle = '#111827';
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.8;
+        ctx.beginPath();
+        ctx.arc(s * 0.32, s * 0.18, s * 0.08, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        // Mouth line (smirk) on the profile snout
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.8;
+        ctx.lineCap = 'round';
+        ctx.beginPath();
+        ctx.moveTo(s * 0.2, s * 0.14);
+        ctx.quadraticCurveTo(s * 0.3, s * 0.18, s * 0.38, s * 0.16);
+        ctx.stroke();
+
+        // White fang (colmillo) sticking out of the mouth
+        ctx.fillStyle = lightCream;
+        ctx.strokeStyle = darkDetail;
+        ctx.lineWidth = 1.2;
+        ctx.beginPath();
+        ctx.moveTo(s * 0.32, s * 0.16);
+        ctx.lineTo(s * 0.35, s * 0.23); // tip of tooth
+        ctx.lineTo(s * 0.37, s * 0.16);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+
+      // Blush
+      if (!isShocked) {
+        ctx.fillStyle = 'rgba(251, 113, 133, 0.6)';
+        ctx.beginPath();
+        ctx.arc(-s * 0.05, s * 0.12, s * 0.05, 0, Math.PI * 2);
+        ctx.fill();
+      }
+
+      ctx.restore();
+    }
+  }
 
   ctx.restore();
 };

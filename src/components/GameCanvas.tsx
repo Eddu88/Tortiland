@@ -17,7 +17,7 @@ import {
   ScheduledBreak
 } from '../types';
 import { SoundEffects } from './SoundEffects';
-import { W, H, TILE, LEVELS } from '../constants';
+import { W, H, TILE, LEVELS, T_BUSH } from '../constants';
 import { usePlayerInput } from '../hooks/usePlayerInput';
 import { useGameEntities } from '../hooks/useGameEntities';
 import { useGameLoop } from '../hooks/useGameLoop';
@@ -123,6 +123,10 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
   // Active enemies list tracked across each physics update cycle
   const enemiesRef = useRef<Enemy[]>([]);
+  // Permanent sandstorms list desolated by the Scorpion
+  const sandstormsRef = useRef<{ col: number; row: number }[]>([]);
+  // Visual dirt/sand splatters on screen when player enters a storm
+  const sandSpotsRef = useRef<{ x: number; y: number; radius: number; opacity: number; rot: number; speed: number }[]>([]);
   // Active vegetable collectibles on the current grid map
   const fruitsRef = useRef<Fruit[]>([]);
   // Particle effects systems currently alive and animating in the game scene
@@ -241,6 +245,8 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     currentLevelIndex,
     goldenBroccoliUsedRef,
     usedGoldenBroccoliRef,
+    sandstormsRef,
+    sandSpotsRef,
   });
 
   /**
@@ -278,6 +284,109 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     // 1. Draw static background components (Walls, Bushes, ground dirt)
     drawMap(ctx, mapRef.current, grassAgesRef.current, breakingTilesRef.current, player.breakingAnimTimer, escapeActive, timestamp, dyingBushesRef.current, 18, 13);
     
+    // Draw Scorpion Sandstorms (Permanent)
+    sandstormsRef.current.forEach(storm => {
+      const cx = storm.col * TILE + TILE / 2;
+      const cy = storm.row * TILE + TILE / 2;
+      
+      ctx.save();
+      // 1. Thick radial background dust cloud
+      const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, TILE * 0.55);
+      grad.addColorStop(0, 'rgba(180, 83, 9, 0.5)');
+      grad.addColorStop(0.5, 'rgba(217, 119, 6, 0.3)');
+      grad.addColorStop(1, 'rgba(251, 191, 36, 0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath();
+      ctx.arc(cx, cy, TILE * 0.55, 0, Math.PI * 2);
+      ctx.fill();
+      
+      // 2. Swirling wind vortex arcs
+      const angle = (timestamp * 0.007) % (Math.PI * 2);
+      ctx.translate(cx, cy);
+      ctx.rotate(angle);
+      
+      ctx.strokeStyle = 'rgba(217, 119, 6, 0.7)';
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, TILE * 0.45, 0, Math.PI * 0.75);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, TILE * 0.28, Math.PI, Math.PI * 1.75);
+      ctx.stroke();
+
+      ctx.strokeStyle = 'rgba(180, 83, 9, 0.7)';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.arc(0, 0, TILE * 0.36, -Math.PI * 0.5, Math.PI * 0.2);
+      ctx.stroke();
+      
+      ctx.restore();
+      
+      // 3. Orbiting dust particles (drawn in global space)
+      ctx.save();
+      for (let i = 0; i < 8; i++) {
+        const orbitRadius = TILE * (0.12 + (i * 0.05));
+        const orbitSpeed = 0.004 + (i % 3) * 0.0015;
+        const phase = timestamp * orbitSpeed + (i * Math.PI * 0.25);
+        const px = cx + Math.cos(phase) * orbitRadius;
+        const py = cy + Math.sin(phase) * orbitRadius;
+        ctx.fillStyle = i % 2 === 0 ? 'rgba(251, 191, 36, 0.85)' : 'rgba(180, 83, 9, 0.75)';
+        ctx.beginPath();
+        ctx.arc(px, py, 1.8 + (i % 2), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    });
+
+    // Draw Snake emerge telegraph warnings
+    enemiesRef.current.forEach(e => {
+      if (e.type === 'snake' && e.isBurrowed && e.telegraphTimer !== undefined && e.telegraphTimer > 0 && e.telegraphCol !== undefined && e.telegraphRow !== undefined) {
+        const cx = e.telegraphCol * TILE + TILE / 2;
+        const cy = e.telegraphRow * TILE + TILE / 2;
+        ctx.save();
+
+        // 1. Dark dirt hole (Ollito) at the center
+        ctx.fillStyle = '#452a16'; // Dark inner soil
+        ctx.beginPath();
+        ctx.ellipse(cx, cy + TILE * 0.1, TILE * 0.25, TILE * 0.12, 0, 0, Math.PI * 2);
+        ctx.fill();
+
+        // 2. Shaking dirt pile around the hole
+        ctx.fillStyle = '#8b5e3c';
+        ctx.strokeStyle = '#5c3d2e';
+        ctx.lineWidth = 1.5;
+        const shakeX = Math.sin(timestamp * 0.06) * 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - TILE * 0.28 + shakeX, cy + TILE * 0.22);
+        ctx.quadraticCurveTo(cx + shakeX, cy - TILE * 0.06, cx + TILE * 0.28 + shakeX, cy + TILE * 0.22);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // 3. Continuously jumping dirt particles (tierra saltando)
+        ctx.fillStyle = '#78350f';
+        ctx.strokeStyle = '#3c1500';
+        ctx.lineWidth = 1.0;
+        for (let i = 0; i < 6; i++) {
+          const phase = (timestamp * 0.0045 + i * 0.23) % 1.0;
+          const jumpY = -Math.sin(phase * Math.PI) * 18;
+          const spreadX = (Math.sin(i * 35) * 0.25) * TILE;
+          
+          const px = cx + spreadX + Math.sin(timestamp * 0.03 + i) * 1.0;
+          const py = cy + TILE * 0.15 + jumpY;
+          
+          ctx.beginPath();
+          ctx.arc(px, py, 2.0 + (i % 2), 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
+        }
+        
+        ctx.restore();
+      }
+    });
     // 2. Draw visual effects particles
     drawParticles(ctx, particlesRef.current);
     
@@ -340,19 +449,73 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 
       // 5. Draw Active Enemies
       enemiesRef.current.forEach(e => {
-        // Translucent overlay drawing for ghost lobos
-        if (e.type === 'fox_ghost') {
-          ctx.globalAlpha = 0.55;
-        } else {
-          ctx.globalAlpha = 1.0;
-        }
+        ctx.globalAlpha = 1.0;
+
+        const overBush = mapRef.current[e.row]?.[e.col] === T_BUSH || 
+                         (e.moving && mapRef.current[e.targetRow]?.[e.targetCol] === T_BUSH);
 
         drawFoxEnemy(ctx, e.x, e.y, e.dir, e.animFrame, e.type, timestamp, {
           isJumping: e.isJumping,
-          jumpProgress: e.jumpProgress
+          jumpProgress: e.jumpProgress,
+          isDiving: e.isDiving,
+          isStunned: e.isStunned,
+          stunTimer: e.stunTimer,
+          isBurrowed: e.isBurrowed,
+          telegraphTimer: e.telegraphTimer,
+          isHowling: e.isHowling,
+          howlTimer: e.howlTimer,
+          isOverBush: overBush
         });
-        ctx.globalAlpha = 1.0;
       });
+
+      // 6. Draw Sand Splatters Screen Overlay
+      sandSpotsRef.current.forEach(spot => {
+        ctx.save();
+        ctx.globalAlpha = spot.opacity;
+        ctx.translate(spot.x, spot.y);
+        ctx.rotate(spot.rot);
+        
+        // Draw central rough jagged sand shape
+        ctx.fillStyle = 'rgba(142, 85, 33, 0.95)';
+        ctx.beginPath();
+        const steps = 8;
+        for (let i = 0; i < steps; i++) {
+          const angle = (i * Math.PI * 2) / steps;
+          const variance = 0.7 + 0.5 * Math.sin(angle * 3 + spot.x + spot.y);
+          const r = spot.radius * variance;
+          const px = Math.cos(angle) * r;
+          const py = Math.sin(angle) * r;
+          if (i === 0) ctx.moveTo(px, py);
+          else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+
+        // Draw multiple grainy sand particles (specks) around it to give a real sand texture
+        ctx.fillStyle = 'rgba(217, 119, 6, 0.95)';
+        const particlesCount = 8;
+        for (let j = 0; j < particlesCount; j++) {
+          const px = Math.sin(j * 43 + spot.x) * spot.radius * 1.5;
+          const py = Math.cos(j * 17 + spot.y) * spot.radius * 1.5;
+          const size = 1.2 + Math.abs(Math.sin(j + spot.x)) * 2.0;
+          ctx.beginPath();
+          ctx.arc(px, py, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        ctx.fillStyle = 'rgba(245, 158, 11, 0.95)';
+        for (let j = 0; j < 5; j++) {
+          const px = Math.cos(j * 31 + spot.y) * spot.radius * 1.3;
+          const py = Math.sin(j * 79 + spot.x) * spot.radius * 1.3;
+          const size = 0.8 + Math.abs(Math.cos(j + spot.y)) * 1.8;
+          ctx.beginPath();
+          ctx.arc(px, py, size, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        
+        ctx.restore();
+      });
+      ctx.globalAlpha = 1.0;
     }
 
     ctx.restore();
@@ -397,6 +560,12 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
     keysRef.current = {};
     lastDirRef.current = null;
   }, [resetTrigger]);
+
+  // Clear sandstorms and screen sand spots when changing levels
+  useEffect(() => {
+    sandstormsRef.current = [];
+    sandSpotsRef.current = [];
+  }, [currentLevelIndex]);
 
   // Hook Virtual Pad input events from HUD/Console buttons
   // Sets keysRef values as if physical keyboard keystrokes happened

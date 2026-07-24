@@ -42,6 +42,8 @@ interface UseGameEntitiesProps {
   currentLevelIndex: number;
   goldenBroccoliUsedRef: React.MutableRefObject<boolean>;
   usedGoldenBroccoliRef: React.MutableRefObject<boolean>;
+  sandstormsRef: React.MutableRefObject<{ col: number; row: number }[]>;
+  sandSpotsRef: React.MutableRefObject<{ x: number; y: number; radius: number; opacity: number; rot: number; speed: number }[]>;
 }
 
 /**
@@ -86,6 +88,8 @@ export const useGameEntities = ({
   currentLevelIndex,
   goldenBroccoliUsedRef,
   usedGoldenBroccoliRef,
+  sandstormsRef,
+  sandSpotsRef,
 }: UseGameEntitiesProps) => {
 
   const levelConfig = LEVELS[currentLevelIndex];
@@ -320,7 +324,7 @@ export const useGameEntities = ({
       targetCol: e.col,
       targetRow: e.row,
       moving: false,
-      dir: e.type === 'fox_chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 },
+      dir: (e.type === 'fox_chaser' || e.type === 'eagle' || e.type === 'scorpion') ? { x: -1, y: 0 } : { x: 0, y: -1 },
       speed: e.speed,
       chaseTimer: 16, // 1 frame en ms
       animFrame: 0,
@@ -552,32 +556,106 @@ export const useGameEntities = ({
       }
     }
 
+    // Update screen sand splatters decay
+    sandSpotsRef.current.forEach(spot => {
+      spot.opacity -= spot.speed * (deltaMs / 1000);
+    });
+    sandSpotsRef.current = sandSpotsRef.current.filter(spot => spot.opacity > 0);
+
+    // Find nearest permanent sandstorm
+    let activeStorm: { col: number; row: number } | null = null;
+    let distToStorm = 999;
+    for (const storm of sandstormsRef.current) {
+      const d = Math.max(Math.abs(player.col - storm.col), Math.abs(player.row - storm.row));
+      if (d < distToStorm) {
+        distToStorm = d;
+        activeStorm = storm;
+      }
+    }
+
+    // Check if player is on the storm cell to trigger screen splatters!
+    const onStormCell = activeStorm && distToStorm === 0;
+    if (onStormCell && sandSpotsRef.current.length < 15) {
+      // Spawn 35 screen spots randomly
+      for (let i = 0; i < 35; i++) {
+        sandSpotsRef.current.push({
+          x: Math.random() * (20 * 40), // COLS * TILE = 800
+          y: Math.random() * (15 * 40), // ROWS * TILE = 600
+          radius: 12 + Math.random() * 28,
+          opacity: 0.85 + Math.random() * 0.15,
+          rot: Math.random() * Math.PI * 2,
+          speed: 0.15 + Math.random() * 0.2
+        });
+      }
+    }
+
     if (!player.moving) {
       // NUEVO: No iniciar movimiento mientras se está sembrando
       if (player.plantingAnimTimer > 0) return;
 
-      if (!turnBlockedRef.current) {
-        // Pick current direction requested
-        let dir = lastDirRef.current;
-        if (lastDirRef.current) {
-          // Clear simulated virtual direction so virtual buttons move exactly one tile
-          lastDirRef.current = null;
+      // Check if player is dragged towards sandstorm (only if no movement key is pressed)
+      const hasMovementKey = keysRef.current['ArrowUp'] || keysRef.current['KeyW'] ||
+        keysRef.current['ArrowDown'] || keysRef.current['KeyS'] ||
+        keysRef.current['ArrowLeft'] || keysRef.current['KeyA'] ||
+        keysRef.current['ArrowRight'] || keysRef.current['KeyD'];
+
+      let dragged = false;
+      if (!hasMovementKey && activeStorm && distToStorm <= 1 && distToStorm > 0) {
+        let pullDir = { x: 0, y: 0 };
+        const dx = activeStorm.col - player.col;
+        const dy = activeStorm.row - player.row;
+        if (Math.abs(dx) >= Math.abs(dy)) {
+          pullDir.x = Math.sign(dx);
         } else {
-          if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) dir = { x: 0, y: -1 };
-          else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) dir = { x: 0, y: 1 };
-          else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) dir = { x: -1, y: 0 };
-          else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) dir = { x: 1, y: 0 };
+          pullDir.y = Math.sign(dy);
+        }
+        let nextC = player.col + pullDir.x;
+        let nextR = player.row + pullDir.y;
+        if (isSolid(nextC, nextR, mapRef.current, false, true, player.goldenBroccoliTimer > 0, awaitingBurrowRef.current)) {
+          if (pullDir.x !== 0) {
+            pullDir = { x: 0, y: Math.sign(dy) };
+          } else {
+            pullDir = { x: Math.sign(dx), y: 0 };
+          }
+          nextC = player.col + pullDir.x;
+          nextR = player.row + pullDir.y;
         }
 
-        if (dir) {
-          player.dir = dir;
-          const nc = player.col + dir.x;
-          const nr = player.row + dir.y;
-          const readyFrame = tileReadyRef.current[nr]?.[nc] ?? 0;
-          if (!isSolid(nc, nr, mapRef.current, false, true, player.goldenBroccoliTimer > 0, awaitingBurrowRef.current) && readyFrame <= frameCountRef.current) {
-            player.targetCol = nc;
-            player.targetRow = nr;
-            player.moving = true;
+        if (!isSolid(nextC, nextR, mapRef.current, false, true, player.goldenBroccoliTimer > 0, awaitingBurrowRef.current)) {
+          player.targetCol = nextC;
+          player.targetRow = nextR;
+          player.moving = true;
+          player.dir = pullDir;
+          (player as any).isDragged = true;
+          dragged = true;
+        }
+      }
+
+      if (!dragged) {
+        (player as any).isDragged = false;
+        if (!turnBlockedRef.current) {
+          // Pick current direction requested
+          let dir = lastDirRef.current;
+          if (lastDirRef.current) {
+            // Clear simulated virtual direction so virtual buttons move exactly one tile
+            lastDirRef.current = null;
+          } else {
+            if (keysRef.current['ArrowUp'] || keysRef.current['KeyW']) dir = { x: 0, y: -1 };
+            else if (keysRef.current['ArrowDown'] || keysRef.current['KeyS']) dir = { x: 0, y: 1 };
+            else if (keysRef.current['ArrowLeft'] || keysRef.current['KeyA']) dir = { x: -1, y: 0 };
+            else if (keysRef.current['ArrowRight'] || keysRef.current['KeyD']) dir = { x: 1, y: 0 };
+          }
+
+          if (dir) {
+            player.dir = dir;
+            const nc = player.col + dir.x;
+            const nr = player.row + dir.y;
+            const readyFrame = tileReadyRef.current[nr]?.[nc] ?? 0;
+            if (!isSolid(nc, nr, mapRef.current, false, true, player.goldenBroccoliTimer > 0, awaitingBurrowRef.current) && readyFrame <= frameCountRef.current) {
+              player.targetCol = nc;
+              player.targetRow = nr;
+              player.moving = true;
+            }
           }
         }
       }
@@ -606,7 +684,23 @@ export const useGameEntities = ({
         const dy = ty - player.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        const step = (player.speed * deltaMs) / 1000;
+        let currentSpeed = player.speed;
+        if ((player as any).isDragged) {
+          currentSpeed = 40;
+        } else if (activeStorm) {
+          if (player.col === activeStorm.col && player.row === activeStorm.row) {
+            currentSpeed = 30; // sandstorm slowdown
+          } else if (distToStorm <= 1) {
+            const targetDist = Math.max(Math.abs(player.targetCol - activeStorm.col), Math.abs(player.targetRow - activeStorm.row));
+            if (targetDist > distToStorm) {
+              currentSpeed = 50; // moving away from sandstorm is slow
+            } else if (targetDist < distToStorm) {
+              currentSpeed = 140; // moving towards is fast
+            }
+          }
+        }
+
+        const step = (currentSpeed * deltaMs) / 1000;
 
         if (dist <= step) {
           player.x = tx;
@@ -752,12 +846,204 @@ export const useGameEntities = ({
   };
 
   const updateEnemy = (e: Enemy, deltaMs: number) => {
-    const ghost = e.type === 'fox_ghost';
+    // If zombie minion is on a bush tile, it dies instantly!
+    if (e.type === 'fox_zombie_spawn' && isBush(e.col, e.row, mapRef.current)) {
+      spawnParticles(e.col, e.row, '#94a3b8');
+      SoundEffects.playBreak(); // pop/break sound
+      enemiesRef.current = enemiesRef.current.filter(x => x.id !== e.id);
+      return;
+    }
+
+    const ghost = e.type === 'eagle' || e.type === 'fox_zombie_spawn';
     const gorilla = e.type === 'gorilla';
 
+    // 1. Snake Burrowing State Machine
+    if (e.type === 'snake') {
+      if ((e as any).burrowCooldown === undefined) {
+        (e as any).burrowCooldown = 8000 + Math.random() * 4000;
+      }
+
+      if (e.isBurrowed) {
+        e.burrowTimer = (e.burrowTimer || 0) - deltaMs;
+        if (e.burrowTimer <= 0) {
+          if (e.telegraphTimer === undefined || e.telegraphTimer <= 0) {
+            // Emerge inteligente: adjacent to player's current/target position
+            const player = playerRef.current;
+            let targetC = player.col;
+            let targetR = player.row;
+            if (player.moving) {
+              targetC = player.targetCol;
+              targetR = player.targetRow;
+            }
+            const candidates = [
+              { col: targetC + 1, row: targetR },
+              { col: targetC - 1, row: targetR },
+              { col: targetC, row: targetR + 1 },
+              { col: targetC, row: targetR - 1 }
+            ].filter(cell => cell.col > 0 && cell.col < COLS - 1 && cell.row > 0 && cell.row < ROWS - 1 && isEmpty(cell.col, cell.row, mapRef.current));
+            
+            const chosen = candidates.length > 0 ? candidates[Math.floor(Math.random() * candidates.length)] : { col: player.col, row: player.row };
+            e.telegraphCol = chosen.col;
+            e.telegraphRow = chosen.row;
+            e.telegraphTimer = 1500; // 1.5 seconds warning
+          } else {
+            e.telegraphTimer -= deltaMs;
+            if (e.telegraphTimer <= 0) {
+              // Emerge!
+              e.col = e.telegraphCol!;
+              e.row = e.telegraphRow!;
+              e.x = e.col * TILE + TILE / 2;
+              e.y = e.row * TILE + TILE / 2;
+              e.targetCol = e.col;
+              e.targetRow = e.row;
+              e.isBurrowed = false;
+              e.moving = false;
+              (e as any).burrowCooldown = 8000 + Math.random() * 4000;
+              e.telegraphTimer = undefined;
+              SoundEffects.playCollect();
+              spawnParticles(e.col, e.row, '#8b5e3c', undefined, true);
+            }
+          }
+        }
+        return;
+      } else {
+        (e as any).burrowCooldown -= deltaMs;
+        if ((e as any).burrowCooldown <= 0 && !e.moving) {
+          e.isBurrowed = true;
+          e.burrowTimer = 2000; // 2 seconds underground
+          e.moving = false;
+          spawnParticles(e.col, e.row, '#8b5e3c', undefined, true);
+          return;
+        }
+      }
+    }
+
+    // 2. Scorpion Sandstorm State Machine (Permanent Sandstorms)
+    if (e.type === 'scorpion') {
+      if (e.sandstormCooldown === undefined) {
+        e.sandstormCooldown = 6000 + Math.random() * 4000;
+      }
+
+      e.sandstormCooldown -= deltaMs;
+      if (e.sandstormCooldown <= 0 && !e.moving) {
+        const alreadyExists = sandstormsRef.current.some(s => s.col === e.col && s.row === e.row);
+        if (!alreadyExists) {
+          sandstormsRef.current.push({ col: e.col, row: e.row });
+          SoundEffects.playCollect();
+          spawnParticles(e.col, e.row, '#d97706'); // amber burst
+        }
+        e.sandstormCooldown = 7000 + Math.random() * 4000; // 7 to 11 seconds cooldown
+      }
+    }
+
+    // 3. Zombie Fox howling State Machine
+    if (e.type === 'fox_zombie') {
+      if (e.howlCooldown === undefined) {
+        e.howlCooldown = 6000 + Math.random() * 3000;
+      }
+
+      if (e.isHowling) {
+        e.howlTimer = (e.howlTimer || 0) - deltaMs;
+        if (e.howlTimer <= 0) {
+          e.isHowling = false;
+          // Spawn minions!
+          const dirs = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+          let spawned = 0;
+          for (const d of dirs) {
+            const nc = e.col + d.x;
+            const nr = e.row + d.y;
+            if (!isSolid(nc, nr, mapRef.current, true, false) && spawned < 2) {
+              enemiesRef.current.push({
+                id: 'minion_' + Math.random(),
+                type: 'fox_zombie_spawn',
+                col: nc,
+                row: nr,
+                x: nc * TILE + TILE / 2,
+                y: nr * TILE + TILE / 2,
+                targetCol: nc,
+                targetRow: nr,
+                moving: false,
+                dir: { ...d },
+                speed: 140, // fast minion
+                chaseTimer: 16,
+                animFrame: 0,
+                animTimer: 0
+              });
+              spawnParticles(nc, nr, '#4a5d4e'); // green smoke
+              spawned++;
+            }
+          }
+          if (spawned > 0) {
+            SoundEffects.playCollect();
+          }
+          e.howlCooldown = 7000 + Math.random() * 3000;
+        }
+        return;
+      } else {
+        e.howlCooldown -= deltaMs;
+        if (e.howlCooldown <= 0 && !e.moving) {
+          e.isHowling = true;
+          e.howlTimer = 1000; // 1s howl
+          e.moving = false;
+          SoundEffects.playCollect(); // Howl sound
+          return;
+        }
+      }
+    }
+
+    // 4. Eagle Stun and Dive State Machine
+    if (e.type === 'eagle') {
+      if (e.isStunned) {
+        e.stunTimer = (e.stunTimer || 0) - deltaMs;
+        if (e.stunTimer <= 0) {
+          e.isStunned = false;
+        }
+        return;
+      }
+
+      if (e.isDiving) {
+        // Diving behavior! If not moving, proceed in diving direction
+        if (!e.moving) {
+          const nc = e.col + e.dir.x;
+          const nr = e.row + e.dir.y;
+          
+          if (isWall(nc, nr, mapRef.current) || (e.col === e.diveTargetCol && e.row === e.diveTargetRow)) {
+            // Hit a wall or finished dive without catching Torti -> Stun!
+            e.isDiving = false;
+            e.isStunned = true;
+            e.stunTimer = 2500;
+            e.moving = false;
+            SoundEffects.playBreak();
+            spawnParticles(e.col, e.row, '#71717a');
+            return;
+          } else {
+            e.targetCol = nc;
+            e.targetRow = nr;
+            e.moving = true;
+          }
+        }
+      } else {
+        // Check alignment to start dive
+        const player = playerRef.current;
+        const isAligned = (player.col === e.col || player.row === e.row);
+        if (isAligned && !e.moving) {
+          e.isDiving = true;
+          e.diveTargetCol = player.col;
+          e.diveTargetRow = player.row;
+          e.dir = { x: Math.sign(player.col - e.col), y: Math.sign(player.row - e.row) };
+          e.moving = true;
+          e.targetCol = e.col + e.dir.x;
+          e.targetRow = e.row + e.dir.y;
+          SoundEffects.playJump();
+          return;
+        }
+      }
+    }
+
+    // Gorilla Jump (existing code)
     if (e.type === 'gorilla') {
       if (e.gorillaJumpCooldown === undefined) {
-        e.gorillaJumpCooldown = 4000 + Math.random() * 2000; // 4 to 6 seconds initial cooldown
+        e.gorillaJumpCooldown = 4000 + Math.random() * 2000;
       }
 
       if (e.isJumping) {
@@ -767,11 +1053,11 @@ export const useGameEntities = ({
         if (e.gorillaJumpTimer <= 0) {
           e.isJumping = false;
           e.jumpProgress = 0;
-          e.gorillaJumpCooldown = 8000 + Math.random() * 4000; // 8 to 12 seconds post-jump cooldown
+          e.gorillaJumpCooldown = 8000 + Math.random() * 4000;
           
-          SoundEffects.playBreak(); // Heavy landing sound
-          relocateAllFruitsFarFromPlayer(); // Relocate fruits upon landing
-          spawnParticles(e.col, e.row, '#71717a'); // Landing dust puff
+          SoundEffects.playBreak();
+          relocateAllFruitsFarFromPlayer();
+          spawnParticles(e.col, e.row, '#71717a');
         }
         
         e.animTimer += deltaMs;
@@ -786,38 +1072,54 @@ export const useGameEntities = ({
           e.isJumping = true;
           e.gorillaJumpTimer = 1000;
           e.jumpProgress = 0;
-          SoundEffects.playJump(); // Play jump sound on takeoff
+          SoundEffects.playJump();
         }
       }
     }
 
+    // 5. Standard pathfinding & direction choices
     if (!e.moving) {
       e.chaseTimer -= deltaMs;
       let newDir;
 
-      if (e.chaseTimer <= 0) {
-        newDir = findChaseDirection(e, ghost, gorilla);
-        if (e.type === 'fox_patrol' || e.type === 'snake_patrol') {
-          if (e.type === 'fox_patrol' && currentLevelIndex === 6) {
-            // Level 7 patrol foxes are fast and aggressive (aggressive pathfinding)
+      const isPatrol = e.type === 'fox_patrol';
+
+      if (isPatrol) {
+        // Patrol AI: tontito
+        const DIRS = [{ x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 }];
+        const validDirs = DIRS.filter(d => !isSolid(e.col + d.x, e.row + d.y, mapRef.current, ghost, false, false, false, gorilla));
+        
+        // 15% chance to change direction at intersections, or if currently blocked
+        const blocked = isSolid(e.col + e.dir.x, e.row + e.dir.y, mapRef.current, ghost, false, false, false, gorilla);
+        if (blocked || (Math.random() < 0.15 && validDirs.length > 0)) {
+          if (validDirs.length > 0) {
+            newDir = validDirs[Math.floor(Math.random() * validDirs.length)];
+          } else {
+            newDir = e.dir; // stuck
+          }
+        } else {
+          newDir = e.dir;
+        }
+        e.chaseTimer = 100 + Math.floor(Math.random() * 100);
+      } else {
+        // Chasers/Followers
+        if (e.chaseTimer <= 0) {
+          newDir = findChaseDirection(e, ghost, gorilla);
+          if (e.type === 'fox_chaser' || e.type === 'snake' || e.type === 'gorilla' || e.type === 'eagle' || e.type === 'scorpion' || e.type === 'fox_zombie_spawn') {
             e.chaseTimer = 16;
           } else {
-            e.chaseTimer = 67 + Math.floor(Math.random() * 67); // patrol=4~8 frames → 67~133ms
+            e.chaseTimer = 50;
           }
-        } else if (e.type === 'fox_chaser' || e.type === 'snake_chaser' || e.type === 'gorilla') {
-          e.chaseTimer = 16; // chaser/gorilla = 1 frame → 16ms
         } else {
-          e.chaseTimer = 50; // ghost=3 frames → 50ms
+          newDir = e.dir;
         }
-      } else {
-        newDir = e.dir;
-      }
 
-      const nc0 = e.col + newDir.x;
-      const nr0 = e.row + newDir.y;
-      if (isSolid(nc0, nr0, mapRef.current, ghost, false, false, false, gorilla)) {
-        newDir = findChaseDirection(e, ghost, gorilla);
-        e.chaseTimer = 16; // 1 frame en ms
+        const nc0 = e.col + newDir.x;
+        const nr0 = e.row + newDir.y;
+        if (isSolid(nc0, nr0, mapRef.current, ghost, false, false, false, gorilla)) {
+          newDir = findChaseDirection(e, ghost, gorilla);
+          e.chaseTimer = 16;
+        }
       }
 
       e.dir = newDir;
@@ -836,7 +1138,7 @@ export const useGameEntities = ({
         e.moving = false;
         e.targetCol = e.col;
         e.targetRow = e.row;
-        e.chaseTimer = 0; // force findChaseDirection on next tick
+        e.chaseTimer = 0;
       } else {
         const tx = e.targetCol * TILE + TILE / 2;
         const ty = e.targetRow * TILE + TILE / 2;
@@ -844,7 +1146,9 @@ export const useGameEntities = ({
         const dy = ty - e.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        const step = (e.speed * deltaMs) / 1000;
+        // Eagle speed is 2.5x during dive
+        const speed = (e.type === 'eagle' && e.isDiving) ? (e.speed * 2.5) : e.speed;
+        const step = (speed * deltaMs) / 1000;
 
         if (dist <= step) {
           e.x = tx;
@@ -860,7 +1164,7 @@ export const useGameEntities = ({
     }
 
     e.animTimer += deltaMs;
-    if (e.animTimer > 150) { // 9 frames * 16.67ms ≈ 150ms
+    if (e.animTimer > 150) {
       e.animTimer = 0;
       e.animFrame = (e.animFrame + 1) % 4;
     }
@@ -871,6 +1175,9 @@ export const useGameEntities = ({
     if (player.invincible > 0 || player.deathAnimTimer > 0 || player.goldenBroccoliTimer > 0) return;
 
     for (const e of enemiesRef.current) {
+      if (e.isBurrowed) continue;
+      if (e.isStunned) continue;
+
       const dx = player.x - e.x;
       const dy = player.y - e.y;
       const dist = Math.sqrt(dx * dx + dy * dy);
@@ -885,6 +1192,8 @@ export const useGameEntities = ({
   };
 
   const respawnEntities = (config = levelConfig) => {
+    sandstormsRef.current = [];
+    sandSpotsRef.current = [];
     const player = playerRef.current;
     player.col = config.playerStartCol;
     player.row = config.playerStartRow;
@@ -906,7 +1215,7 @@ export const useGameEntities = ({
         targetCol: e.col,
         targetRow: e.row,
         moving: false,
-        dir: existing?.dir || (e.type === 'fox_chaser' ? { x: -1, y: 0 } : { x: 0, y: -1 }),
+        dir: existing?.dir || ((e.type === 'fox_chaser' || e.type === 'eagle' || e.type === 'scorpion') ? { x: -1, y: 0 } : { x: 0, y: -1 }),
         speed: e.speed,
         chaseTimer: 16, // 1 frame en ms
         animFrame: existing?.animFrame || 0,

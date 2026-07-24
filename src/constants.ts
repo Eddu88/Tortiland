@@ -74,7 +74,7 @@ export const LEVELS: LevelConfig[] = [
       [3, 5], [3, 15], [5, 9], [7, 3], [7, 13], [9, 7], [11, 11]
     ],
     enemies: [
-      { id: '1_1', type: 'snake_patrol', col: 18, row: 10, speed: 82 }
+      { id: '1_1', type: 'snake', col: 18, row: 10, speed: 82 }
     ]
   },
   {
@@ -98,11 +98,11 @@ export const LEVELS: LevelConfig[] = [
       [3, 1], [3, 18], [6, 6], [8, 13], [11, 2], [11, 17], [13, 5], [13, 14]
     ],
     enemies: [
-      { id: '2_1', type: 'snake_patrol', col: 1, row: 2, speed: 82 },
-      { id: '2_2', type: 'snake_patrol', col: 18, row: 10, speed: 82 },
-      { id: '2_3', type: 'snake_patrol', col: 1, row: 12, speed: 82 },
-      { id: '2_4', type: 'snake_patrol', col: 13, row: 1, speed: 82 },
-      { id: '2_5', type: 'snake_patrol', col: 11, row: 13, speed: 82 }
+      { id: '2_1', type: 'snake', col: 1, row: 2, speed: 82 },
+      { id: '2_2', type: 'snake', col: 18, row: 10, speed: 82 },
+      { id: '2_3', type: 'snake', col: 1, row: 12, speed: 82 },
+      { id: '2_4', type: 'snake', col: 13, row: 1, speed: 82 },
+      { id: '2_5', type: 'snake', col: 11, row: 13, speed: 82 }
     ]
   },
   {
@@ -121,8 +121,8 @@ export const LEVELS: LevelConfig[] = [
       [4, 2], [4, 17], [10, 2], [10, 17], [13, 3], [13, 15]
     ],
     enemies: [
-      { id: '3_1', type: 'snake_chaser', col: 10, row: 13, speed: 92 },
-      { id: '3_2', type: 'snake_chaser', col: 1, row: 13, speed: 92 }
+      { id: '3_1', type: 'snake', col: 10, row: 13, speed: 92 },
+      { id: '3_2', type: 'snake', col: 1, row: 13, speed: 92 }
     ]
   },
   {
@@ -210,7 +210,7 @@ export const LEVELS: LevelConfig[] = [
   {
     number: 8,
     name: 'La Presión del Cazador',
-    description: 'Dos veloces zorros cazadores te persiguen activamente sin descanso.',
+    description: 'Un veloz zorro cazador y un escorpión del desierto te persiguen activamente sin descanso.',
     playerStartCol: 18,
     playerStartRow: 1,
     innerWalls: [
@@ -224,13 +224,13 @@ export const LEVELS: LevelConfig[] = [
     ],
     enemies: [
       { id: '8_1', type: 'fox_chaser', col: 10, row: 13, speed: 120 },
-      { id: '8_2', type: 'fox_chaser', col: 1, row: 13, speed: 120 }
+      { id: '8_2', type: 'scorpion', col: 1, row: 13, speed: 110 }
     ]
   },
   {
     number: 9,
     name: 'El Claro del Gorila',
-    description: 'Un imponente gorila lento que salta sobre los muros y desorganiza tus frutas.',
+    description: 'Un imponente gorila lento y una majestuosa águila cazadora vigilan este claro.',
     playerStartCol: 1,
     playerStartRow: 13,
     innerWalls: [
@@ -245,13 +245,14 @@ export const LEVELS: LevelConfig[] = [
       [1, 8], [1, 11], [7, 3], [7, 16], [13, 8], [13, 11]
     ],
     enemies: [
-      { id: '9_1', type: 'gorilla', col: 10, row: 13, speed: 56 }
+      { id: '9_1', type: 'gorilla', col: 10, row: 13, speed: 56 },
+      { id: '9_2', type: 'eagle', col: 18, row: 1, speed: 92 }
     ]
   },
   {
     number: 10,
-    name: 'La Noche de los Espectros',
-    description: 'Cinco veloces zorros fantasma que atraviesan los arbustos hacen de este jardín una pesadilla.',
+    name: 'La Invasión Zombie',
+    description: 'Cinco temibles zorros zombie que invocan veloces cachorros. ¡Usa los arbustos a tu favor!',
     playerStartCol: 18,
     playerStartRow: 1,
     innerWalls: [
@@ -266,11 +267,11 @@ export const LEVELS: LevelConfig[] = [
       [3, 2], [3, 17], [5, 5], [5, 14], [9, 5], [9, 14], [11, 2], [11, 17]
     ],
     enemies: [
-      { id: '10_1', type: 'fox_ghost', col: 10, row: 13, speed: 110 },
-      { id: '10_2', type: 'fox_ghost', col: 1, row: 13, speed: 110 },
-      { id: '10_3', type: 'fox_ghost', col: 1, row: 1, speed: 110 },
-      { id: '10_4', type: 'fox_ghost', col: 18, row: 10, speed: 110 },
-      { id: '10_5', type: 'fox_ghost', col: 10, row: 1, speed: 110 }
+      { id: '10_1', type: 'fox_zombie', col: 10, row: 13, speed: 70 },
+      { id: '10_2', type: 'fox_zombie', col: 1, row: 13, speed: 70 },
+      { id: '10_3', type: 'fox_zombie', col: 1, row: 1, speed: 70 },
+      { id: '10_4', type: 'fox_zombie', col: 18, row: 10, speed: 70 },
+      { id: '10_5', type: 'fox_zombie', col: 10, row: 1, speed: 70 }
     ]
   }
 ];
