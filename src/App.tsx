@@ -3,7 +3,7 @@ import { GameCanvas } from './components/GameCanvas';
 import { GameControls } from './components/GameControls';
 import { GameState, LevelPhase } from './types';
 import { formatTime } from './utils/map';
-import { Shield, Sparkles, Heart, Play, RotateCcw, HelpCircle, Gamepad2, Lock, Star, ChevronLeft } from 'lucide-react';
+import { Heart, Play, RotateCcw, Gamepad2, Lock, Star, ChevronLeft } from 'lucide-react';
 import { LEVELS } from './constants';
 
 const BeetrootIcon = () => (

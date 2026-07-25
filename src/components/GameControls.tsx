@@ -32,17 +32,17 @@ interface GameControlsProps {
  */
 export const GameControls: React.FC<GameControlsProps> = ({
   score,
-  lives,
-  levelPhase,
-  fruitsLeft,
+  lives: _lives,
+  levelPhase: _levelPhase,
+  fruitsLeft: _fruitsLeft,
   gameTimeElapsed,
-  goldenBroccoliTimer,
+  goldenBroccoliTimer: _goldenBroccoliTimer,
   soundOn,
   setSoundOn,
   triggerVirtualCommand,
-  triggerReset,
+  triggerReset: _triggerReset,
   gameState,
-  setGameState,
+  setGameState: _setGameState,
 }) => {
   const [highScores, setHighScores] = useState<HighScore[]>([]);
   const [playerName, setPlayerName] = useState<string>('JUGADOR');

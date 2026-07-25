@@ -205,24 +205,15 @@ export const drawFox = (
   ctx.ellipse(finalPx, py + s * 0.56, s * 0.62, s * 0.16, 0, 0, Math.PI * 2);
   ctx.fill();
 
-  // Color Palette (3-Tone System)
-  let baseOrange = isGolden ? '#ffd43b' : '#ff781f'; // Fox bright orange / Yellow-gold
-  let lightCream = isGolden ? '#fef08a' : '#fcfbf7'; // White fur / Light cream yellow
-  let earPink = isGolden ? '#eab308' : '#f43f5e'; // Inside ear pink / Yellow-orange
-  let darkDetail = isGolden ? '#78350f' : '#3c1800'; // Dark tips & outline
-  const bandanaGreen = '#10b981'; // Cozy emerald green bandana
+  // Color Palette (3-Tone System per Variant)
+  const variant = type === 'fox_chaser' ? 'chaser' : (type === 'fox_zombie' || type === 'fox_zombie_spawn' ? 'zombie' : 'patrol');
 
-  if (type === 'fox_chaser') {
-    baseOrange = '#64748b'; // Gray/Steel armored lobo
-    lightCream = '#f1f5f9';
-    earPink = '#334155';
-    darkDetail = '#0f172a';
-  } else if (type === 'fox_zombie' || type === 'fox_zombie_spawn') {
-    baseOrange = '#4a5d4e'; // Zombie decay green/gray
-    lightCream = '#a9bfa8'; // Pale moldy green
-    earPink = '#ef4444'; // Crimson zombie ears
-    darkDetail = '#1b261c'; // Rotten dark highlights
-  }
+  let baseOrange = isGolden ? '#ffd43b' : (variant === 'chaser' ? '#e2e8f0' : (variant === 'zombie' ? '#4a5d4e' : '#ff781f'));
+  let lightCream = isGolden ? '#fef08a' : (variant === 'chaser' ? '#475569' : (variant === 'zombie' ? '#a9bfa8' : '#fcfbf7'));
+  let earPink = isGolden ? '#eab308' : (variant === 'chaser' ? '#94a3b8' : (variant === 'zombie' ? '#ef4444' : '#f43f5e'));
+  let darkDetail = isGolden ? '#78350f' : (variant === 'chaser' ? '#0f172a' : (variant === 'zombie' ? '#1b261c' : '#3c1800'));
+  let bandanaGreen = isGolden ? '#f59e0b' : (variant === 'chaser' ? '#ef4444' : (variant === 'zombie' ? '#10b981' : '#10b981'));
+  const eyeGlowColor = variant === 'zombie' ? '#ef4444' : (variant === 'chaser' ? '#f87171' : '#ffffff');
 
   const facing: 'right' | 'left' | 'up' | 'down' =
     dir.x > 0 ? 'right' :
@@ -321,27 +312,7 @@ export const drawFox = (
     ctx.fill();
     ctx.stroke();
 
-    // Add Chaser chestplate:
-    if (type === 'fox_chaser') {
-      ctx.fillStyle = '#94a3b8';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.22, 0);
-      ctx.lineTo(s * 0.22, 0);
-      ctx.lineTo(s * 0.16, s * 0.34);
-      ctx.lineTo(0, s * 0.44);
-      ctx.lineTo(-s * 0.16, s * 0.34);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Glowing power gem central slot
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath();
-      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // (Chaser chestplate removed)
 
     ctx.restore();
 
@@ -403,26 +374,7 @@ export const drawFox = (
       ctx.fill();
       ctx.stroke();
 
-      // Add Chaser headband armor:
-      if (type === 'fox_chaser') {
-        ctx.fillStyle = '#475569';
-        ctx.strokeStyle = darkDetail;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Little forehead central spike
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.moveTo(-2.5, -s * 0.38);
-        ctx.lineTo(0, -s * 0.65);
-        ctx.lineTo(2.5, -s * 0.38);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // (Chaser headband armor removed)
 
       ctx.restore();
     }
@@ -484,27 +436,7 @@ export const drawFox = (
     ctx.fill();
     ctx.stroke();
 
-    // Add Chaser chestplate:
-    if (type === 'fox_chaser') {
-      ctx.fillStyle = '#94a3b8';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.22, 0);
-      ctx.lineTo(s * 0.22, 0);
-      ctx.lineTo(s * 0.16, s * 0.34);
-      ctx.lineTo(0, s * 0.44);
-      ctx.lineTo(-s * 0.16, s * 0.34);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Glowing power gem central slot
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath();
-      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // (Chaser chestplate removed)
 
     ctx.restore();
 
@@ -595,26 +527,7 @@ export const drawFox = (
       ctx.fill();
       ctx.stroke();
 
-      // Add Chaser headband armor:
-      if (type === 'fox_chaser') {
-        ctx.fillStyle = '#475569';
-        ctx.strokeStyle = darkDetail;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Little forehead central spike
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.moveTo(-2.5, -s * 0.38);
-        ctx.lineTo(0, -s * 0.65);
-        ctx.lineTo(2.5, -s * 0.38);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // (Chaser headband armor removed)
 
       // White cheek accents around snout
       ctx.fillStyle = lightCream;
@@ -625,7 +538,6 @@ export const drawFox = (
 
       // Eyes
       const drawEye = (ex: number, ey: number) => {
-        const isZombie = type === 'fox_zombie' || type === 'fox_zombie_spawn';
         if (plantingAnimTimer > 0) {
           ctx.strokeStyle = darkDetail;
           ctx.lineWidth = 2.5;
@@ -641,19 +553,19 @@ export const drawFox = (
           ctx.beginPath();
           ctx.arc(ex - s * 0.02, ey - s * 0.02, s * 0.04, 0, Math.PI * 2);
           ctx.fill();
-        } else if (isZombie) {
-          // Glowing red zombie eyes
-          ctx.fillStyle = '#ef4444';
+        } else if (variant === 'zombie' || variant === 'chaser') {
+          // Glowing eye (lime green for zombie, bright red for chaser)
+          ctx.fillStyle = eyeGlowColor;
           ctx.beginPath();
           ctx.arc(ex, ey, s * 0.075, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.fillStyle = '#fef08a'; // yellow glint
+          ctx.fillStyle = variant === 'zombie' ? '#fef08a' : '#ffffff'; // yellow glint for zombie, white for chaser
           ctx.beginPath();
           ctx.arc(ex - s * 0.015, ey - s * 0.015, s * 0.02, 0, Math.PI * 2);
           ctx.fill();
-          
-          // Angry zombie eyebrow
+
+          // Angry eyebrow
           ctx.strokeStyle = darkDetail;
           ctx.lineWidth = 2.0;
           ctx.lineCap = 'round';
@@ -775,27 +687,7 @@ export const drawFox = (
     ctx.fill();
     ctx.stroke();
 
-    // Add Chaser chestplate:
-    if (type === 'fox_chaser') {
-      ctx.fillStyle = '#94a3b8';
-      ctx.strokeStyle = '#475569';
-      ctx.lineWidth = 1.2;
-      ctx.beginPath();
-      ctx.moveTo(-s * 0.22, 0);
-      ctx.lineTo(s * 0.22, 0);
-      ctx.lineTo(s * 0.16, s * 0.34);
-      ctx.lineTo(0, s * 0.44);
-      ctx.lineTo(-s * 0.16, s * 0.34);
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      // Glowing power gem central slot
-      ctx.fillStyle = '#ef4444';
-      ctx.beginPath();
-      ctx.arc(0, s * 0.22, 2, 0, Math.PI * 2);
-      ctx.fill();
-    }
+    // (Chaser chestplate removed)
 
     ctx.restore();
 
@@ -889,26 +781,7 @@ export const drawFox = (
       ctx.fill();
       ctx.stroke();
 
-      // Add Chaser headband armor:
-      if (type === 'fox_chaser') {
-        ctx.fillStyle = '#475569';
-        ctx.strokeStyle = darkDetail;
-        ctx.lineWidth = 1.0;
-        ctx.beginPath();
-        ctx.arc(0, 0, s * 0.38, Math.PI, 0, false);
-        ctx.closePath();
-        ctx.fill();
-        ctx.stroke();
-
-        // Little forehead central spike
-        ctx.fillStyle = '#cbd5e1';
-        ctx.beginPath();
-        ctx.moveTo(-2.5, -s * 0.38);
-        ctx.lineTo(0, -s * 0.65);
-        ctx.lineTo(2.5, -s * 0.38);
-        ctx.closePath();
-        ctx.fill();
-      }
+      // (Chaser headband armor removed)
 
       // White cheek on right face
       ctx.fillStyle = lightCream;
@@ -934,14 +807,14 @@ export const drawFox = (
           ctx.beginPath();
           ctx.arc(ex - s * 0.02, ey - s * 0.02, s * 0.04, 0, Math.PI * 2);
           ctx.fill();
-        } else if (isZombie) {
-          // Glowing red zombie eye in profile
-          ctx.fillStyle = '#ef4444';
+        } else if (isZombie || type === 'fox_chaser') {
+          // Glowing profile eye (green for zombie, red for chaser)
+          ctx.fillStyle = eyeGlowColor;
           ctx.beginPath();
           ctx.arc(ex, ey, s * 0.08, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.fillStyle = '#fef08a'; // yellow glint
+          ctx.fillStyle = isZombie ? '#fef08a' : '#ffffff'; // yellow glint for zombie, white for chaser
           ctx.beginPath();
           ctx.arc(ex - s * 0.015, ey - s * 0.015, s * 0.02, 0, Math.PI * 2);
           ctx.fill();
@@ -951,30 +824,19 @@ export const drawFox = (
           ctx.lineWidth = 2.2;
           ctx.lineCap = 'round';
           ctx.beginPath();
-          ctx.moveTo(ex + s * 0.1, ey - s * 0.08);
-          ctx.lineTo(ex - s * 0.08, ey - s * 0.05);
+          ctx.moveTo(ex + s * 0.1, ey - s * 0.12);
+          ctx.lineTo(ex - s * 0.08, ey - s * 0.08);
           ctx.stroke();
         } else {
-          // Predator/Wild sly fox eye (cunning vertical slit)
-          ctx.fillStyle = baseOrange;
+          // Determined profile eye
+          ctx.fillStyle = '#000000';
           ctx.beginPath();
           ctx.arc(ex, ey, s * 0.08, 0, Math.PI * 2);
           ctx.fill();
 
-          ctx.strokeStyle = darkDetail;
-          ctx.lineWidth = 1.5;
-          ctx.stroke();
-
-          // Vertical slit/rasgada pupil
-          ctx.fillStyle = darkDetail;
-          ctx.beginPath();
-          ctx.ellipse(ex, ey, s * 0.02, s * 0.07, 0, 0, Math.PI * 2);
-          ctx.fill();
-
-          // Glint
           ctx.fillStyle = '#ffffff';
           ctx.beginPath();
-          ctx.arc(ex - s * 0.018, ey - s * 0.018, s * 0.022, 0, Math.PI * 2);
+          ctx.arc(ex - s * 0.025, ey - s * 0.025, s * 0.025, 0, Math.PI * 2);
           ctx.fill();
 
           // Eyebrow pointing down-right (determined)
@@ -1041,7 +903,7 @@ export const drawFox = (
       }
 
       // Blush
-      if (!isShocked) {
+      if (!isShocked && variant !== 'zombie') {
         ctx.fillStyle = 'rgba(251, 113, 133, 0.6)';
         ctx.beginPath();
         ctx.arc(-s * 0.05, s * 0.12, s * 0.05, 0, Math.PI * 2);

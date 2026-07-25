@@ -68,7 +68,6 @@ export const drawGardenTurtle = (
 
   // Death animation properties (shock, hide, roll falling and ghost parpadeo)
   let deathJumpY = 0;
-  let deathAngle = 0;
   let deathOpacity = 1.0;
   let isShocked = false;
   let isTuckedDeath = false;
@@ -305,7 +304,7 @@ export const drawGardenTurtle = (
   }
 
   // Helper to draw chubby legs
-  const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number, isFront: boolean) => {
+  const drawChubbyLeg = (lx: number, ly: number, legWalkOffset: number, _isFront: boolean) => {
     if (legScaleY === 0 || limbsScale === 0 || tuckProgress >= 1.0) return; // Skip drawing when tucked in shell
 
     ctx.save();

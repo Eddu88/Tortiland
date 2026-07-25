@@ -9,8 +9,9 @@
  * 1: Solid wall (WALL)
  * 2: Shrub/grass block that can be planted or broke (BUSH/GRASS)
  * 3: Torti's safe burrow (BURROW)
+ * 4: Gorilla landing hole (HOLE)
  */
-export type TileType = 0 | 1 | 2 | 3;
+export type TileType = 0 | 1 | 2 | 3 | 4;
 
 /**
  * Defines enemy behavioral configurations:

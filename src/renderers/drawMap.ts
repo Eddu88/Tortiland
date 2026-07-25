@@ -5,15 +5,7 @@
 
 import { TileType, GridPos } from '../types';
 import { COLS, ROWS, TILE, T_WALL, T_BUSH } from '../constants';
-// Cubic Bezier helper for value interpolation
-function cubicBezier(t: number, p0: number, p1: number, p2: number, p3: number): number {
-  const u = 1 - t;
-  const tt = t * t;
-  const uu = u * u;
-  const uuu = uu * u;
-  const ttt = tt * t;
-  return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3;
-}
+
 // Helper to draw leaf circles that can jut out past the standard grid boundaries
 const drawLeaf = (
   ctx: CanvasRenderingContext2D,
@@ -41,8 +33,8 @@ const drawBushSingle = (
   ctx: CanvasRenderingContext2D,
   x: number,
   y: number,
-  c: number,
-  r: number,
+  _c: number,
+  _r: number,
   variant: number,
   alpha: number,
   growProgress: number,
@@ -240,7 +232,6 @@ export const drawMap = (
 
         // B. Draw 3D Stone Block occupying the full tile
         const topH = 14; // 14 px sunlit flat top face
-        const frontH = TILE - topH; // 26 px shaded front face
 
         // 1. Draw Top Face (sunlit flat stone bricks)
         ctx.fillStyle = '#F5F1F2'; // Sunlit bone-white
@@ -494,16 +485,7 @@ export const drawMap = (
   drawTurtleShrine(ctx, burrowCol * TILE, (burrowRow - 1) * TILE, timestamp, escapeActive);
 };
 
-// ─── Utility helpers ─────────────────────────────────────────────
-function lerpColor(a: string, b: string, t: number): string {
-  const h = (s: string) => parseInt(s, 16);
-  const r1 = h(a.slice(1, 3)), g1 = h(a.slice(3, 5)), b1 = h(a.slice(5, 7));
-  const r2 = h(b.slice(1, 3)), g2 = h(b.slice(3, 5)), b2 = h(b.slice(5, 7));
-  const ri = Math.round(r1 + (r2 - r1) * t);
-  const gi = Math.round(g1 + (g2 - g1) * t);
-  const bi = Math.round(b1 + (b2 - b1) * t);
-  return `rgb(${ri},${gi},${bi})`;
-}
+
 
 // ==========================================
 // 3. BOSS DEN

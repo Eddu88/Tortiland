@@ -23,7 +23,7 @@ export const drawSnake = (
   plantingAnimTimer: number = 0,
   breakingAnimTimer: number = 0,
   deathAnimTimer: number = 0,
-  type?: EnemyType,
+  _type?: EnemyType,
   extra?: { isBurrowed?: boolean }
 ) => {
   if (extra?.isBurrowed) {
@@ -46,7 +46,6 @@ export const drawSnake = (
   let deathJumpY = 0;
   let deathOpacity = 1.0;
   let shellRotation = 0;
-  let limbsScale = 1.0;
 
   // Snake has a fast springy bobbing
   const bob = Math.sin(t * 0.012 + frame) * 2.2;
@@ -88,10 +87,8 @@ export const drawSnake = (
   // 2. Breaking Tiles / Spinning Dash (Spins like a circular spiral)
   if (breakingAnimTimer > 0) {
     if (breakingAnimTimer >= 517) {
-      limbsScale = 0;
       animScale = 0.9;
     } else if (breakingAnimTimer >= 276) {
-      limbsScale = 1.0;
       isShocked = true;
       let vueloOffset = (517 - breakingAnimTimer >= 102) ? TILE : ((517 - breakingAnimTimer) / 102) * TILE;
       const localOffsetX = Math.abs(dir.x) * vueloOffset;

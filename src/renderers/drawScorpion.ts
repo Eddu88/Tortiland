@@ -156,7 +156,6 @@ export const drawScorpion = (
     ctx.translate(-finalPx, -finalCy);
   }
 
-  const walkCycle = playerIsMoving ? Math.sin(t * 0.025) * 0.25 : 0;
 
   // Draw Segmented Stinger Tail (coils overhead like a big cartoon loop)
   const drawStingerTail = (tx: number, ty: number, rotate: number, pointDown: boolean) => {
@@ -395,7 +394,7 @@ export const drawScorpion = (
       ctx.stroke();
 
       // Giant round bug eyes
-      const drawBugEye = (ex: number, ey: number, hasMonocle: boolean) => {
+      const drawBugEye = (ex: number, ey: number, _hasMonocle: boolean) => {
         if (plantingAnimTimer > 0) {
           // Closed happy eye arcs
           ctx.strokeStyle = outlines;

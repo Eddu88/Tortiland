@@ -17,11 +17,11 @@ import {
   ScheduledBreak
 } from '../types';
 import { SoundEffects } from './SoundEffects';
-import { W, H, TILE, LEVELS, T_BUSH } from '../constants';
+import { W, H, TILE, T_BUSH } from '../constants';
 import { usePlayerInput } from '../hooks/usePlayerInput';
 import { useGameEntities } from '../hooks/useGameEntities';
 import { useGameLoop } from '../hooks/useGameLoop';
-import { formatTime } from '../utils/map';
+
 
 // Capa de Render drawing functions
 import { drawMap } from '../renderers/drawMap';
@@ -75,11 +75,11 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
   setLives,
   levelPhase,
   setLevelPhase,
-  gameTimeElapsed,
+  gameTimeElapsed: _gameTimeElapsed,
   setGameTimeElapsed,
-  fruitsLeft,
+  fruitsLeft: _fruitsLeft,
   setFruitsLeft,
-  goldenBroccoliTimer,
+  goldenBroccoliTimer: _goldenBroccoliTimer,
   setGoldenBroccoliTimer,
   resetTrigger,
   soundOn,
@@ -89,8 +89,7 @@ export const GameCanvas: React.FC<GameCanvasProps> = ({
 }) => {
   // HTML5 Canvas element reference used to access the 2D rendering context
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  // Current level configurations loaded once when level shifts
-  const levelConfig = LEVELS[currentLevelIndex];
+
 
   // ==========================================
   // Core high-frequency variables cache (Refs)

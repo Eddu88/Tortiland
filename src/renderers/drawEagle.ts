@@ -32,7 +32,6 @@ export const drawEagle = (
   let bodyOffsetY = 0;
   let headOffsetX = 0;
   let headOffsetY = 0;
-  let wingScaleX = 1.0;
   let wingRotation = 0;
 
   if (extra?.isOverBush) {
@@ -167,7 +166,7 @@ export const drawEagle = (
   const walkCycle = playerIsMoving ? Math.sin(t * 0.015) * 0.22 : 0;
 
   // Draw Talons (large stylized accessories, not biological real claws)
-  const drawClaw = (cx: number, cyOff: number, walkOff: number) => {
+  const drawClaw = (cx: number, walkOff: number) => {
     if (isTuckedDeath || limbsScale === 0) return;
     ctx.save();
     ctx.translate(cx, finalCy + s * 0.45 + bodyOffsetY + walkOff * s * 0.2);
@@ -244,8 +243,8 @@ export const drawEagle = (
     ctx.restore();
 
     // 3. Claws behind body
-    drawClaw(finalPx - s * 0.16, 0, walkCycle);
-    drawClaw(finalPx + s * 0.16, 0, -walkCycle);
+    drawClaw(finalPx - s * 0.16, walkCycle);
+    drawClaw(finalPx + s * 0.16, -walkCycle);
 
     // 4. Pilot Scarf Tails waving behind
     if (!isTuckedDeath) {
@@ -302,8 +301,8 @@ export const drawEagle = (
     }
 
     // Left claw & Right claw
-    drawClaw(finalPx - s * 0.18, 0, walkCycle);
-    drawClaw(finalPx + s * 0.18, 0, -walkCycle);
+    drawClaw(finalPx - s * 0.18, walkCycle);
+    drawClaw(finalPx + s * 0.18, -walkCycle);
 
     // 2. Torso with puffy chest feathers
     ctx.save();
@@ -515,8 +514,8 @@ export const drawEagle = (
     }
 
     // Talons
-    drawClaw(finalPx - s * 0.12, 0, walkCycle);
-    drawClaw(finalPx + s * 0.15, 0, -walkCycle);
+    drawClaw(finalPx - s * 0.12, walkCycle);
+    drawClaw(finalPx + s * 0.15, -walkCycle);
 
     // 2. Torso and Cream/Tan Chest feathers (pushed left/right in 3-4 view)
     ctx.save();

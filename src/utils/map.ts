@@ -4,7 +4,7 @@
  */
 
 import { TileType } from '../types';
-import { COLS, ROWS, T_EMPTY, T_WALL, T_BUSH, T_BURROW } from '../constants';
+import { COLS, ROWS, T_EMPTY, T_WALL, T_BUSH, T_BURROW, T_HOLE } from '../constants';
 
 /**
  * Format seconds into elegant MM:SS
@@ -82,7 +82,7 @@ export function isSolid(
   isPlayer = false,
   goldenBroccoliActive = false,
   awaitingBurrow = false,
-  gorillaMode = false
+  _gorillaMode = false
 ): boolean {
   if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return true;
   if (map[row]?.[col] === T_WALL) {
@@ -95,6 +95,10 @@ export function isSolid(
   }
   if (map[row]?.[col] === T_BURROW) {
     if (isPlayer && awaitingBurrow) return false;
+    return true;
+  }
+  if (map[row]?.[col] === T_HOLE) {
+    if (ghostMode) return false;
     return true;
   }
   return false;

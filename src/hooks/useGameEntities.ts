@@ -1,6 +1,6 @@
 import React from 'react';
 import { GameState, LevelPhase, Player, Enemy, Fruit, Particle, TileType, Position, ScheduledBreak } from '../types';
-import { COLS, ROWS, TILE, T_EMPTY, T_WALL, T_BUSH, T_BURROW, LEVELS } from '../constants';
+import { COLS, ROWS, TILE, T_EMPTY, T_BUSH, T_BURROW, LEVELS } from '../constants';
 import { SoundEffects } from '../components/SoundEffects';
 import {
   buildBaseMap,
@@ -71,8 +71,8 @@ export const useGameEntities = ({
   turnBlockedRef,
   lives,
   levelPhase,
-  gameState,
-  score,
+  gameState: _gameState,
+  score: _score,
   setScore,
   levelScore,
   setLevelScore,
@@ -756,39 +756,7 @@ export const useGameEntities = ({
     }
   };
 
-  const pushFruit = (fruit: Fruit, dir: Position) => {
-    const isCellBlocked = (c: number, r: number) => {
-      if (c < 0 || c >= COLS || r < 0 || r >= ROWS) return true;
-      if (mapRef.current[r]?.[c] !== T_EMPTY) return true;
-      if (c === 18 && r === 13) return true;
-      if (c >= 8 && c <= 11 && r >= 5 && r <= 8) return true;
-      if (fruitsRef.current.some(f => f.col === c && f.row === r)) return true;
-      return false;
-    };
 
-    const targetCol = fruit.col + dir.x;
-    const targetRow = fruit.row + dir.y;
-
-    if (!isCellBlocked(targetCol, targetRow)) {
-      fruit.col = targetCol;
-      fruit.row = targetRow;
-    } else {
-      // Try random adjacent cell
-      const candidates = [
-        { x: 1, y: 0 },
-        { x: -1, y: 0 },
-        { x: 0, y: 1 },
-        { x: 0, y: -1 }
-      ].map(d => ({ col: fruit.col + d.x, row: fruit.row + d.y }))
-       .filter(cell => !isCellBlocked(cell.col, cell.row));
-
-      if (candidates.length > 0) {
-        const chosen = candidates[Math.floor(Math.random() * candidates.length)];
-        fruit.col = chosen.col;
-        fruit.row = chosen.row;
-      }
-    }
-  };
 
   const relocateAllFruitsFarFromPlayer = () => {
     const player = playerRef.current;

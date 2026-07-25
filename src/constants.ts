@@ -26,6 +26,7 @@ export const T_EMPTY = 0; // Walkable path
 export const T_WALL = 1;  // Unbreakable stone block
 export const T_BUSH = 2;  // Modifiable shrub/foliage block
 export const T_BURROW = 3; // Escape exit door
+export const T_HOLE = 4;  // Gorilla landing hole obstacle
 
 /**
  * Shared coordinates array representing the classic maze design.

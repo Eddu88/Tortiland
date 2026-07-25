@@ -14,9 +14,9 @@ export const drawGorilla = (
   ctx: CanvasRenderingContext2D,
   px: number,
   py: number,
-  dir: Position,
-  frame: number,
-  type: EnemyType,
+  _dir: Position,
+  _frame: number,
+  _type: EnemyType,
   t: number,
   extra?: { isJumping?: boolean; jumpProgress?: number }
 ) => {
